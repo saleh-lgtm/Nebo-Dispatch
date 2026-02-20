@@ -11,7 +11,6 @@ export default defineConfig({
   },
   datasource: {
     url: process.env["DATABASE_URL"],
-    // @ts-ignore - Prisma 7 CLI requires this here, but types might be lagging
     directUrl: process.env["DIRECT_URL"],
-  },
+  } as any,
 });
