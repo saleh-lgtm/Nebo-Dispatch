@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
-import { LayoutDashboard, Calendar, ClipboardList, Users, LogOut, User as UserIcon } from "lucide-react";
+import { LayoutDashboard, Calendar, CalendarClock, ClipboardList, Users, LogOut, User as UserIcon } from "lucide-react";
 
 export default function Navbar() {
     const { data: session } = useSession();
@@ -43,6 +43,10 @@ export default function Navbar() {
 
                     {isAdmin && (
                         <>
+                            <Link href="/admin/scheduler" className="flex items-center gap-2 nav-link">
+                                <CalendarClock size={18} />
+                                <span>Scheduler</span>
+                            </Link>
                             <Link href="/admin/analytics" className="flex items-center gap-2 nav-link">
                                 <LayoutDashboard size={18} />
                                 <span>Analytics</span>

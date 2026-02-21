@@ -131,7 +131,11 @@ model Schedule {
   isPublished Boolean  @default(false)
   shiftStart  DateTime
   shiftEnd    DateTime
+  weekStart   DateTime? // Sunday 00:00:00 of the week for efficient queries
   requests    SchedulingRequest[]
+
+  @@index([weekStart])
+  @@index([userId, weekStart])
 }
 
 model Affiliate {
