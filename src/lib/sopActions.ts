@@ -191,7 +191,7 @@ export async function updateSOP(id: string, data: UpdateSOPData) {
         "UPDATE",
         "SOP",
         id,
-        data
+        data as Record<string, unknown>
     );
 
     revalidatePath("/sops");

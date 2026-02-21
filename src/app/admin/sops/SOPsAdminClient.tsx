@@ -10,10 +10,10 @@ import {
     Eye,
     EyeOff,
     Clock,
-    User,
     FolderOpen,
-    GripVertical,
     ExternalLink,
+    FileText,
+    AlertTriangle,
 } from "lucide-react";
 import {
     createSOP,
@@ -163,353 +163,194 @@ export default function SOPsAdminClient({ initialSOPs }: Props) {
     };
 
     return (
-        <div className="flex flex-col gap-6 animate-fade-in" style={{ padding: "1.5rem" }}>
-            {/* Header */}
-            <header className="flex items-center justify-between flex-wrap gap-4">
-                <div className="flex items-center gap-3">
-                    <BookOpen size={28} className="text-accent" />
-                    <div>
-                        <h1 className="font-display" style={{ fontSize: "1.75rem" }}>
-                            Standard Operating Procedures
-                        </h1>
-                        <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>
-                            Manage company SOPs and documentation
-                        </p>
+        <>
+            <div className="sops-admin">
+                {/* Header */}
+                <header className="page-header">
+                    <div className="header-content">
+                        <div className="header-icon">
+                            <BookOpen size={24} />
+                        </div>
+                        <div>
+                            <h1>Standard Operating Procedures</h1>
+                            <p>Manage company SOPs and documentation</p>
+                        </div>
+                    </div>
+                    <div className="header-actions">
+                        <select
+                            className="filter-select"
+                            value={filterCategory}
+                            onChange={(e) => setFilterCategory(e.target.value)}
+                        >
+                            <option value="all">All Categories</option>
+                            {categories.map((cat) => (
+                                <option key={cat} value={cat}>
+                                    {cat}
+                                </option>
+                            ))}
+                        </select>
+                        <button onClick={() => setShowForm(true)} className="btn-primary">
+                            <Plus size={18} />
+                            New SOP
+                        </button>
+                    </div>
+                </header>
+
+                {/* Stats */}
+                <div className="stats-row">
+                    <div className="stat-item">
+                        <span className="stat-number">{sops.length}</span>
+                        <span className="stat-label">Total SOPs</span>
+                    </div>
+                    <div className="stat-item">
+                        <span className="stat-number stat-success">{sops.filter((s) => s.isPublished).length}</span>
+                        <span className="stat-label">Published</span>
+                    </div>
+                    <div className="stat-item">
+                        <span className="stat-number stat-warning">{sops.filter((s) => !s.isPublished).length}</span>
+                        <span className="stat-label">Drafts</span>
+                    </div>
+                    <div className="stat-item">
+                        <span className="stat-number stat-info">{categories.length}</span>
+                        <span className="stat-label">Categories</span>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
-                    <select
-                        className="input"
-                        style={{ width: "auto", minWidth: "150px" }}
-                        value={filterCategory}
-                        onChange={(e) => setFilterCategory(e.target.value)}
-                    >
-                        <option value="all">All Categories</option>
-                        {categories.map((cat) => (
-                            <option key={cat} value={cat}>
-                                {cat}
-                            </option>
-                        ))}
-                    </select>
-                    <button onClick={() => setShowForm(true)} className="btn btn-primary">
-                        <Plus size={18} /> New SOP
-                    </button>
-                </div>
-            </header>
 
-            {/* Stats Row */}
-            <div
-                style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-                    gap: "1rem",
-                }}
-            >
-                <div className="glass-card" style={{ padding: "1rem", textAlign: "center" }}>
-                    <p style={{ fontSize: "2rem", fontWeight: 700, color: "var(--accent)" }}>
-                        {sops.length}
-                    </p>
-                    <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "uppercase" }}>
-                        Total SOPs
-                    </p>
-                </div>
-                <div className="glass-card" style={{ padding: "1rem", textAlign: "center" }}>
-                    <p style={{ fontSize: "2rem", fontWeight: 700, color: "var(--success)" }}>
-                        {sops.filter((s) => s.isPublished).length}
-                    </p>
-                    <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "uppercase" }}>
-                        Published
-                    </p>
-                </div>
-                <div className="glass-card" style={{ padding: "1rem", textAlign: "center" }}>
-                    <p style={{ fontSize: "2rem", fontWeight: 700, color: "var(--warning)" }}>
-                        {sops.filter((s) => !s.isPublished).length}
-                    </p>
-                    <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "uppercase" }}>
-                        Drafts
-                    </p>
-                </div>
-                <div className="glass-card" style={{ padding: "1rem", textAlign: "center" }}>
-                    <p style={{ fontSize: "2rem", fontWeight: 700, color: "var(--info)" }}>
-                        {categories.length}
-                    </p>
-                    <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "uppercase" }}>
-                        Categories
-                    </p>
-                </div>
-            </div>
-
-            {/* SOPs List */}
-            <div className="glass-card" style={{ padding: 0, overflow: "hidden" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead>
-                        <tr
-                            style={{
-                                borderBottom: "1px solid var(--border)",
-                                background: "rgba(0,0,0,0.2)",
-                            }}
-                        >
-                            <th
-                                style={{
-                                    padding: "1rem",
-                                    textAlign: "left",
-                                    fontSize: "0.75rem",
-                                    textTransform: "uppercase",
-                                    color: "var(--text-secondary)",
-                                    fontWeight: 600,
-                                }}
-                            >
-                                Title
-                            </th>
-                            <th
-                                style={{
-                                    padding: "1rem",
-                                    textAlign: "left",
-                                    fontSize: "0.75rem",
-                                    textTransform: "uppercase",
-                                    color: "var(--text-secondary)",
-                                    fontWeight: 600,
-                                }}
-                            >
-                                Category
-                            </th>
-                            <th
-                                style={{
-                                    padding: "1rem",
-                                    textAlign: "center",
-                                    fontSize: "0.75rem",
-                                    textTransform: "uppercase",
-                                    color: "var(--text-secondary)",
-                                    fontWeight: 600,
-                                }}
-                            >
-                                Status
-                            </th>
-                            <th
-                                style={{
-                                    padding: "1rem",
-                                    textAlign: "left",
-                                    fontSize: "0.75rem",
-                                    textTransform: "uppercase",
-                                    color: "var(--text-secondary)",
-                                    fontWeight: 600,
-                                }}
-                            >
-                                Updated
-                            </th>
-                            <th
-                                style={{
-                                    padding: "1rem",
-                                    textAlign: "right",
-                                    fontSize: "0.75rem",
-                                    textTransform: "uppercase",
-                                    color: "var(--text-secondary)",
-                                    fontWeight: 600,
-                                }}
-                            >
-                                Actions
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredSOPs.map((sop, idx) => (
-                            <tr
-                                key={sop.id}
-                                style={{
-                                    borderBottom:
-                                        idx < filteredSOPs.length - 1
-                                            ? "1px solid var(--border)"
-                                            : "none",
-                                    transition: "background 0.15s",
-                                }}
-                                onMouseEnter={(e) =>
-                                    (e.currentTarget.style.background = "rgba(196, 167, 125, 0.05)")
-                                }
-                                onMouseLeave={(e) =>
-                                    (e.currentTarget.style.background = "transparent")
-                                }
-                            >
-                                <td style={{ padding: "1rem" }}>
-                                    <div className="flex flex-col gap-1">
-                                        <span style={{ fontWeight: 500 }}>{sop.title}</span>
-                                        {sop.description && (
-                                            <span
-                                                style={{
-                                                    fontSize: "0.8125rem",
-                                                    color: "var(--text-secondary)",
-                                                    display: "-webkit-box",
-                                                    WebkitLineClamp: 1,
-                                                    WebkitBoxOrient: "vertical",
-                                                    overflow: "hidden",
-                                                }}
-                                            >
-                                                {sop.description}
-                                            </span>
-                                        )}
-                                    </div>
-                                </td>
-                                <td style={{ padding: "1rem" }}>
-                                    {sop.category ? (
-                                        <span
-                                            className="badge badge-primary"
-                                            style={{ fontSize: "0.6875rem" }}
-                                        >
-                                            <FolderOpen size={10} />
-                                            {sop.category}
-                                        </span>
-                                    ) : (
-                                        <span style={{ color: "var(--text-muted)" }}>-</span>
-                                    )}
-                                </td>
-                                <td style={{ padding: "1rem", textAlign: "center" }}>
-                                    <button
-                                        onClick={() => handleTogglePublished(sop)}
-                                        className={`badge ${
-                                            sop.isPublished ? "badge-success" : "badge-warning"
-                                        }`}
-                                        style={{ cursor: "pointer" }}
-                                        title={
-                                            sop.isPublished
-                                                ? "Click to unpublish"
-                                                : "Click to publish"
-                                        }
-                                    >
-                                        {sop.isPublished ? (
-                                            <>
-                                                <Eye size={10} /> Published
-                                            </>
-                                        ) : (
-                                            <>
-                                                <EyeOff size={10} /> Draft
-                                            </>
-                                        )}
-                                    </button>
-                                </td>
-                                <td style={{ padding: "1rem" }}>
-                                    <div className="flex items-center gap-1" style={{ color: "var(--text-secondary)", fontSize: "0.8125rem" }}>
-                                        <Clock size={12} />
-                                        {formatDate(sop.updatedAt)}
-                                    </div>
-                                </td>
-                                <td style={{ padding: "1rem" }}>
-                                    <div className="flex justify-end gap-2">
-                                        <Link
-                                            href={`/sops/${sop.slug}`}
-                                            target="_blank"
-                                            className="btn btn-ghost btn-sm"
-                                            style={{ padding: "0.375rem 0.5rem" }}
-                                            title="View SOP"
-                                        >
-                                            <ExternalLink size={14} />
-                                        </Link>
-                                        <button
-                                            onClick={() => handleEdit(sop)}
-                                            className="btn btn-ghost btn-sm"
-                                            style={{ padding: "0.375rem 0.5rem" }}
-                                            title="Edit"
-                                        >
-                                            <Edit3 size={14} />
-                                        </button>
-                                        <button
-                                            onClick={() => setDeleteConfirm(sop.id)}
-                                            className="btn btn-ghost btn-sm"
-                                            style={{
-                                                padding: "0.375rem 0.5rem",
-                                                color: "var(--danger)",
-                                            }}
-                                            title="Delete"
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                        {filteredSOPs.length === 0 && (
+                {/* SOPs Table */}
+                <div className="table-card">
+                    <table>
+                        <thead>
                             <tr>
-                                <td colSpan={5} style={{ padding: "3rem", textAlign: "center" }}>
-                                    <BookOpen
-                                        size={48}
-                                        style={{ opacity: 0.3, margin: "0 auto 1rem" }}
-                                    />
-                                    <p style={{ color: "var(--text-secondary)" }}>
-                                        {filterCategory === "all"
-                                            ? "No SOPs yet. Create one to get started."
-                                            : `No SOPs in "${filterCategory}" category.`}
-                                    </p>
-                                </td>
+                                <th>Title</th>
+                                <th>Category</th>
+                                <th>Status</th>
+                                <th>Updated</th>
+                                <th>Actions</th>
                             </tr>
-                        )}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {filteredSOPs.map((sop) => (
+                                <tr key={sop.id}>
+                                    <td>
+                                        <div className="sop-title">
+                                            <span className="title-text">{sop.title}</span>
+                                            {sop.description && (
+                                                <span className="title-desc">{sop.description}</span>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {sop.category ? (
+                                            <span className="category-badge">
+                                                <FolderOpen size={12} />
+                                                {sop.category}
+                                            </span>
+                                        ) : (
+                                            <span className="no-category">—</span>
+                                        )}
+                                    </td>
+                                    <td>
+                                        <button
+                                            onClick={() => handleTogglePublished(sop)}
+                                            className={`status-badge ${sop.isPublished ? "published" : "draft"}`}
+                                            title={sop.isPublished ? "Click to unpublish" : "Click to publish"}
+                                        >
+                                            {sop.isPublished ? (
+                                                <>
+                                                    <Eye size={12} /> Published
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <EyeOff size={12} /> Draft
+                                                </>
+                                            )}
+                                        </button>
+                                    </td>
+                                    <td>
+                                        <div className="date-cell">
+                                            <Clock size={14} />
+                                            {formatDate(sop.updatedAt)}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div className="action-btns">
+                                            <Link
+                                                href={`/sops/${sop.slug}`}
+                                                target="_blank"
+                                                className="action-btn"
+                                                title="View SOP"
+                                            >
+                                                <ExternalLink size={16} />
+                                            </Link>
+                                            <button
+                                                onClick={() => handleEdit(sop)}
+                                                className="action-btn"
+                                                title="Edit"
+                                            >
+                                                <Edit3 size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => setDeleteConfirm(sop.id)}
+                                                className="action-btn danger"
+                                                title="Delete"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                            {filteredSOPs.length === 0 && (
+                                <tr>
+                                    <td colSpan={5} className="empty-state">
+                                        <FileText size={48} />
+                                        <p>
+                                            {filterCategory === "all"
+                                                ? "No SOPs yet. Create one to get started."
+                                                : `No SOPs in "${filterCategory}" category.`}
+                                        </p>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             {/* Create/Edit Modal */}
             {showForm && (
-                <div
-                    className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) resetForm();
-                    }}
-                >
-                    <div
-                        className="glass-card w-full animate-scale-in"
-                        style={{ maxWidth: "800px", maxHeight: "90vh", overflow: "auto" }}
-                    >
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-3">
-                                <BookOpen className="text-accent" />
-                                <h2 className="font-display" style={{ fontSize: "1.5rem" }}>
-                                    {editingSOP ? "Edit SOP" : "New SOP"}
-                                </h2>
+                <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) resetForm(); }}>
+                    <div className="modal modal-lg">
+                        <div className="modal-header">
+                            <div className="modal-title">
+                                <BookOpen size={20} />
+                                <h2>{editingSOP ? "Edit SOP" : "New SOP"}</h2>
                             </div>
-                            <button onClick={resetForm} className="btn-icon">
-                                <X size={18} />
+                            <button onClick={resetForm} className="close-btn">
+                                <X size={20} />
                             </button>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                            <div
-                                style={{
-                                    display: "grid",
-                                    gridTemplateColumns: "1fr 1fr",
-                                    gap: "1rem",
-                                }}
-                            >
-                                <div className="flex flex-col gap-1">
-                                    <label
-                                        className="text-xs uppercase tracking-wider font-bold"
-                                        style={{ color: "var(--text-secondary)" }}
-                                    >
-                                        Title *
-                                    </label>
+                        <form onSubmit={handleSubmit} className="modal-form">
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Title *</label>
                                     <input
                                         type="text"
                                         required
-                                        className="input"
                                         placeholder="e.g., Customer Complaint Handling"
                                         value={formData.title}
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, title: e.target.value })
-                                        }
+                                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                                     />
                                 </div>
-                                <div className="flex flex-col gap-1">
-                                    <label
-                                        className="text-xs uppercase tracking-wider font-bold"
-                                        style={{ color: "var(--text-secondary)" }}
-                                    >
-                                        Category
-                                    </label>
+                                <div className="form-group">
+                                    <label>Category</label>
                                     <input
                                         type="text"
-                                        className="input"
                                         placeholder="e.g., Customer Service"
                                         list="categories"
                                         value={formData.category}
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, category: e.target.value })
-                                        }
+                                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                                     />
                                     <datalist id="categories">
                                         {categories.map((cat) => (
@@ -519,88 +360,48 @@ export default function SOPsAdminClient({ initialSOPs }: Props) {
                                 </div>
                             </div>
 
-                            <div className="flex flex-col gap-1">
-                                <label
-                                    className="text-xs uppercase tracking-wider font-bold"
-                                    style={{ color: "var(--text-secondary)" }}
-                                >
-                                    Description
-                                </label>
+                            <div className="form-group">
+                                <label>Description</label>
                                 <input
                                     type="text"
-                                    className="input"
                                     placeholder="Brief description of this SOP..."
                                     value={formData.description}
-                                    onChange={(e) =>
-                                        setFormData({ ...formData, description: e.target.value })
-                                    }
+                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                                 />
                             </div>
 
-                            <div className="flex flex-col gap-1">
-                                <label
-                                    className="text-xs uppercase tracking-wider font-bold"
-                                    style={{ color: "var(--text-secondary)" }}
-                                >
-                                    Content *
-                                </label>
+                            <div className="form-group">
+                                <label>Content *</label>
                                 <textarea
                                     required
-                                    className="input"
                                     placeholder="Write the SOP content here... (Markdown supported)"
-                                    style={{ height: "300px", resize: "vertical", fontFamily: "monospace" }}
+                                    className="content-textarea"
                                     value={formData.content}
-                                    onChange={(e) =>
-                                        setFormData({ ...formData, content: e.target.value })
-                                    }
+                                    onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                                 />
-                                <p style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                                    Tip: You can use Markdown formatting (headings, lists, bold, etc.)
-                                </p>
+                                <p className="form-hint">Tip: You can use Markdown formatting (headings, lists, bold, etc.)</p>
                             </div>
 
-                            <div className="flex items-center gap-3">
-                                <label className="flex items-center gap-2 cursor-pointer">
+                            <div className="publish-toggle">
+                                <label className="toggle-label">
                                     <input
                                         type="checkbox"
                                         checked={formData.isPublished}
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, isPublished: e.target.checked })
-                                        }
-                                        style={{ accentColor: "var(--accent)" }}
+                                        onChange={(e) => setFormData({ ...formData, isPublished: e.target.checked })}
                                     />
-                                    <span style={{ fontSize: "0.875rem" }}>
-                                        Publish immediately
-                                    </span>
+                                    <span>Publish immediately</span>
                                 </label>
-                                <span
-                                    className={`badge ${
-                                        formData.isPublished ? "badge-success" : "badge-warning"
-                                    }`}
-                                    style={{ fontSize: "0.625rem" }}
-                                >
+                                <span className={`toggle-status ${formData.isPublished ? "published" : "draft"}`}>
                                     {formData.isPublished ? "Will be visible" : "Draft only"}
                                 </span>
                             </div>
 
-                            <div className="flex justify-end gap-3 mt-2">
-                                <button
-                                    type="button"
-                                    onClick={resetForm}
-                                    className="btn btn-outline"
-                                >
+                            <div className="modal-actions">
+                                <button type="button" onClick={resetForm} className="btn-secondary">
                                     Cancel
                                 </button>
-                                <button
-                                    type="submit"
-                                    className="btn btn-primary"
-                                    disabled={loading}
-                                >
-                                    {loading
-                                        ? "Saving..."
-                                        : editingSOP
-                                        ? "Update SOP"
-                                        : "Create SOP"}
+                                <button type="submit" className="btn-primary" disabled={loading}>
+                                    {loading ? "Saving..." : editingSOP ? "Update SOP" : "Create SOP"}
                                 </button>
                             </div>
                         </form>
@@ -610,57 +411,579 @@ export default function SOPsAdminClient({ initialSOPs }: Props) {
 
             {/* Delete Confirmation Modal */}
             {deleteConfirm && (
-                <div
-                    className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) setDeleteConfirm(null);
-                    }}
-                >
-                    <div className="glass-card w-full max-w-sm animate-scale-in text-center">
-                        <Trash2
-                            size={48}
-                            style={{
-                                color: "var(--danger)",
-                                margin: "0 auto 1rem",
-                                opacity: 0.8,
-                            }}
-                        />
-                        <h2
-                            className="font-display"
-                            style={{ fontSize: "1.25rem", marginBottom: "0.5rem" }}
-                        >
-                            Delete SOP?
-                        </h2>
-                        <p
-                            style={{
-                                color: "var(--text-secondary)",
-                                marginBottom: "1.5rem",
-                            }}
-                        >
-                            This action cannot be undone. The SOP will be permanently removed.
-                        </p>
-                        <div className="flex justify-center gap-3">
-                            <button
-                                onClick={() => setDeleteConfirm(null)}
-                                className="btn btn-outline"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => handleDelete(deleteConfirm)}
-                                className="btn"
-                                style={{
-                                    background: "var(--danger)",
-                                    color: "white",
-                                }}
-                                disabled={loading}
-                            >
-                                {loading ? "Deleting..." : "Delete"}
-                            </button>
+                <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setDeleteConfirm(null); }}>
+                    <div className="modal modal-sm">
+                        <div className="delete-modal">
+                            <div className="delete-icon">
+                                <AlertTriangle size={32} />
+                            </div>
+                            <h2>Delete SOP?</h2>
+                            <p>This action cannot be undone. The SOP will be permanently removed.</p>
+                            <div className="delete-actions">
+                                <button onClick={() => setDeleteConfirm(null)} className="btn-secondary">
+                                    Cancel
+                                </button>
+                                <button onClick={() => handleDelete(deleteConfirm)} className="btn-danger" disabled={loading}>
+                                    {loading ? "Deleting..." : "Delete"}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
-        </div>
+
+            <style jsx>{`
+                .sops-admin {
+                    padding: 1.5rem;
+                    max-width: 1400px;
+                    margin: 0 auto;
+                }
+
+                /* Header */
+                .page-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    gap: 1rem;
+                    margin-bottom: 1.5rem;
+                    flex-wrap: wrap;
+                }
+
+                .header-content {
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                }
+
+                .header-icon {
+                    width: 48px;
+                    height: 48px;
+                    background: var(--primary-soft);
+                    border-radius: var(--radius-md);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: var(--primary);
+                }
+
+                .page-header h1 {
+                    font-size: 1.5rem;
+                    font-weight: 600;
+                    color: var(--text-primary);
+                    margin-bottom: 0.25rem;
+                }
+
+                .page-header p {
+                    font-size: 0.875rem;
+                    color: var(--text-secondary);
+                }
+
+                .header-actions {
+                    display: flex;
+                    gap: 0.75rem;
+                    align-items: center;
+                }
+
+                .filter-select {
+                    padding: 0.5rem 1rem;
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-md);
+                    color: var(--text-primary);
+                    font-size: 0.875rem;
+                    cursor: pointer;
+                    min-width: 150px;
+                }
+
+                .btn-primary {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.5rem 1rem;
+                    background: var(--primary);
+                    color: white;
+                    border: none;
+                    border-radius: var(--radius-md);
+                    font-size: 0.875rem;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: background 0.15s;
+                }
+
+                .btn-primary:hover {
+                    background: var(--primary-hover);
+                }
+
+                /* Stats */
+                .stats-row {
+                    display: grid;
+                    grid-template-columns: repeat(4, 1fr);
+                    gap: 1rem;
+                    margin-bottom: 1.5rem;
+                }
+
+                .stat-item {
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-lg);
+                    padding: 1rem 1.25rem;
+                    text-align: center;
+                }
+
+                .stat-number {
+                    display: block;
+                    font-size: 1.75rem;
+                    font-weight: 700;
+                    color: var(--primary);
+                    margin-bottom: 0.25rem;
+                }
+
+                .stat-success { color: var(--success); }
+                .stat-warning { color: var(--warning); }
+                .stat-info { color: var(--info); }
+
+                .stat-label {
+                    font-size: 0.75rem;
+                    color: var(--text-secondary);
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                }
+
+                /* Table */
+                .table-card {
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-lg);
+                    overflow: hidden;
+                }
+
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                }
+
+                th {
+                    padding: 1rem;
+                    text-align: left;
+                    font-size: 0.75rem;
+                    font-weight: 600;
+                    color: var(--text-muted);
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                    background: var(--bg-secondary);
+                    border-bottom: 1px solid var(--border);
+                }
+
+                th:last-child {
+                    text-align: right;
+                }
+
+                td {
+                    padding: 1rem;
+                    border-bottom: 1px solid var(--border);
+                    vertical-align: middle;
+                }
+
+                tr:last-child td {
+                    border-bottom: none;
+                }
+
+                tr:hover td {
+                    background: var(--bg-hover);
+                }
+
+                .sop-title {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.25rem;
+                }
+
+                .title-text {
+                    font-weight: 500;
+                    color: var(--text-primary);
+                }
+
+                .title-desc {
+                    font-size: 0.8125rem;
+                    color: var(--text-secondary);
+                    display: -webkit-box;
+                    -webkit-line-clamp: 1;
+                    -webkit-box-orient: vertical;
+                    overflow: hidden;
+                }
+
+                .category-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.375rem;
+                    padding: 0.25rem 0.625rem;
+                    background: var(--primary-soft);
+                    color: var(--primary);
+                    border-radius: 9999px;
+                    font-size: 0.75rem;
+                    font-weight: 500;
+                }
+
+                .no-category {
+                    color: var(--text-muted);
+                }
+
+                .status-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.375rem;
+                    padding: 0.25rem 0.625rem;
+                    border-radius: 9999px;
+                    font-size: 0.75rem;
+                    font-weight: 500;
+                    border: none;
+                    cursor: pointer;
+                    transition: all 0.15s;
+                }
+
+                .status-badge.published {
+                    background: var(--success-bg);
+                    color: var(--success);
+                }
+
+                .status-badge.draft {
+                    background: var(--warning-bg);
+                    color: var(--warning);
+                }
+
+                .status-badge:hover {
+                    opacity: 0.8;
+                }
+
+                .date-cell {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.375rem;
+                    font-size: 0.8125rem;
+                    color: var(--text-secondary);
+                }
+
+                .action-btns {
+                    display: flex;
+                    justify-content: flex-end;
+                    gap: 0.5rem;
+                }
+
+                .action-btn {
+                    padding: 0.375rem;
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-md);
+                    color: var(--text-secondary);
+                    cursor: pointer;
+                    transition: all 0.15s;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    text-decoration: none;
+                }
+
+                .action-btn:hover {
+                    background: var(--bg-hover);
+                    color: var(--text-primary);
+                    border-color: var(--border-hover);
+                }
+
+                .action-btn.danger:hover {
+                    background: var(--danger-bg);
+                    color: var(--danger);
+                    border-color: var(--danger-border);
+                }
+
+                .empty-state {
+                    text-align: center;
+                    padding: 3rem !important;
+                    color: var(--text-muted);
+                }
+
+                .empty-state :global(svg) {
+                    opacity: 0.3;
+                    margin-bottom: 1rem;
+                }
+
+                .empty-state p {
+                    font-size: 0.875rem;
+                }
+
+                /* Modal */
+                .modal-overlay {
+                    position: fixed;
+                    inset: 0;
+                    background: rgba(0, 0, 0, 0.7);
+                    backdrop-filter: blur(4px);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 100;
+                    padding: 1rem;
+                }
+
+                .modal {
+                    background: var(--bg-primary);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-lg);
+                    width: 100%;
+                    max-height: 90vh;
+                    overflow: auto;
+                    animation: modalIn 0.2s ease;
+                }
+
+                .modal-lg {
+                    max-width: 700px;
+                }
+
+                .modal-sm {
+                    max-width: 400px;
+                }
+
+                @keyframes modalIn {
+                    from {
+                        opacity: 0;
+                        transform: scale(0.95);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: scale(1);
+                    }
+                }
+
+                .modal-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 1.25rem 1.5rem;
+                    border-bottom: 1px solid var(--border);
+                }
+
+                .modal-title {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    color: var(--primary);
+                }
+
+                .modal-title h2 {
+                    font-size: 1.25rem;
+                    font-weight: 600;
+                    color: var(--text-primary);
+                }
+
+                .close-btn {
+                    padding: 0.5rem;
+                    background: none;
+                    border: none;
+                    color: var(--text-secondary);
+                    cursor: pointer;
+                    border-radius: var(--radius-md);
+                    transition: all 0.15s;
+                }
+
+                .close-btn:hover {
+                    background: var(--bg-hover);
+                    color: var(--text-primary);
+                }
+
+                .modal-form {
+                    padding: 1.5rem;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1.25rem;
+                }
+
+                .form-row {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 1rem;
+                }
+
+                .form-group {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.5rem;
+                }
+
+                .form-group label {
+                    font-size: 0.75rem;
+                    font-weight: 600;
+                    color: var(--text-secondary);
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                }
+
+                .form-group input,
+                .form-group textarea {
+                    padding: 0.75rem 1rem;
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-md);
+                    color: var(--text-primary);
+                    font-size: 0.9375rem;
+                    font-family: inherit;
+                    transition: border-color 0.15s;
+                }
+
+                .form-group input:focus,
+                .form-group textarea:focus {
+                    outline: none;
+                    border-color: var(--primary);
+                }
+
+                .form-group input::placeholder,
+                .form-group textarea::placeholder {
+                    color: var(--text-muted);
+                }
+
+                .content-textarea {
+                    height: 250px;
+                    resize: vertical;
+                    font-family: monospace;
+                }
+
+                .form-hint {
+                    font-size: 0.75rem;
+                    color: var(--text-muted);
+                }
+
+                .publish-toggle {
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                }
+
+                .toggle-label {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    cursor: pointer;
+                    font-size: 0.875rem;
+                }
+
+                .toggle-label input {
+                    accent-color: var(--primary);
+                }
+
+                .toggle-status {
+                    padding: 0.25rem 0.5rem;
+                    border-radius: 0.25rem;
+                    font-size: 0.6875rem;
+                    font-weight: 600;
+                }
+
+                .toggle-status.published {
+                    background: var(--success-bg);
+                    color: var(--success);
+                }
+
+                .toggle-status.draft {
+                    background: var(--warning-bg);
+                    color: var(--warning);
+                }
+
+                .modal-actions {
+                    display: flex;
+                    justify-content: flex-end;
+                    gap: 0.75rem;
+                    margin-top: 0.5rem;
+                }
+
+                .btn-secondary {
+                    padding: 0.625rem 1.25rem;
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-md);
+                    color: var(--text-primary);
+                    font-size: 0.875rem;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.15s;
+                }
+
+                .btn-secondary:hover {
+                    background: var(--bg-hover);
+                    border-color: var(--border-hover);
+                }
+
+                /* Delete Modal */
+                .delete-modal {
+                    padding: 2rem;
+                    text-align: center;
+                }
+
+                .delete-icon {
+                    width: 64px;
+                    height: 64px;
+                    background: var(--danger-bg);
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin: 0 auto 1.25rem;
+                    color: var(--danger);
+                }
+
+                .delete-modal h2 {
+                    font-size: 1.25rem;
+                    font-weight: 600;
+                    margin-bottom: 0.5rem;
+                }
+
+                .delete-modal p {
+                    color: var(--text-secondary);
+                    font-size: 0.875rem;
+                    margin-bottom: 1.5rem;
+                }
+
+                .delete-actions {
+                    display: flex;
+                    justify-content: center;
+                    gap: 0.75rem;
+                }
+
+                .btn-danger {
+                    padding: 0.625rem 1.25rem;
+                    background: var(--danger);
+                    border: none;
+                    border-radius: var(--radius-md);
+                    color: white;
+                    font-size: 0.875rem;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: background 0.15s;
+                }
+
+                .btn-danger:hover {
+                    background: #DC2626;
+                }
+
+                .btn-danger:disabled,
+                .btn-primary:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                }
+
+                @media (max-width: 768px) {
+                    .stats-row {
+                        grid-template-columns: repeat(2, 1fr);
+                    }
+
+                    .form-row {
+                        grid-template-columns: 1fr;
+                    }
+
+                    .header-actions {
+                        width: 100%;
+                    }
+
+                    .filter-select {
+                        flex: 1;
+                    }
+                }
+            `}</style>
+        </>
     );
 }

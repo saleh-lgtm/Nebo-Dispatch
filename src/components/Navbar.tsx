@@ -65,11 +65,9 @@ function NavDropdown({ label, icon, children, badge, activePrefix = "/admin" }: 
     const dropdownRef = useRef<HTMLDivElement>(null);
     const pathname = usePathname();
 
-    // Check if any child link is active
     const prefixes = Array.isArray(activePrefix) ? activePrefix : [activePrefix];
     const isActive = prefixes.some(prefix => pathname.startsWith(prefix));
 
-    // Close on click outside
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -80,7 +78,6 @@ function NavDropdown({ label, icon, children, badge, activePrefix = "/admin" }: 
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Close on route change
     useEffect(() => {
         setOpen(false);
     }, [pathname]);
@@ -127,12 +124,10 @@ export default function Navbar() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const pathname = usePathname();
 
-    // Close mobile menu on route change
     useEffect(() => {
         setMobileMenuOpen(false);
     }, [pathname]);
 
-    // Prevent body scroll when mobile menu is open
     useEffect(() => {
         if (mobileMenuOpen) {
             document.body.style.overflow = "hidden";
@@ -155,22 +150,16 @@ export default function Navbar() {
 
     return (
         <>
-            <nav
-                className="navbar-light sticky-top"
-                role="navigation"
-                aria-label="Main navigation"
-            >
-                <div className="container flex items-center justify-between">
-                    <Link href="/dashboard" className="flex items-center gap-2" aria-label="Nebo Rides Dashboard">
-                        <img src="/logo.png" alt="" style={{ height: "32px", width: "auto" }} aria-hidden="true" />
+            <nav className="navbar" role="navigation" aria-label="Main navigation">
+                <div className="navbar-inner">
+                    <Link href="/dashboard" className="navbar-brand" aria-label="Nebo Rides Dashboard">
+                        <img src="/logo.png" alt="" className="brand-logo" aria-hidden="true" />
                     </Link>
 
                     {/* Desktop Navigation */}
-                    <div className="nav-links desktop hide-mobile">
-                        {/* Common Links */}
+                    <div className="nav-links desktop-nav">
                         <NavLink href="/dashboard" icon={<LayoutDashboard size={18} />} label="Dashboard" />
 
-                        {/* Schedule & Work - For non-super-admin */}
                         {!isSuperAdmin && (
                             <>
                                 <NavLink href="/schedule" icon={<Calendar size={18} />} label="Schedule" />
@@ -183,7 +172,6 @@ export default function Navbar() {
                         <NavLink href="/affiliates" icon={<Users size={18} />} label="Affiliates" />
                         <NavLink href="/sops" icon={<BookOpen size={18} />} label="SOPs" />
 
-                        {/* Admin Dropdown */}
                         {isAdmin && (
                             <>
                                 <div className="nav-divider" />
@@ -232,7 +220,7 @@ export default function Navbar() {
 
                     {/* Mobile Menu Button */}
                     <button
-                        className="mobile-menu-btn show-mobile"
+                        className="mobile-menu-btn"
                         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                         aria-expanded={mobileMenuOpen}
                         aria-controls="mobile-nav"
@@ -245,11 +233,7 @@ export default function Navbar() {
 
             {/* Mobile Navigation Overlay */}
             {mobileMenuOpen && (
-                <div
-                    className="mobile-nav-overlay open"
-                    onClick={closeMobileMenu}
-                    aria-hidden="true"
-                />
+                <div className="mobile-nav-overlay" onClick={closeMobileMenu} aria-hidden="true" />
             )}
 
             {/* Mobile Navigation Drawer */}
@@ -260,32 +244,24 @@ export default function Navbar() {
                 aria-modal="true"
                 aria-label="Mobile navigation"
             >
-                {/* User Info Header */}
                 <div className="mobile-nav-header">
-                    <div className="flex items-center gap-3">
-                        <div className="avatar avatar-sm">
+                    <div className="mobile-user-info">
+                        <div className="mobile-avatar">
                             {(session.user.name || session.user.email || "U").charAt(0).toUpperCase()}
                         </div>
-                        <div className="flex flex-col">
-                            <span className="font-medium" style={{ fontSize: "0.875rem" }}>
-                                {session.user.name || "User"}
-                            </span>
+                        <div className="mobile-user-details">
+                            <span className="mobile-user-name">{session.user.name || "User"}</span>
                             <RoleBadge role={role} />
                         </div>
                     </div>
-                    <button
-                        onClick={closeMobileMenu}
-                        className="icon-btn"
-                        aria-label="Close menu"
-                    >
+                    <button onClick={closeMobileMenu} className="mobile-close-btn" aria-label="Close menu">
                         <X size={20} />
                     </button>
                 </div>
 
                 <div className="mobile-nav-content">
-                    {/* Main Section */}
                     <div className="mobile-nav-section">
-                        <span className="nav-section-label">Main</span>
+                        <span className="mobile-section-label">Main</span>
                         <NavLink href="/dashboard" icon={<LayoutDashboard size={18} />} label="Dashboard" onClick={closeMobileMenu} />
                         {!isSuperAdmin && (
                             <NavLink href="/schedule" icon={<Calendar size={18} />} label="My Schedule" onClick={closeMobileMenu} />
@@ -297,10 +273,9 @@ export default function Navbar() {
                         <NavLink href="/sops" icon={<BookOpen size={18} />} label="SOPs" onClick={closeMobileMenu} />
                     </div>
 
-                    {/* Admin Section - Scheduling */}
                     {isAdmin && (
                         <div className="mobile-nav-section">
-                            <span className="nav-section-label">
+                            <span className="mobile-section-label">
                                 <Shield size={12} />
                                 Admin - Scheduling
                             </span>
@@ -309,10 +284,9 @@ export default function Navbar() {
                         </div>
                     )}
 
-                    {/* Admin Section - Team */}
                     {isAdmin && (
                         <div className="mobile-nav-section">
-                            <span className="nav-section-label">
+                            <span className="mobile-section-label">
                                 <Shield size={12} />
                                 Admin - Team
                             </span>
@@ -324,10 +298,9 @@ export default function Navbar() {
                         </div>
                     )}
 
-                    {/* Super Admin Section */}
                     {isSuperAdmin && (
                         <div className="mobile-nav-section">
-                            <span className="nav-section-label">
+                            <span className="mobile-section-label">
                                 <ShieldCheck size={12} />
                                 System
                             </span>
@@ -336,9 +309,8 @@ export default function Navbar() {
                         </div>
                     )}
 
-                    {/* Settings Section */}
                     <div className="mobile-nav-section">
-                        <span className="nav-section-label">Account</span>
+                        <span className="mobile-section-label">Account</span>
                         <NavLink href="/settings" icon={<Settings size={18} />} label="Settings" onClick={closeMobileMenu} />
                         <button
                             onClick={() => {
@@ -355,36 +327,36 @@ export default function Navbar() {
             </div>
 
             <style jsx>{`
-                /* Light Navbar Styles - Refined */
-                .navbar-light {
-                    background: var(--navbar-bg);
-                    border-bottom: 1px solid var(--navbar-border);
-                    padding: 0.875rem 0;
+                /* Navbar Base */
+                .navbar {
+                    background: var(--bg-card);
+                    border-bottom: 1px solid var(--border);
+                    position: sticky;
+                    top: 0;
                     z-index: 100;
-                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
                 }
 
-                .navbar-light :global(.nav-link) {
-                    color: var(--navbar-text-secondary);
-                    font-size: 0.8125rem;
-                    letter-spacing: 0.01em;
+                .navbar-inner {
+                    max-width: 1500px;
+                    margin: 0 auto;
+                    padding: 0 1.5rem;
+                    height: 60px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
                 }
 
-                .navbar-light :global(.nav-link:hover) {
-                    color: var(--navbar-text);
-                    background: rgba(0, 0, 0, 0.035);
+                .navbar-brand {
+                    display: flex;
+                    align-items: center;
                 }
 
-                .navbar-light :global(.nav-link-active) {
-                    color: var(--navbar-accent);
-                    background: rgba(139, 115, 85, 0.08);
-                    font-weight: 600;
+                .brand-logo {
+                    height: 32px;
+                    width: auto;
                 }
 
-                .navbar-light :global(.nav-link-active:hover) {
-                    background: rgba(139, 115, 85, 0.12);
-                }
-
+                /* Desktop Navigation */
                 .nav-links {
                     display: flex;
                     align-items: center;
@@ -394,23 +366,49 @@ export default function Navbar() {
                 .nav-divider {
                     width: 1px;
                     height: 24px;
-                    background: var(--navbar-border);
+                    background: var(--border);
                     margin: 0 0.5rem;
                 }
 
-                .nav-section-label {
-                    font-size: 0.7rem;
-                    font-weight: 600;
-                    color: #A8A29E;
-                    text-transform: uppercase;
-                    letter-spacing: 0.08em;
-                    padding: 0.5rem 0.75rem;
+                /* Nav Link Styles */
+                :global(.nav-link) {
                     display: flex;
                     align-items: center;
                     gap: 0.5rem;
+                    padding: 0.5rem 0.75rem;
+                    border-radius: var(--radius-md);
+                    color: var(--text-secondary);
+                    font-weight: 500;
+                    font-size: 0.8125rem;
+                    transition: all 0.15s ease;
+                    text-decoration: none;
+                    background: none;
+                    border: none;
+                    cursor: pointer;
+                    font-family: inherit;
+                    white-space: nowrap;
                 }
 
-                /* Dropdown Styles */
+                :global(.nav-link:hover) {
+                    color: var(--text-primary);
+                    background: var(--bg-hover);
+                }
+
+                :global(.nav-link-active) {
+                    color: var(--primary);
+                    background: var(--primary-soft);
+                }
+
+                :global(.nav-link-active:hover) {
+                    background: var(--primary-soft);
+                }
+
+                :global(.logout-btn:hover) {
+                    color: var(--danger) !important;
+                    background: var(--danger-bg) !important;
+                }
+
+                /* Dropdown */
                 .nav-dropdown {
                     position: relative;
                 }
@@ -422,7 +420,7 @@ export default function Navbar() {
                 }
 
                 .dropdown-arrow {
-                    transition: transform var(--transition-fast);
+                    transition: transform 0.15s ease;
                     margin-left: 0.25rem;
                 }
 
@@ -433,8 +431,8 @@ export default function Navbar() {
                 .nav-badge {
                     font-size: 0.625rem;
                     font-weight: 700;
-                    background: var(--accent);
-                    color: var(--bg-primary);
+                    background: var(--primary);
+                    color: white;
                     padding: 0.125rem 0.375rem;
                     border-radius: 0.25rem;
                     margin-left: 0.25rem;
@@ -442,25 +440,22 @@ export default function Navbar() {
 
                 .nav-dropdown-menu {
                     position: absolute;
-                    top: calc(100% + 0.625rem);
+                    top: calc(100% + 0.5rem);
                     right: 0;
                     min-width: 240px;
-                    background: #FFFFFF;
-                    border: 1px solid var(--navbar-border);
-                    border-radius: 0.875rem;
-                    padding: 0.625rem;
-                    box-shadow:
-                        0 16px 40px rgba(0, 0, 0, 0.1),
-                        0 4px 12px rgba(0, 0, 0, 0.05),
-                        0 0 0 1px rgba(0, 0, 0, 0.02);
-                    animation: dropdownFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-lg);
+                    padding: 0.5rem;
+                    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+                    animation: dropdownFade 0.15s ease;
                     z-index: 50;
                 }
 
-                @keyframes dropdownFadeIn {
+                @keyframes dropdownFade {
                     from {
                         opacity: 0;
-                        transform: translateY(-8px);
+                        transform: translateY(-4px);
                     }
                     to {
                         opacity: 1;
@@ -469,20 +464,20 @@ export default function Navbar() {
                 }
 
                 .dropdown-section {
-                    padding: 0.5rem 0;
+                    padding: 0.375rem 0;
                 }
 
                 .dropdown-section:not(:last-child) {
-                    border-bottom: 1px solid var(--navbar-border);
+                    border-bottom: 1px solid var(--border);
                 }
 
                 .dropdown-section-label {
-                    font-size: 0.65rem;
+                    font-size: 0.625rem;
                     font-weight: 600;
-                    color: #A8A29E;
+                    color: var(--text-muted);
                     text-transform: uppercase;
                     letter-spacing: 0.08em;
-                    padding: 0.25rem 0.75rem 0.5rem;
+                    padding: 0.25rem 0.75rem 0.375rem;
                     display: block;
                 }
 
@@ -491,7 +486,7 @@ export default function Navbar() {
                     display: inline-flex;
                     align-items: center;
                     gap: 0.25rem;
-                    font-size: 0.65rem;
+                    font-size: 0.625rem;
                     font-weight: 600;
                     padding: 0.125rem 0.5rem;
                     border-radius: 0.25rem;
@@ -500,93 +495,130 @@ export default function Navbar() {
                 }
 
                 :global(.badge-super-admin) {
-                    background: rgba(239, 68, 68, 0.15);
+                    background: var(--danger-bg);
                     color: var(--danger);
                 }
 
                 :global(.badge-admin) {
-                    background: rgba(245, 158, 11, 0.15);
+                    background: var(--warning-bg);
                     color: var(--warning);
                 }
 
                 :global(.badge-dispatcher) {
-                    background: rgba(34, 197, 94, 0.15);
+                    background: var(--success-bg);
                     color: var(--success);
                 }
 
-                /* Nav Link Styles */
-                :global(.nav-link) {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                    padding: 0.5rem 0.75rem;
-                    border-radius: 0.5rem;
-                    color: var(--text-secondary);
-                    font-weight: 500;
-                    font-size: 0.875rem;
-                    transition: all var(--transition-fast);
-                    text-decoration: none;
-                    background: none;
-                    border: none;
-                    cursor: pointer;
-                    font-family: inherit;
-                    position: relative;
-                    white-space: nowrap;
-                }
-
-                :global(.nav-link:hover) {
-                    color: var(--text-primary);
-                    background: rgba(255, 255, 255, 0.08);
-                }
-
-                :global(.nav-link:active) {
-                    transform: scale(0.98);
-                }
-
-                :global(.nav-link-active) {
-                    color: var(--accent);
-                    background: rgba(183, 175, 163, 0.12);
-                }
-
-                :global(.nav-link-active:hover) {
-                    background: rgba(183, 175, 163, 0.18);
-                }
-
-                :global(.logout-btn:hover) {
-                    color: var(--danger) !important;
-                    background: var(--danger-glow) !important;
-                }
-
-                /* Mobile Styles */
+                /* Mobile Menu Button */
                 .mobile-menu-btn {
                     display: none;
                     background: none;
                     border: none;
-                    color: var(--navbar-text);
+                    color: var(--text-primary);
                     cursor: pointer;
                     padding: 0.5rem;
-                    border-radius: 0.5rem;
-                    transition: all var(--transition-fast);
+                    border-radius: var(--radius-md);
+                    transition: background 0.15s ease;
                 }
 
                 .mobile-menu-btn:hover {
-                    background: rgba(0, 0, 0, 0.04);
+                    background: var(--bg-hover);
                 }
 
-                .mobile-menu-btn:active {
-                    transform: scale(0.95);
+                /* Mobile Overlay */
+                .mobile-nav-overlay {
+                    position: fixed;
+                    inset: 0;
+                    background: rgba(0, 0, 0, 0.6);
+                    backdrop-filter: blur(4px);
+                    z-index: 150;
+                    animation: fadeIn 0.2s ease;
+                }
+
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+
+                /* Mobile Drawer */
+                .mobile-nav-drawer {
+                    position: fixed;
+                    top: 0;
+                    right: 0;
+                    width: 300px;
+                    max-width: 85vw;
+                    height: 100vh;
+                    background: var(--bg-primary);
+                    border-left: 1px solid var(--border);
+                    z-index: 200;
+                    transform: translateX(100%);
+                    transition: transform 0.25s ease;
+                    overflow-y: auto;
+                    display: flex;
+                    flex-direction: column;
+                }
+
+                .mobile-nav-drawer.open {
+                    transform: translateX(0);
                 }
 
                 .mobile-nav-header {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
-                    padding-bottom: 1rem;
-                    border-bottom: 1px solid var(--navbar-border);
-                    margin-bottom: 1rem;
+                    padding: 1.25rem;
+                    border-bottom: 1px solid var(--border);
+                }
+
+                .mobile-user-info {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                }
+
+                .mobile-avatar {
+                    width: 40px;
+                    height: 40px;
+                    background: var(--primary-soft);
+                    color: var(--primary);
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: 600;
+                    font-size: 1rem;
+                }
+
+                .mobile-user-details {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.25rem;
+                }
+
+                .mobile-user-name {
+                    font-weight: 600;
+                    font-size: 0.875rem;
+                    color: var(--text-primary);
+                }
+
+                .mobile-close-btn {
+                    background: none;
+                    border: none;
+                    color: var(--text-secondary);
+                    cursor: pointer;
+                    padding: 0.5rem;
+                    border-radius: var(--radius-md);
+                    transition: all 0.15s ease;
+                }
+
+                .mobile-close-btn:hover {
+                    background: var(--bg-hover);
+                    color: var(--text-primary);
                 }
 
                 .mobile-nav-content {
+                    flex: 1;
+                    padding: 1rem;
                     display: flex;
                     flex-direction: column;
                     gap: 0.5rem;
@@ -596,37 +628,34 @@ export default function Navbar() {
                     display: flex;
                     flex-direction: column;
                     gap: 0.25rem;
-                    padding-bottom: 0.5rem;
+                    padding-bottom: 0.75rem;
                 }
 
                 .mobile-nav-section:not(:last-child) {
-                    border-bottom: 1px solid var(--navbar-border);
-                    margin-bottom: 0.5rem;
+                    border-bottom: 1px solid var(--border);
+                    margin-bottom: 0.75rem;
                 }
 
-                @media (max-width: 768px) {
-                    .hide-mobile {
-                        display: none !important;
-                    }
+                .mobile-section-label {
+                    font-size: 0.6875rem;
+                    font-weight: 600;
+                    color: var(--text-muted);
+                    text-transform: uppercase;
+                    letter-spacing: 0.08em;
+                    padding: 0.375rem 0.75rem;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
 
-                    .show-mobile {
-                        display: flex !important;
+                /* Responsive */
+                @media (max-width: 900px) {
+                    .desktop-nav {
+                        display: none !important;
                     }
 
                     .mobile-menu-btn {
                         display: flex;
-                    }
-
-                    .nav-divider {
-                        width: 100%;
-                        height: 1px;
-                        margin: 0.5rem 0;
-                    }
-                }
-
-                @media (min-width: 769px) {
-                    .show-mobile {
-                        display: none !important;
                     }
                 }
             `}</style>

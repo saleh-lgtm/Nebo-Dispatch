@@ -34,28 +34,25 @@ export default async function SOPDetailPage({ params }: Props) {
     // Simple markdown-like rendering
     const renderContent = (content: string) => {
         const lines = content.split("\n");
-        const elements: JSX.Element[] = [];
+        const elements: React.JSX.Element[] = [];
         let listItems: string[] = [];
         let listType: "ul" | "ol" | null = null;
         let key = 0;
+
+        const listStyle = {
+            paddingLeft: "1.5rem",
+            marginBottom: "1rem",
+            color: "var(--text-secondary)",
+            lineHeight: 1.8,
+        };
 
         const flushList = () => {
             if (listItems.length > 0 && listType) {
                 const ListTag = listType;
                 elements.push(
-                    <ListTag
-                        key={key++}
-                        style={{
-                            paddingLeft: "1.5rem",
-                            marginBottom: "1rem",
-                            color: "var(--text-secondary)",
-                            lineHeight: 1.8,
-                        }}
-                    >
+                    <ListTag key={key++} style={listStyle}>
                         {listItems.map((item, i) => (
-                            <li key={i} style={{ marginBottom: "0.25rem" }}>
-                                {item}
-                            </li>
+                            <li key={i} style={{ marginBottom: "0.375rem" }}>{item}</li>
                         ))}
                     </ListTag>
                 );
@@ -67,134 +64,100 @@ export default async function SOPDetailPage({ params }: Props) {
         for (const line of lines) {
             const trimmed = line.trim();
 
-            // Headers
             if (trimmed.startsWith("### ")) {
                 flushList();
                 elements.push(
-                    <h4
-                        key={key++}
-                        className="font-display"
-                        style={{
-                            fontSize: "1.125rem",
-                            color: "var(--text-primary)",
-                            marginTop: "1.5rem",
-                            marginBottom: "0.75rem",
-                        }}
-                    >
+                    <h4 key={key++} style={{
+                        fontSize: "1.0625rem",
+                        fontWeight: 600,
+                        color: "var(--text-primary)",
+                        marginTop: "1.5rem",
+                        marginBottom: "0.75rem",
+                    }}>
                         {trimmed.slice(4)}
                     </h4>
                 );
             } else if (trimmed.startsWith("## ")) {
                 flushList();
                 elements.push(
-                    <h3
-                        key={key++}
-                        className="font-display"
-                        style={{
-                            fontSize: "1.375rem",
-                            color: "var(--accent)",
-                            marginTop: "2rem",
-                            marginBottom: "1rem",
-                        }}
-                    >
+                    <h3 key={key++} style={{
+                        fontSize: "1.25rem",
+                        fontWeight: 600,
+                        color: "var(--primary)",
+                        marginTop: "1.75rem",
+                        marginBottom: "0.875rem",
+                    }}>
                         {trimmed.slice(3)}
                     </h3>
                 );
             } else if (trimmed.startsWith("# ")) {
                 flushList();
                 elements.push(
-                    <h2
-                        key={key++}
-                        className="font-display"
-                        style={{
-                            fontSize: "1.75rem",
-                            color: "var(--accent)",
-                            marginTop: "2rem",
-                            marginBottom: "1rem",
-                            borderBottom: "1px solid var(--border)",
-                            paddingBottom: "0.5rem",
-                        }}
-                    >
+                    <h2 key={key++} style={{
+                        fontSize: "1.5rem",
+                        fontWeight: 600,
+                        color: "var(--primary)",
+                        marginTop: "2rem",
+                        marginBottom: "1rem",
+                        paddingBottom: "0.5rem",
+                        borderBottom: "1px solid var(--border)",
+                    }}>
                         {trimmed.slice(2)}
                     </h2>
                 );
-            }
-            // Unordered list
-            else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+            } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
                 if (listType !== "ul") {
                     flushList();
                     listType = "ul";
                 }
                 listItems.push(trimmed.slice(2));
-            }
-            // Ordered list
-            else if (/^\d+\.\s/.test(trimmed)) {
+            } else if (/^\d+\.\s/.test(trimmed)) {
                 if (listType !== "ol") {
                     flushList();
                     listType = "ol";
                 }
                 listItems.push(trimmed.replace(/^\d+\.\s/, ""));
-            }
-            // Horizontal rule
-            else if (trimmed === "---" || trimmed === "***") {
+            } else if (trimmed === "---" || trimmed === "***") {
                 flushList();
                 elements.push(
-                    <hr
-                        key={key++}
-                        style={{
-                            border: "none",
-                            borderTop: "1px solid var(--border)",
-                            margin: "1.5rem 0",
-                        }}
-                    />
+                    <hr key={key++} style={{
+                        border: "none",
+                        borderTop: "1px solid var(--border)",
+                        margin: "1.5rem 0",
+                    }} />
                 );
-            }
-            // Code block marker
-            else if (trimmed.startsWith("```")) {
-                // Skip code fence markers for now
-            }
-            // Blockquote
-            else if (trimmed.startsWith("> ")) {
+            } else if (trimmed.startsWith("```")) {
+                // Skip code fence markers
+            } else if (trimmed.startsWith("> ")) {
                 flushList();
                 elements.push(
-                    <blockquote
-                        key={key++}
-                        style={{
-                            borderLeft: "3px solid var(--accent)",
-                            paddingLeft: "1rem",
-                            marginLeft: 0,
-                            marginBottom: "1rem",
-                            color: "var(--text-secondary)",
-                            fontStyle: "italic",
-                        }}
-                    >
+                    <blockquote key={key++} style={{
+                        borderLeft: "3px solid var(--primary)",
+                        paddingLeft: "1rem",
+                        marginLeft: 0,
+                        marginBottom: "1rem",
+                        color: "var(--text-secondary)",
+                        fontStyle: "italic",
+                    }}>
                         {trimmed.slice(2)}
                     </blockquote>
                 );
-            }
-            // Empty line
-            else if (trimmed === "") {
+            } else if (trimmed === "") {
                 flushList();
-            }
-            // Regular paragraph
-            else {
+            } else {
                 flushList();
-                // Apply inline formatting
                 let formatted = trimmed;
-                // Bold
                 formatted = formatted.replace(
                     /\*\*(.+?)\*\*/g,
                     '<strong style="color: var(--text-primary); font-weight: 600;">$1</strong>'
                 );
-                // Italic
                 formatted = formatted.replace(
                     /\*(.+?)\*/g,
                     '<em>$1</em>'
                 );
-                // Inline code
                 formatted = formatted.replace(
                     /`(.+?)`/g,
-                    '<code style="background: var(--bg-muted); padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.875rem;">$1</code>'
+                    '<code style="background: var(--bg-secondary); padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.875rem; font-family: monospace;">$1</code>'
                 );
 
                 elements.push(
@@ -216,15 +179,18 @@ export default async function SOPDetailPage({ params }: Props) {
     };
 
     return (
-        <div className="flex flex-col gap-6 animate-fade-in" style={{ padding: "1.5rem" }}>
+        <div style={{ padding: "1.5rem", maxWidth: "900px", margin: "0 auto" }}>
             {/* Back Link */}
             <Link
                 href="/sops"
-                className="flex items-center gap-2"
                 style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
                     color: "var(--text-secondary)",
                     fontSize: "0.875rem",
-                    width: "fit-content",
+                    textDecoration: "none",
+                    marginBottom: "1.5rem",
                 }}
             >
                 <ArrowLeft size={16} />
@@ -232,46 +198,57 @@ export default async function SOPDetailPage({ params }: Props) {
             </Link>
 
             {/* Header */}
-            <header className="flex flex-col gap-4">
-                <div className="flex items-center gap-3">
-                    <BookOpen size={28} className="text-accent" />
-                    <h1 className="font-display" style={{ fontSize: "2rem" }}>
+            <header style={{ marginBottom: "2rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
+                    <div style={{
+                        width: "48px",
+                        height: "48px",
+                        background: "var(--primary-soft)",
+                        borderRadius: "var(--radius-md)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "var(--primary)",
+                        flexShrink: 0,
+                    }}>
+                        <BookOpen size={24} />
+                    </div>
+                    <h1 style={{ fontSize: "1.75rem", fontWeight: 600, color: "var(--text-primary)" }}>
                         {sop.title}
                     </h1>
                 </div>
 
                 {sop.description && (
-                    <p
-                        style={{
-                            color: "var(--text-secondary)",
-                            fontSize: "1.0625rem",
-                            maxWidth: "700px",
-                        }}
-                    >
+                    <p style={{
+                        fontSize: "1.0625rem",
+                        color: "var(--text-secondary)",
+                        lineHeight: 1.6,
+                        marginBottom: "1rem",
+                        maxWidth: "700px",
+                    }}>
                         {sop.description}
                     </p>
                 )}
 
-                <div
-                    className="flex items-center gap-4 flex-wrap"
-                    style={{
-                        fontSize: "0.8125rem",
-                        color: "var(--text-muted)",
-                        paddingTop: "0.5rem",
-                        borderTop: "1px solid var(--border)",
-                    }}
-                >
+                <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "1.5rem",
+                    flexWrap: "wrap",
+                    paddingTop: "1rem",
+                    borderTop: "1px solid var(--border)",
+                }}>
                     {sop.category && (
-                        <div className="flex items-center gap-1">
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.375rem", fontSize: "0.8125rem", color: "var(--text-muted)" }}>
                             <FolderOpen size={14} />
                             <span>{sop.category}</span>
                         </div>
                     )}
-                    <div className="flex items-center gap-1">
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.375rem", fontSize: "0.8125rem", color: "var(--text-muted)" }}>
                         <User size={14} />
                         <span>{sop.createdBy.name || "Admin"}</span>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.375rem", fontSize: "0.8125rem", color: "var(--text-muted)" }}>
                         <Clock size={14} />
                         <span>Updated {formatDate(sop.updatedAt)}</span>
                     </div>
@@ -279,12 +256,12 @@ export default async function SOPDetailPage({ params }: Props) {
             </header>
 
             {/* Content */}
-            <article
-                className="glass-card"
-                style={{
-                    maxWidth: "800px",
-                }}
-            >
+            <article style={{
+                background: "var(--bg-card)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-lg)",
+                padding: "2rem",
+            }}>
                 {renderContent(sop.content)}
             </article>
         </div>

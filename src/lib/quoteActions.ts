@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireAuth } from "./auth-helpers";
 import { createAuditLog } from "./auditActions";
-import { QuoteStatus, QuoteOutcome, QuoteActionType } from "@prisma/client";
+import { QuoteStatus, QuoteOutcome, QuoteActionType, Prisma } from "@prisma/client";
 
 // 72 hours in milliseconds
 const QUOTE_EXPIRATION_HOURS = 72;
@@ -222,7 +222,7 @@ export async function recordQuoteAction(
                 userId: session.user.id,
                 actionType,
                 notes,
-                metadata: metadata as Record<string, unknown> | undefined,
+                metadata: metadata as Prisma.InputJsonValue | undefined,
             },
             include: {
                 user: { select: { id: true, name: true } },
@@ -232,7 +232,7 @@ export async function recordQuoteAction(
 
     await createAuditLog(
         session.user.id,
-        "QUOTE_ACTION",
+        "FOLLOW_UP",
         "Quote",
         quoteId,
         { actionType, notes }
@@ -324,7 +324,7 @@ export async function setQuoteOutcome(
 
     await createAuditLog(
         session.user.id,
-        outcome === "WON" ? "CONVERT" : "LOST",
+        outcome === "WON" ? "CONVERT" : "UPDATE_STATUS",
         "Quote",
         quoteId,
         { outcome, reason }

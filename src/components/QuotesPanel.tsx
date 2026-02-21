@@ -6,14 +6,11 @@ import {
     Phone,
     Mail,
     Clock,
-    CheckCircle,
-    XCircle,
     Plus,
     RefreshCw,
     MessageSquare,
     X,
     ChevronRight,
-    AlertTriangle,
     Timer,
     Calendar,
     User,
@@ -27,9 +24,6 @@ import {
     Hourglass,
 } from "lucide-react";
 import {
-    recordFollowUp,
-    convertQuote,
-    updateQuoteStatus,
     createQuote,
     recordQuoteAction,
     setQuoteOutcome,
@@ -62,6 +56,7 @@ interface Quote {
     status: "PENDING" | "FOLLOWING_UP" | "CONVERTED" | "LOST" | "EXPIRED";
     outcome: "WON" | "LOST" | null;
     outcomeReason: string | null;
+    outcomeAt?: Date;
     followUpCount: number;
     lastFollowUp: Date | null;
     nextFollowUp: Date | null;
@@ -78,11 +73,8 @@ interface Quote {
 
 interface Props {
     quotes: Quote[];
-    userId: string;
-    isAdmin: boolean;
 }
 
-// Helper to format relative time
 function formatTimeSince(date: Date | null): string {
     if (!date) return "Never";
     const now = new Date();
@@ -99,7 +91,6 @@ function formatTimeSince(date: Date | null): string {
     return then.toLocaleDateString();
 }
 
-// Helper to format time until expiration
 function formatTimeUntilExpiry(expiresAt: Date): { text: string; urgent: boolean; expired: boolean } {
     const now = new Date();
     const expiry = new Date(expiresAt);
@@ -115,95 +106,168 @@ function formatTimeUntilExpiry(expiresAt: Date): { text: string; urgent: boolean
     return { text: `${Math.floor(diffHours / 24)}d left`, urgent: false, expired: false };
 }
 
-export default function QuotesPanel({ quotes, userId, isAdmin }: Props) {
+export default function QuotesPanel({ quotes }: Props) {
     const [showModal, setShowModal] = useState(false);
     const activeQuotes = quotes.filter(q => q.status === "PENDING" || q.status === "FOLLOWING_UP");
-    const overdueCount = activeQuotes.filter(q => q.nextFollowUp && new Date(q.nextFollowUp) < new Date()).length;
     const flaggedCount = activeQuotes.filter(q => q.isFlagged).length;
     const expiringCount = activeQuotes.filter(q => {
         const exp = formatTimeUntilExpiry(q.expiresAt);
         return exp.urgent && !exp.expired;
     }).length;
 
+    const hasUrgent = flaggedCount > 0 || expiringCount > 0;
+
     return (
         <>
-            {/* Compact Trigger Card */}
-            <button
-                onClick={() => setShowModal(true)}
-                className="glass-card glass-card-interactive"
-                style={{
-                    width: "100%",
-                    textAlign: "left",
-                    border: (overdueCount > 0 || flaggedCount > 0) ? "1px solid rgba(248, 113, 113, 0.3)" : "1px solid var(--glass-border)",
-                }}
-            >
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div
-                            style={{
-                                width: "48px",
-                                height: "48px",
-                                borderRadius: "0.75rem",
-                                background: (overdueCount > 0 || flaggedCount > 0) ? "var(--danger-bg)" : "var(--accent-soft)",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                            }}
-                        >
-                            <FileText size={24} style={{ color: (overdueCount > 0 || flaggedCount > 0) ? "var(--danger)" : "var(--accent)" }} />
-                        </div>
-                        <div>
-                            <h3 className="font-display" style={{ fontSize: "1.125rem", marginBottom: "0.125rem" }}>
-                                Quote Follow-ups
-                            </h3>
-                            <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-                                {activeQuotes.length === 0 ? (
-                                    "No pending quotes"
-                                ) : (
-                                    <span className="flex items-center gap-2 flex-wrap">
-                                        <span>{activeQuotes.length} pending</span>
-                                        {flaggedCount > 0 && (
-                                            <span style={{ color: "var(--danger)" }} className="flex items-center gap-1">
-                                                <Flag size={12} />
-                                                {flaggedCount} flagged
-                                            </span>
-                                        )}
-                                        {expiringCount > 0 && (
-                                            <span style={{ color: "var(--warning)" }} className="flex items-center gap-1">
-                                                <Hourglass size={12} />
-                                                {expiringCount} expiring soon
-                                            </span>
-                                        )}
-                                    </span>
-                                )}
-                            </p>
-                        </div>
+            <button onClick={() => setShowModal(true)} className="quotes-trigger">
+                <div className="trigger-content">
+                    <div className={`trigger-icon ${hasUrgent ? "urgent" : ""}`}>
+                        <FileText size={24} />
                     </div>
-                    <div className="flex items-center gap-2">
-                        {activeQuotes.length > 0 && (
-                            <span
-                                style={{
-                                    background: (overdueCount > 0 || flaggedCount > 0) ? "var(--danger)" : "var(--warning)",
-                                    color: (overdueCount > 0 || flaggedCount > 0) ? "white" : "black",
-                                    padding: "0.25rem 0.75rem",
-                                    borderRadius: "9999px",
-                                    fontSize: "0.875rem",
-                                    fontWeight: 600,
-                                }}
-                            >
-                                {activeQuotes.length}
-                            </span>
-                        )}
-                        <ChevronRight size={20} style={{ color: "var(--text-secondary)" }} />
+                    <div className="trigger-text">
+                        <h3>Quote Follow-ups</h3>
+                        <p>
+                            {activeQuotes.length === 0 ? (
+                                "No pending quotes"
+                            ) : (
+                                <span className="trigger-stats">
+                                    <span>{activeQuotes.length} pending</span>
+                                    {flaggedCount > 0 && (
+                                        <span className="stat-flagged">
+                                            <Flag size={12} />
+                                            {flaggedCount} flagged
+                                        </span>
+                                    )}
+                                    {expiringCount > 0 && (
+                                        <span className="stat-expiring">
+                                            <Hourglass size={12} />
+                                            {expiringCount} expiring
+                                        </span>
+                                    )}
+                                </span>
+                            )}
+                        </p>
                     </div>
                 </div>
+                <div className="trigger-right">
+                    {activeQuotes.length > 0 && (
+                        <span className={`trigger-badge ${hasUrgent ? "urgent" : ""}`}>
+                            {activeQuotes.length}
+                        </span>
+                    )}
+                    <ChevronRight size={20} className="trigger-arrow" />
+                </div>
+
+                <style jsx>{`
+                    .quotes-trigger {
+                        width: 100%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        padding: 1.25rem;
+                        background: var(--bg-card);
+                        border: 1px solid var(--border);
+                        border-radius: var(--radius-lg);
+                        cursor: pointer;
+                        transition: all 0.15s ease;
+                        text-align: left;
+                    }
+
+                    .quotes-trigger:hover {
+                        border-color: var(--primary);
+                        background: var(--bg-hover);
+                    }
+
+                    .trigger-content {
+                        display: flex;
+                        align-items: center;
+                        gap: 1rem;
+                    }
+
+                    .trigger-icon {
+                        width: 48px;
+                        height: 48px;
+                        border-radius: var(--radius-md);
+                        background: var(--primary-soft);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: var(--primary);
+                    }
+
+                    .trigger-icon.urgent {
+                        background: var(--danger-bg);
+                        color: var(--danger);
+                    }
+
+                    .trigger-text h3 {
+                        font-size: 1rem;
+                        font-weight: 600;
+                        color: var(--text-primary);
+                        margin-bottom: 0.25rem;
+                    }
+
+                    .trigger-text p {
+                        font-size: 0.875rem;
+                        color: var(--text-secondary);
+                    }
+
+                    .trigger-stats {
+                        display: flex;
+                        align-items: center;
+                        gap: 0.75rem;
+                        flex-wrap: wrap;
+                    }
+
+                    .stat-flagged {
+                        display: flex;
+                        align-items: center;
+                        gap: 0.25rem;
+                        color: var(--danger);
+                    }
+
+                    .stat-expiring {
+                        display: flex;
+                        align-items: center;
+                        gap: 0.25rem;
+                        color: var(--warning);
+                    }
+
+                    .trigger-right {
+                        display: flex;
+                        align-items: center;
+                        gap: 0.75rem;
+                    }
+
+                    .trigger-badge {
+                        padding: 0.25rem 0.75rem;
+                        background: var(--warning);
+                        color: var(--text-inverse);
+                        border-radius: 9999px;
+                        font-size: 0.875rem;
+                        font-weight: 600;
+                    }
+
+                    .trigger-badge.urgent {
+                        background: var(--danger);
+                        color: white;
+                    }
+
+                    .trigger-arrow {
+                        color: var(--text-muted);
+                        transition: transform 0.15s;
+                    }
+
+                    .quotes-trigger:hover .trigger-arrow {
+                        transform: translateX(4px);
+                        color: var(--primary);
+                    }
+                `}</style>
             </button>
 
-            {/* Quotes Modal */}
             {showModal && (
                 <QuotesModal
                     quotes={quotes}
-                    userId={userId}
                     onClose={() => setShowModal(false)}
                 />
             )}
@@ -211,10 +275,9 @@ export default function QuotesPanel({ quotes, userId, isAdmin }: Props) {
     );
 }
 
-function QuotesModal({ quotes, userId, onClose }: { quotes: Quote[]; userId: string; onClose: () => void }) {
+function QuotesModal({ quotes, onClose }: { quotes: Quote[]; onClose: () => void }) {
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
-    const [loading, setLoading] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<"active" | "all">("active");
 
     const statusColors = {
@@ -222,7 +285,7 @@ function QuotesModal({ quotes, userId, onClose }: { quotes: Quote[]; userId: str
         FOLLOWING_UP: { bg: "var(--info-bg)", color: "var(--info)", label: "Following Up" },
         CONVERTED: { bg: "var(--success-bg)", color: "var(--success)", label: "Won" },
         LOST: { bg: "var(--danger-bg)", color: "var(--danger)", label: "Lost" },
-        EXPIRED: { bg: "var(--bg-muted)", color: "var(--text-muted)", label: "Expired" },
+        EXPIRED: { bg: "var(--bg-secondary)", color: "var(--text-muted)", label: "Expired" },
     };
 
     const isOverdue = (nextFollowUp: Date | null) => {
@@ -233,7 +296,6 @@ function QuotesModal({ quotes, userId, onClose }: { quotes: Quote[]; userId: str
     const activeQuotes = quotes.filter(q => q.status === "PENDING" || q.status === "FOLLOWING_UP");
     const displayQuotes = activeTab === "active" ? activeQuotes : quotes;
 
-    // Sort: flagged first, then by next follow-up
     const sortedQuotes = [...displayQuotes].sort((a, b) => {
         if (a.isFlagged && !b.isFlagged) return -1;
         if (!a.isFlagged && b.isFlagged) return 1;
@@ -244,261 +306,396 @@ function QuotesModal({ quotes, userId, onClose }: { quotes: Quote[]; userId: str
     });
 
     return (
-        <div
-            style={{
-                position: "fixed",
-                inset: 0,
-                background: "rgba(0, 0, 0, 0.85)",
-                backdropFilter: "blur(8px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: 100,
-                padding: "1rem",
-            }}
-            onClick={(e) => e.target === e.currentTarget && onClose()}
-        >
-            <div
-                className="animate-fade-in-scale"
-                style={{
-                    width: "100%",
-                    maxWidth: "800px",
-                    maxHeight: "90vh",
-                    background: "var(--bg-elevated)",
-                    borderRadius: "1.125rem",
-                    border: "1px solid var(--border)",
-                    boxShadow: "var(--shadow-xl)",
-                    display: "flex",
-                    flexDirection: "column",
-                    overflow: "hidden",
-                }}
-            >
-                {/* Header */}
-                <div
-                    style={{
-                        padding: "1.25rem 1.5rem",
-                        borderBottom: "1px solid var(--border)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                    }}
-                >
-                    <div className="flex items-center gap-3">
-                        <FileText size={24} className="text-accent" />
-                        <h2 className="font-display" style={{ fontSize: "1.5rem" }}>Quote Follow-ups</h2>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => setShowAddModal(true)}
-                            className="btn btn-primary"
-                            style={{ padding: "0.5rem 1rem", fontSize: "0.875rem" }}
-                        >
-                            <Plus size={16} />
-                            Add Quote
-                        </button>
-                        <button
-                            onClick={onClose}
-                            className="btn btn-ghost btn-icon"
-                            aria-label="Close"
-                        >
-                            <X size={20} />
-                        </button>
-                    </div>
-                </div>
-
-                {/* Tabs */}
-                <div style={{ padding: "1rem 1.5rem 0", display: "flex", gap: "0.5rem" }}>
-                    <button
-                        onClick={() => setActiveTab("active")}
-                        className={`tab-btn ${activeTab === "active" ? "active" : ""}`}
-                    >
-                        Active ({activeQuotes.length})
-                    </button>
-                    <button
-                        onClick={() => setActiveTab("all")}
-                        className={`tab-btn ${activeTab === "all" ? "active" : ""}`}
-                    >
-                        All ({quotes.length})
-                    </button>
-                </div>
-
-                {/* Content */}
-                <div style={{ flex: 1, overflow: "auto", padding: "1rem 1.5rem 1.5rem" }}>
-                    {sortedQuotes.length === 0 ? (
-                        <div style={{ textAlign: "center", padding: "3rem 0", color: "var(--text-secondary)" }}>
-                            <FileText size={48} style={{ opacity: 0.2, marginBottom: "1rem" }} />
-                            <p style={{ fontSize: "1rem", marginBottom: "0.5rem" }}>No quotes to display</p>
-                            <p style={{ fontSize: "0.875rem" }}>Click "Add Quote" to create a new quote.</p>
+        <>
+            <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+                <div className="quotes-modal">
+                    {/* Header */}
+                    <div className="modal-header">
+                        <div className="header-title">
+                            <FileText size={24} />
+                            <h2>Quote Follow-ups</h2>
                         </div>
-                    ) : (
-                        <div className="flex flex-col gap-3">
-                            {sortedQuotes.map((quote) => {
-                                const expiry = formatTimeUntilExpiry(quote.expiresAt);
-                                const showExpiryWarning = (quote.status === "PENDING" || quote.status === "FOLLOWING_UP") && expiry.urgent;
+                        <div className="header-actions">
+                            <button onClick={() => setShowAddModal(true)} className="btn-primary">
+                                <Plus size={16} />
+                                Add Quote
+                            </button>
+                            <button onClick={onClose} className="btn-close">
+                                <X size={20} />
+                            </button>
+                        </div>
+                    </div>
 
-                                return (
-                                    <div
-                                        key={quote.id}
-                                        onClick={() => setSelectedQuoteId(quote.id)}
-                                        className="quote-card"
-                                        style={{
-                                            padding: "1rem",
-                                            borderRadius: "0.75rem",
-                                            background: quote.isFlagged
-                                                ? "rgba(248, 113, 113, 0.06)"
-                                                : isOverdue(quote.nextFollowUp) && (quote.status === "PENDING" || quote.status === "FOLLOWING_UP")
-                                                ? "rgba(248, 113, 113, 0.04)"
-                                                : "var(--bg-secondary)",
-                                            border: quote.isFlagged
-                                                ? "1px solid rgba(248, 113, 113, 0.3)"
-                                                : isOverdue(quote.nextFollowUp) && (quote.status === "PENDING" || quote.status === "FOLLOWING_UP")
-                                                ? "1px solid rgba(248, 113, 113, 0.2)"
-                                                : "1px solid var(--border)",
-                                            cursor: "pointer",
-                                            transition: "all 0.2s ease",
-                                        }}
-                                    >
-                                        <div className="flex items-start justify-between" style={{ marginBottom: "0.75rem" }}>
-                                            <div>
-                                                <div className="flex items-center gap-2" style={{ marginBottom: "0.25rem" }}>
-                                                    {quote.isFlagged && (
-                                                        <Flag size={14} style={{ color: "var(--danger)" }} />
-                                                    )}
-                                                    <h4 style={{ fontWeight: 600 }}>{quote.clientName}</h4>
-                                                    <span
-                                                        style={{
-                                                            background: statusColors[quote.status].bg,
-                                                            color: statusColors[quote.status].color,
-                                                            padding: "0.125rem 0.5rem",
-                                                            borderRadius: "9999px",
-                                                            fontSize: "0.65rem",
-                                                            fontWeight: 600,
-                                                            textTransform: "uppercase",
-                                                            letterSpacing: "0.05em",
-                                                        }}
-                                                    >
+                    {/* Tabs */}
+                    <div className="modal-tabs">
+                        <button
+                            onClick={() => setActiveTab("active")}
+                            className={`tab ${activeTab === "active" ? "active" : ""}`}
+                        >
+                            Active ({activeQuotes.length})
+                        </button>
+                        <button
+                            onClick={() => setActiveTab("all")}
+                            className={`tab ${activeTab === "all" ? "active" : ""}`}
+                        >
+                            All ({quotes.length})
+                        </button>
+                    </div>
+
+                    {/* Content */}
+                    <div className="modal-content">
+                        {sortedQuotes.length === 0 ? (
+                            <div className="empty-state">
+                                <FileText size={48} />
+                                <p>No quotes to display</p>
+                                <span>Click "Add Quote" to create a new quote.</span>
+                            </div>
+                        ) : (
+                            <div className="quotes-list">
+                                {sortedQuotes.map((quote) => {
+                                    const expiry = formatTimeUntilExpiry(quote.expiresAt);
+                                    const showExpiryWarning = (quote.status === "PENDING" || quote.status === "FOLLOWING_UP") && expiry.urgent;
+                                    const overdue = isOverdue(quote.nextFollowUp) && (quote.status === "PENDING" || quote.status === "FOLLOWING_UP");
+
+                                    return (
+                                        <div
+                                            key={quote.id}
+                                            onClick={() => setSelectedQuoteId(quote.id)}
+                                            className={`quote-card ${quote.isFlagged ? "flagged" : ""} ${overdue ? "overdue" : ""}`}
+                                        >
+                                            <div className="quote-header">
+                                                <div className="quote-title">
+                                                    {quote.isFlagged && <Flag size={14} className="flag-icon" />}
+                                                    <h4>{quote.clientName}</h4>
+                                                    <span className="status-badge" style={{ background: statusColors[quote.status].bg, color: statusColors[quote.status].color }}>
                                                         {statusColors[quote.status].label}
                                                     </span>
                                                     {showExpiryWarning && (
-                                                        <span
-                                                            style={{
-                                                                background: expiry.expired ? "var(--danger-bg)" : "var(--warning-bg)",
-                                                                color: expiry.expired ? "var(--danger)" : "var(--warning)",
-                                                                padding: "0.125rem 0.5rem",
-                                                                borderRadius: "9999px",
-                                                                fontSize: "0.65rem",
-                                                                fontWeight: 600,
-                                                            }}
-                                                            className="flex items-center gap-1"
-                                                        >
+                                                        <span className={`expiry-badge ${expiry.expired ? "expired" : ""}`}>
                                                             <Hourglass size={10} />
                                                             {expiry.text}
                                                         </span>
                                                     )}
                                                 </div>
-                                                <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-                                                    {quote.serviceType}
-                                                    {quote.estimatedAmount && ` • $${quote.estimatedAmount.toLocaleString()}`}
-                                                    {quote.source && ` • via ${quote.source}`}
-                                                </p>
+                                                <div className="quote-meta-right">
+                                                    <span><RefreshCw size={10} /> {quote.followUpCount} follow-ups</span>
+                                                    <span><Timer size={10} /> {formatTimeSince(quote.lastActionAt)}</span>
+                                                </div>
                                             </div>
-                                            <div className="flex flex-col items-end gap-1" style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
-                                                <span className="flex items-center gap-1">
-                                                    <RefreshCw size={10} />
-                                                    {quote.followUpCount} follow-ups
-                                                </span>
-                                                <span className="flex items-center gap-1">
-                                                    <Timer size={10} />
-                                                    Last: {formatTimeSince(quote.lastActionAt)}
-                                                </span>
+
+                                            <p className="quote-subtitle">
+                                                {quote.serviceType}
+                                                {quote.estimatedAmount && ` • $${quote.estimatedAmount.toLocaleString()}`}
+                                                {quote.source && ` • via ${quote.source}`}
+                                            </p>
+
+                                            <div className="quote-details">
+                                                {quote.clientPhone && (
+                                                    <span><Phone size={12} /> {quote.clientPhone}</span>
+                                                )}
+                                                {quote.clientEmail && (
+                                                    <span><Mail size={12} /> {quote.clientEmail}</span>
+                                                )}
+                                                {quote.dateOfService && (
+                                                    <span><Calendar size={12} /> Service: {new Date(quote.dateOfService).toLocaleDateString()}</span>
+                                                )}
+                                                {(quote.status === "PENDING" || quote.status === "FOLLOWING_UP") && quote.nextFollowUp && (
+                                                    <span className={overdue ? "overdue-text" : ""}>
+                                                        <Clock size={12} />
+                                                        {overdue ? "Overdue" : "Next"}: {new Date(quote.nextFollowUp).toLocaleDateString()}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            <div className="quote-footer">
+                                                Created by {quote.createdBy.name || "Unknown"} • {new Date(quote.createdAt).toLocaleDateString()}
                                             </div>
                                         </div>
-
-                                        <div className="flex items-center gap-4 flex-wrap" style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                                            {quote.clientPhone && (
-                                                <span className="flex items-center gap-1">
-                                                    <Phone size={12} />
-                                                    {quote.clientPhone}
-                                                </span>
-                                            )}
-                                            {quote.clientEmail && (
-                                                <span className="flex items-center gap-1">
-                                                    <Mail size={12} />
-                                                    {quote.clientEmail}
-                                                </span>
-                                            )}
-                                            {quote.dateOfService && (
-                                                <span className="flex items-center gap-1">
-                                                    <Calendar size={12} />
-                                                    Service: {new Date(quote.dateOfService).toLocaleDateString()}
-                                                </span>
-                                            )}
-                                            {(quote.status === "PENDING" || quote.status === "FOLLOWING_UP") && quote.nextFollowUp && (
-                                                <span className="flex items-center gap-1" style={{ color: isOverdue(quote.nextFollowUp) ? "var(--danger)" : "var(--text-secondary)" }}>
-                                                    <Clock size={12} />
-                                                    {isOverdue(quote.nextFollowUp) ? "Overdue" : "Next"}: {new Date(quote.nextFollowUp).toLocaleDateString()}
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        <div style={{ marginTop: "0.75rem", fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                                            Created by {quote.createdBy.name || "Unknown"} • {new Date(quote.createdAt).toLocaleDateString()}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
                 </div>
-
-                <style jsx>{`
-                    .tab-btn {
-                        padding: 0.5rem 1rem;
-                        border-radius: 9999px;
-                        border: none;
-                        cursor: pointer;
-                        font-size: 0.875rem;
-                        font-weight: 500;
-                        background: var(--bg-secondary);
-                        color: var(--text-secondary);
-                        transition: all 0.2s ease;
-                        font-family: inherit;
-                    }
-                    .tab-btn:hover {
-                        background: var(--bg-muted);
-                        color: var(--text-primary);
-                    }
-                    .tab-btn.active {
-                        background: var(--accent);
-                        color: var(--text-inverse);
-                    }
-                    .quote-card:hover {
-                        transform: translateX(4px);
-                        border-color: var(--border-accent) !important;
-                    }
-                `}</style>
             </div>
 
-            {/* Add Quote Modal */}
-            {showAddModal && (
-                <AddQuoteModal
-                    onClose={() => setShowAddModal(false)}
-                    userId={userId}
-                />
-            )}
+            {showAddModal && <AddQuoteModal onClose={() => setShowAddModal(false)} />}
+            {selectedQuoteId && <QuoteDetailModal quoteId={selectedQuoteId} onClose={() => setSelectedQuoteId(null)} />}
 
-            {/* Quote Detail Modal */}
-            {selectedQuoteId && (
-                <QuoteDetailModal
-                    quoteId={selectedQuoteId}
-                    onClose={() => setSelectedQuoteId(null)}
-                />
-            )}
-        </div>
+            <style jsx>{`
+                .modal-overlay {
+                    position: fixed;
+                    inset: 0;
+                    background: rgba(0, 0, 0, 0.7);
+                    backdrop-filter: blur(4px);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 100;
+                    padding: 1rem;
+                }
+
+                .quotes-modal {
+                    width: 100%;
+                    max-width: 800px;
+                    max-height: 90vh;
+                    background: var(--bg-primary);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-lg);
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                    animation: modalIn 0.2s ease;
+                }
+
+                @keyframes modalIn {
+                    from { opacity: 0; transform: scale(0.95); }
+                    to { opacity: 1; transform: scale(1); }
+                }
+
+                .modal-header {
+                    padding: 1.25rem 1.5rem;
+                    border-bottom: 1px solid var(--border);
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+
+                .header-title {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    color: var(--primary);
+                }
+
+                .header-title h2 {
+                    font-size: 1.25rem;
+                    font-weight: 600;
+                    color: var(--text-primary);
+                }
+
+                .header-actions {
+                    display: flex;
+                    gap: 0.5rem;
+                }
+
+                .btn-primary {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.375rem;
+                    padding: 0.5rem 1rem;
+                    background: var(--primary);
+                    color: white;
+                    border: none;
+                    border-radius: var(--radius-md);
+                    font-size: 0.875rem;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: background 0.15s;
+                }
+
+                .btn-primary:hover {
+                    background: var(--primary-hover);
+                }
+
+                .btn-close {
+                    padding: 0.5rem;
+                    background: none;
+                    border: none;
+                    color: var(--text-secondary);
+                    cursor: pointer;
+                    border-radius: var(--radius-md);
+                    transition: all 0.15s;
+                }
+
+                .btn-close:hover {
+                    background: var(--bg-hover);
+                    color: var(--text-primary);
+                }
+
+                .modal-tabs {
+                    padding: 1rem 1.5rem 0;
+                    display: flex;
+                    gap: 0.5rem;
+                }
+
+                .tab {
+                    padding: 0.5rem 1rem;
+                    border-radius: 9999px;
+                    border: none;
+                    background: var(--bg-secondary);
+                    color: var(--text-secondary);
+                    font-size: 0.875rem;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.15s;
+                }
+
+                .tab:hover {
+                    background: var(--bg-hover);
+                    color: var(--text-primary);
+                }
+
+                .tab.active {
+                    background: var(--primary);
+                    color: white;
+                }
+
+                .modal-content {
+                    flex: 1;
+                    overflow: auto;
+                    padding: 1rem 1.5rem 1.5rem;
+                }
+
+                .empty-state {
+                    text-align: center;
+                    padding: 3rem 0;
+                    color: var(--text-muted);
+                }
+
+                .empty-state :global(svg) {
+                    opacity: 0.2;
+                    margin-bottom: 1rem;
+                }
+
+                .empty-state p {
+                    font-size: 1rem;
+                    margin-bottom: 0.25rem;
+                    color: var(--text-secondary);
+                }
+
+                .empty-state span {
+                    font-size: 0.875rem;
+                }
+
+                .quotes-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.75rem;
+                }
+
+                .quote-card {
+                    padding: 1rem;
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-md);
+                    cursor: pointer;
+                    transition: all 0.15s;
+                }
+
+                .quote-card:hover {
+                    border-color: var(--primary);
+                    transform: translateX(4px);
+                }
+
+                .quote-card.flagged {
+                    background: rgba(239, 68, 68, 0.05);
+                    border-color: rgba(239, 68, 68, 0.2);
+                }
+
+                .quote-card.overdue {
+                    border-left: 3px solid var(--danger);
+                }
+
+                .quote-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    margin-bottom: 0.5rem;
+                }
+
+                .quote-title {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    flex-wrap: wrap;
+                }
+
+                .quote-title :global(.flag-icon) {
+                    color: var(--danger);
+                }
+
+                .quote-title h4 {
+                    font-weight: 600;
+                    color: var(--text-primary);
+                }
+
+                .status-badge {
+                    padding: 0.125rem 0.5rem;
+                    border-radius: 9999px;
+                    font-size: 0.65rem;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                }
+
+                .expiry-badge {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.25rem;
+                    padding: 0.125rem 0.5rem;
+                    background: var(--warning-bg);
+                    color: var(--warning);
+                    border-radius: 9999px;
+                    font-size: 0.65rem;
+                    font-weight: 600;
+                }
+
+                .expiry-badge.expired {
+                    background: var(--danger-bg);
+                    color: var(--danger);
+                }
+
+                .quote-meta-right {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: flex-end;
+                    gap: 0.25rem;
+                    font-size: 0.7rem;
+                    color: var(--text-muted);
+                }
+
+                .quote-meta-right span {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.25rem;
+                }
+
+                .quote-subtitle {
+                    font-size: 0.875rem;
+                    color: var(--text-secondary);
+                    margin-bottom: 0.75rem;
+                }
+
+                .quote-details {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 1rem;
+                    font-size: 0.8rem;
+                    color: var(--text-secondary);
+                }
+
+                .quote-details span {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.375rem;
+                }
+
+                .overdue-text {
+                    color: var(--danger) !important;
+                }
+
+                .quote-footer {
+                    margin-top: 0.75rem;
+                    font-size: 0.75rem;
+                    color: var(--text-muted);
+                }
+            `}</style>
+        </>
     );
 }
 
-function AddQuoteModal({ onClose, userId }: { onClose: () => void; userId: string }) {
+function AddQuoteModal({ onClose }: { onClose: () => void }) {
     const { data: session } = useSession();
     const [loading, setLoading] = useState(false);
     const [form, setForm] = useState({
@@ -536,107 +733,44 @@ function AddQuoteModal({ onClose, userId }: { onClose: () => void; userId: strin
     };
 
     return (
-        <div
-            style={{
-                position: "fixed",
-                inset: 0,
-                background: "rgba(0, 0, 0, 0.9)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: 110,
-                padding: "1rem",
-            }}
-            onClick={(e) => e.target === e.currentTarget && onClose()}
-        >
-            <div
-                className="glass-card animate-fade-in-scale"
-                style={{ width: "100%", maxWidth: "550px", maxHeight: "90vh", overflow: "auto" }}
-            >
-                <div className="flex items-center justify-between" style={{ marginBottom: "1.5rem" }}>
-                    <h3 className="font-display" style={{ fontSize: "1.5rem" }}>Add New Quote</h3>
-                    <button onClick={onClose} className="btn btn-ghost btn-icon">
-                        <X size={20} />
-                    </button>
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+            <div className="add-modal">
+                <div className="modal-header">
+                    <h3>Add New Quote</h3>
+                    <button onClick={onClose} className="btn-close"><X size={20} /></button>
                 </div>
 
-                {/* Creator Info */}
-                <div
-                    style={{
-                        padding: "0.75rem 1rem",
-                        background: "var(--bg-secondary)",
-                        borderRadius: "0.625rem",
-                        marginBottom: "1.5rem",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.75rem",
-                    }}
-                >
-                    <div
-                        style={{
-                            width: "36px",
-                            height: "36px",
-                            borderRadius: "50%",
-                            background: "var(--accent-soft)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            color: "var(--accent)",
-                            fontWeight: 600,
-                        }}
-                    >
+                <div className="creator-info">
+                    <div className="creator-avatar">
                         {(session?.user?.name || "U").charAt(0).toUpperCase()}
                     </div>
                     <div>
-                        <p style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Created by</p>
-                        <p style={{ fontWeight: 500 }}>{session?.user?.name || "You"}</p>
+                        <p className="creator-label">Created by</p>
+                        <p className="creator-name">{session?.user?.name || "You"}</p>
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                    <div>
-                        <label className="input-label">Client Name *</label>
-                        <input
-                            className="input"
-                            value={form.clientName}
-                            onChange={(e) => setForm({ ...form, clientName: e.target.value })}
-                            placeholder="John Doe"
-                            required
-                        />
+                <form onSubmit={handleSubmit}>
+                    <div className="form-group">
+                        <label>Client Name *</label>
+                        <input value={form.clientName} onChange={(e) => setForm({ ...form, clientName: e.target.value })} placeholder="John Doe" required />
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                        <div>
-                            <label className="input-label">Email</label>
-                            <input
-                                className="input"
-                                type="email"
-                                value={form.clientEmail}
-                                onChange={(e) => setForm({ ...form, clientEmail: e.target.value })}
-                                placeholder="john@example.com"
-                            />
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label>Email</label>
+                            <input type="email" value={form.clientEmail} onChange={(e) => setForm({ ...form, clientEmail: e.target.value })} placeholder="john@example.com" />
                         </div>
-                        <div>
-                            <label className="input-label">Phone</label>
-                            <input
-                                className="input"
-                                type="tel"
-                                value={form.clientPhone}
-                                onChange={(e) => setForm({ ...form, clientPhone: e.target.value })}
-                                placeholder="+1 234 567 8900"
-                            />
+                        <div className="form-group">
+                            <label>Phone</label>
+                            <input type="tel" value={form.clientPhone} onChange={(e) => setForm({ ...form, clientPhone: e.target.value })} placeholder="+1 234 567 8900" />
                         </div>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                        <div>
-                            <label className="input-label">Service Type *</label>
-                            <select
-                                className="input"
-                                value={form.serviceType}
-                                onChange={(e) => setForm({ ...form, serviceType: e.target.value })}
-                                required
-                            >
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label>Service Type *</label>
+                            <select value={form.serviceType} onChange={(e) => setForm({ ...form, serviceType: e.target.value })} required>
                                 <option value="">Select service...</option>
                                 <option value="Airport Transfer">Airport Transfer</option>
                                 <option value="Hourly Service">Hourly Service</option>
@@ -647,13 +781,9 @@ function AddQuoteModal({ onClose, userId }: { onClose: () => void; userId: strin
                                 <option value="Other">Other</option>
                             </select>
                         </div>
-                        <div>
-                            <label className="input-label">Source</label>
-                            <select
-                                className="input"
-                                value={form.source}
-                                onChange={(e) => setForm({ ...form, source: e.target.value })}
-                            >
+                        <div className="form-group">
+                            <label>Source</label>
+                            <select value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })}>
                                 <option value="">Select source...</option>
                                 <option value="Phone">Phone Call</option>
                                 <option value="Email">Email</option>
@@ -667,71 +797,229 @@ function AddQuoteModal({ onClose, userId }: { onClose: () => void; userId: strin
                         </div>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                        <div>
-                            <label className="input-label">Date of Service</label>
-                            <input
-                                className="input"
-                                type="date"
-                                value={form.dateOfService}
-                                onChange={(e) => setForm({ ...form, dateOfService: e.target.value })}
-                            />
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label>Date of Service</label>
+                            <input type="date" value={form.dateOfService} onChange={(e) => setForm({ ...form, dateOfService: e.target.value })} />
                         </div>
-                        <div>
-                            <label className="input-label">Estimated Amount</label>
-                            <input
-                                className="input"
-                                type="number"
-                                value={form.estimatedAmount}
-                                onChange={(e) => setForm({ ...form, estimatedAmount: e.target.value })}
-                                placeholder="0.00"
-                            />
+                        <div className="form-group">
+                            <label>Estimated Amount</label>
+                            <input type="number" value={form.estimatedAmount} onChange={(e) => setForm({ ...form, estimatedAmount: e.target.value })} placeholder="0.00" />
                         </div>
                     </div>
 
-                    <div>
-                        <label className="input-label">Notes</label>
-                        <textarea
-                            className="input"
-                            value={form.notes}
-                            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                            placeholder="Additional details about the quote..."
-                            style={{ height: "80px", resize: "none" }}
-                        />
+                    <div className="form-group">
+                        <label>Notes</label>
+                        <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Additional details..." />
                     </div>
 
-                    <div
-                        style={{
-                            padding: "0.75rem",
-                            background: "var(--info-bg)",
-                            border: "1px solid var(--info-border)",
-                            borderRadius: "0.5rem",
-                            fontSize: "0.8rem",
-                            color: "var(--info)",
-                        }}
-                    >
+                    <div className="info-box">
                         Quote will expire in 72 hours if no action is taken.
                     </div>
 
-                    <div className="flex gap-3" style={{ marginTop: "0.5rem" }}>
-                        <button
-                            type="submit"
-                            className="btn btn-primary"
-                            style={{ flex: 1 }}
-                            disabled={loading}
-                        >
+                    <div className="form-actions">
+                        <button type="submit" className="btn-primary" disabled={loading}>
                             {loading ? "Adding..." : "Add Quote"}
                         </button>
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="btn btn-secondary"
-                        >
-                            Cancel
-                        </button>
+                        <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
                     </div>
                 </form>
             </div>
+
+            <style jsx>{`
+                .modal-overlay {
+                    position: fixed;
+                    inset: 0;
+                    background: rgba(0, 0, 0, 0.8);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 110;
+                    padding: 1rem;
+                }
+
+                .add-modal {
+                    width: 100%;
+                    max-width: 550px;
+                    max-height: 90vh;
+                    overflow: auto;
+                    background: var(--bg-primary);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-lg);
+                    padding: 1.5rem;
+                    animation: modalIn 0.2s ease;
+                }
+
+                @keyframes modalIn {
+                    from { opacity: 0; transform: scale(0.95); }
+                    to { opacity: 1; transform: scale(1); }
+                }
+
+                .modal-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 1.25rem;
+                }
+
+                .modal-header h3 {
+                    font-size: 1.25rem;
+                    font-weight: 600;
+                }
+
+                .btn-close {
+                    padding: 0.5rem;
+                    background: none;
+                    border: none;
+                    color: var(--text-secondary);
+                    cursor: pointer;
+                    border-radius: var(--radius-md);
+                }
+
+                .btn-close:hover {
+                    background: var(--bg-hover);
+                }
+
+                .creator-info {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    padding: 0.75rem 1rem;
+                    background: var(--bg-secondary);
+                    border-radius: var(--radius-md);
+                    margin-bottom: 1.5rem;
+                }
+
+                .creator-avatar {
+                    width: 36px;
+                    height: 36px;
+                    background: var(--primary-soft);
+                    color: var(--primary);
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: 600;
+                }
+
+                .creator-label {
+                    font-size: 0.75rem;
+                    color: var(--text-muted);
+                }
+
+                .creator-name {
+                    font-weight: 500;
+                }
+
+                form {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1rem;
+                }
+
+                .form-row {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 1rem;
+                }
+
+                .form-group {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.375rem;
+                }
+
+                .form-group label {
+                    font-size: 0.75rem;
+                    font-weight: 600;
+                    color: var(--text-secondary);
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                }
+
+                .form-group input,
+                .form-group select,
+                .form-group textarea {
+                    padding: 0.75rem 1rem;
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-md);
+                    color: var(--text-primary);
+                    font-size: 0.9375rem;
+                    font-family: inherit;
+                }
+
+                .form-group input:focus,
+                .form-group select:focus,
+                .form-group textarea:focus {
+                    outline: none;
+                    border-color: var(--primary);
+                }
+
+                .form-group textarea {
+                    height: 80px;
+                    resize: none;
+                }
+
+                .info-box {
+                    padding: 0.75rem;
+                    background: var(--info-bg);
+                    border: 1px solid var(--info-border);
+                    border-radius: var(--radius-md);
+                    font-size: 0.8rem;
+                    color: var(--info);
+                }
+
+                .form-actions {
+                    display: flex;
+                    gap: 0.75rem;
+                    margin-top: 0.5rem;
+                }
+
+                .btn-primary {
+                    flex: 1;
+                    padding: 0.75rem 1.5rem;
+                    background: var(--primary);
+                    color: white;
+                    border: none;
+                    border-radius: var(--radius-md);
+                    font-size: 0.9375rem;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: background 0.15s;
+                }
+
+                .btn-primary:hover:not(:disabled) {
+                    background: var(--primary-hover);
+                }
+
+                .btn-primary:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                }
+
+                .btn-secondary {
+                    padding: 0.75rem 1.5rem;
+                    background: var(--bg-secondary);
+                    color: var(--text-primary);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-md);
+                    font-size: 0.9375rem;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.15s;
+                }
+
+                .btn-secondary:hover {
+                    background: var(--bg-hover);
+                }
+
+                @media (max-width: 600px) {
+                    .form-row {
+                        grid-template-columns: 1fr;
+                    }
+                }
+            `}</style>
         </div>
     );
 }
@@ -817,23 +1105,25 @@ function QuoteDetailModal({ quoteId, onClose }: { quoteId: string; onClose: () =
         FOLLOWING_UP: { bg: "var(--info-bg)", color: "var(--info)", label: "Following Up" },
         CONVERTED: { bg: "var(--success-bg)", color: "var(--success)", label: "Won" },
         LOST: { bg: "var(--danger-bg)", color: "var(--danger)", label: "Lost" },
-        EXPIRED: { bg: "var(--bg-muted)", color: "var(--text-muted)", label: "Expired" },
+        EXPIRED: { bg: "var(--bg-secondary)", color: "var(--text-muted)", label: "Expired" },
     };
 
     if (loading) {
         return (
-            <div
-                style={{
-                    position: "fixed",
-                    inset: 0,
-                    background: "rgba(0, 0, 0, 0.9)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    zIndex: 120,
-                }}
-            >
-                <div className="animate-pulse" style={{ color: "var(--text-secondary)" }}>Loading...</div>
+            <div className="loading-overlay">
+                <span>Loading...</span>
+                <style jsx>{`
+                    .loading-overlay {
+                        position: fixed;
+                        inset: 0;
+                        background: rgba(0, 0, 0, 0.8);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        z-index: 120;
+                        color: var(--text-secondary);
+                    }
+                `}</style>
             </div>
         );
     }
@@ -847,427 +1137,696 @@ function QuoteDetailModal({ quoteId, onClose }: { quoteId: string; onClose: () =
     const isActive = quote.status === "PENDING" || quote.status === "FOLLOWING_UP";
 
     return (
-        <div
-            style={{
-                position: "fixed",
-                inset: 0,
-                background: "rgba(0, 0, 0, 0.9)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: 120,
-                padding: "1rem",
-            }}
-            onClick={(e) => e.target === e.currentTarget && onClose()}
-        >
-            <div
-                className="animate-fade-in-scale"
-                style={{
-                    width: "100%",
-                    maxWidth: "700px",
-                    maxHeight: "90vh",
-                    background: "var(--bg-elevated)",
-                    borderRadius: "1.125rem",
-                    border: "1px solid var(--border)",
-                    boxShadow: "var(--shadow-xl)",
-                    display: "flex",
-                    flexDirection: "column",
-                    overflow: "hidden",
-                }}
-            >
-                {/* Header */}
-                <div style={{ padding: "1.25rem 1.5rem", borderBottom: "1px solid var(--border)" }}>
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <div className="flex items-center gap-2" style={{ marginBottom: "0.25rem" }}>
-                                {quote.isFlagged && <Flag size={16} style={{ color: "var(--danger)" }} />}
-                                <h2 className="font-display" style={{ fontSize: "1.5rem" }}>{quote.clientName}</h2>
-                                <span
-                                    style={{
-                                        background: statusColors[quote.status].bg,
-                                        color: statusColors[quote.status].color,
-                                        padding: "0.25rem 0.75rem",
-                                        borderRadius: "9999px",
-                                        fontSize: "0.7rem",
-                                        fontWeight: 600,
-                                        textTransform: "uppercase",
-                                    }}
-                                >
+        <>
+            <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+                <div className="detail-modal">
+                    {/* Header */}
+                    <div className="modal-header">
+                        <div className="header-left">
+                            <div className="header-title">
+                                {quote.isFlagged && <Flag size={16} className="flag" />}
+                                <h2>{quote.clientName}</h2>
+                                <span className="status" style={{ background: statusColors[quote.status].bg, color: statusColors[quote.status].color }}>
                                     {statusColors[quote.status].label}
                                 </span>
                             </div>
-                            <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>
+                            <p className="header-subtitle">
                                 {quote.serviceType} • ${quote.estimatedAmount?.toLocaleString() || "TBD"}
                             </p>
                         </div>
-                        <button onClick={onClose} className="btn btn-ghost btn-icon">
-                            <X size={20} />
-                        </button>
+                        <button onClick={onClose} className="btn-close"><X size={20} /></button>
                     </div>
 
-                    {/* Stats row */}
-                    <div className="flex items-center gap-4 flex-wrap" style={{ marginTop: "1rem", fontSize: "0.8rem" }}>
-                        <span className="flex items-center gap-1" style={{ color: "var(--text-secondary)" }}>
-                            <Timer size={14} />
-                            Last action: {formatTimeSince(quote.lastActionAt)}
-                        </span>
-                        <span className="flex items-center gap-1" style={{ color: "var(--text-secondary)" }}>
-                            <RefreshCw size={14} />
-                            {quote.actionCount} actions
-                        </span>
+                    {/* Stats */}
+                    <div className="stats-row">
+                        <span><Timer size={14} /> Last: {formatTimeSince(quote.lastActionAt)}</span>
+                        <span><RefreshCw size={14} /> {quote.actionCount} actions</span>
                         {isActive && (
-                            <span
-                                className="flex items-center gap-1"
-                                style={{ color: expiry.urgent ? "var(--danger)" : "var(--text-secondary)" }}
-                            >
-                                <Hourglass size={14} />
-                                {expiry.text}
+                            <span className={expiry.urgent ? "urgent" : ""}>
+                                <Hourglass size={14} /> {expiry.text}
                             </span>
                         )}
                     </div>
-                </div>
 
-                {/* Tabs */}
-                <div style={{ padding: "0.75rem 1.5rem", borderBottom: "1px solid var(--border)", display: "flex", gap: "0.5rem" }}>
-                    <button
-                        onClick={() => setActiveTab("actions")}
-                        style={{
-                            padding: "0.5rem 1rem",
-                            borderRadius: "0.5rem",
-                            border: "none",
-                            cursor: "pointer",
-                            fontSize: "0.8rem",
-                            fontWeight: 500,
-                            background: activeTab === "actions" ? "var(--accent-soft)" : "transparent",
-                            color: activeTab === "actions" ? "var(--accent)" : "var(--text-secondary)",
-                            fontFamily: "inherit",
-                        }}
-                    >
-                        <History size={14} style={{ marginRight: "0.375rem", verticalAlign: "middle" }} />
-                        Activity
-                    </button>
-                    <button
-                        onClick={() => setActiveTab("details")}
-                        style={{
-                            padding: "0.5rem 1rem",
-                            borderRadius: "0.5rem",
-                            border: "none",
-                            cursor: "pointer",
-                            fontSize: "0.8rem",
-                            fontWeight: 500,
-                            background: activeTab === "details" ? "var(--accent-soft)" : "transparent",
-                            color: activeTab === "details" ? "var(--accent)" : "var(--text-secondary)",
-                            fontFamily: "inherit",
-                        }}
-                    >
-                        <FileText size={14} style={{ marginRight: "0.375rem", verticalAlign: "middle" }} />
-                        Details
-                    </button>
-                </div>
+                    {/* Tabs */}
+                    <div className="tabs">
+                        <button onClick={() => setActiveTab("actions")} className={activeTab === "actions" ? "active" : ""}>
+                            <History size={14} /> Activity
+                        </button>
+                        <button onClick={() => setActiveTab("details")} className={activeTab === "details" ? "active" : ""}>
+                            <FileText size={14} /> Details
+                        </button>
+                    </div>
 
-                {/* Content */}
-                <div style={{ flex: 1, overflow: "auto", padding: "1.25rem 1.5rem" }}>
-                    {activeTab === "actions" ? (
-                        <div className="flex flex-col gap-4">
-                            {/* Action input - only for active quotes */}
-                            {isActive && (
-                                <div style={{ background: "var(--bg-secondary)", borderRadius: "0.75rem", padding: "1rem" }}>
-                                    <textarea
-                                        className="input"
-                                        placeholder="Add notes about your action..."
-                                        value={noteInput}
-                                        onChange={(e) => setNoteInput(e.target.value)}
-                                        style={{ height: "70px", resize: "none", marginBottom: "0.75rem" }}
-                                    />
-                                    <div className="flex gap-2 flex-wrap">
-                                        <button
-                                            onClick={() => handleAction("CALLED")}
-                                            className="btn btn-secondary"
-                                            style={{ padding: "0.5rem 0.75rem", fontSize: "0.8rem" }}
-                                            disabled={actionLoading || !noteInput.trim()}
-                                        >
-                                            <PhoneCall size={14} />
-                                            Called
-                                        </button>
-                                        <button
-                                            onClick={() => handleAction("EMAILED")}
-                                            className="btn btn-secondary"
-                                            style={{ padding: "0.5rem 0.75rem", fontSize: "0.8rem" }}
-                                            disabled={actionLoading || !noteInput.trim()}
-                                        >
-                                            <Send size={14} />
-                                            Emailed
-                                        </button>
-                                        <button
-                                            onClick={() => handleAction("TEXTED")}
-                                            className="btn btn-secondary"
-                                            style={{ padding: "0.5rem 0.75rem", fontSize: "0.8rem" }}
-                                            disabled={actionLoading || !noteInput.trim()}
-                                        >
-                                            <MessageCircle size={14} />
-                                            Texted
-                                        </button>
-                                        <button
-                                            onClick={handleAddNote}
-                                            className="btn btn-secondary"
-                                            style={{ padding: "0.5rem 0.75rem", fontSize: "0.8rem" }}
-                                            disabled={actionLoading || !noteInput.trim()}
-                                        >
-                                            <MessageSquare size={14} />
-                                            Add Note
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Outcome buttons - only for active quotes */}
-                            {isActive && (
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => setShowOutcomeModal("WON")}
-                                        className="btn"
-                                        style={{
-                                            flex: 1,
-                                            padding: "0.75rem",
-                                            background: "var(--success-bg)",
-                                            color: "var(--success)",
-                                            border: "1px solid var(--success-border)",
-                                        }}
-                                    >
-                                        <Trophy size={16} />
-                                        Mark as Won
-                                    </button>
-                                    <button
-                                        onClick={() => setShowOutcomeModal("LOST")}
-                                        className="btn"
-                                        style={{
-                                            flex: 1,
-                                            padding: "0.75rem",
-                                            background: "var(--danger-bg)",
-                                            color: "var(--danger)",
-                                            border: "1px solid var(--danger-border)",
-                                        }}
-                                    >
-                                        <ThumbsDown size={16} />
-                                        Mark as Lost
-                                    </button>
-                                </div>
-                            )}
-
-                            {/* Outcome display for closed quotes */}
-                            {quote.outcome && (
-                                <div
-                                    style={{
-                                        padding: "1rem",
-                                        borderRadius: "0.75rem",
-                                        background: quote.outcome === "WON" ? "var(--success-bg)" : "var(--danger-bg)",
-                                        border: `1px solid ${quote.outcome === "WON" ? "var(--success-border)" : "var(--danger-border)"}`,
-                                    }}
-                                >
-                                    <div className="flex items-center gap-2" style={{ marginBottom: "0.5rem" }}>
-                                        {quote.outcome === "WON" ? (
-                                            <Trophy size={18} style={{ color: "var(--success)" }} />
-                                        ) : (
-                                            <ThumbsDown size={18} style={{ color: "var(--danger)" }} />
-                                        )}
-                                        <span style={{ fontWeight: 600, color: quote.outcome === "WON" ? "var(--success)" : "var(--danger)" }}>
-                                            Quote {quote.outcome === "WON" ? "Won" : "Lost"}
-                                        </span>
-                                        {quote.outcomeAt && (
-                                            <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
-                                                • {new Date(quote.outcomeAt).toLocaleDateString()}
-                                            </span>
-                                        )}
-                                    </div>
-                                    {quote.outcomeReason && (
-                                        <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-                                            {quote.outcomeReason}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Action history */}
-                            <div>
-                                <h4 style={{ fontSize: "0.9rem", fontWeight: 600, marginBottom: "0.75rem", color: "var(--text-secondary)" }}>
-                                    Activity History
-                                </h4>
-                                <div className="flex flex-col gap-2">
-                                    {quote.actions && quote.actions.length > 0 ? (
-                                        quote.actions.map((action) => (
-                                            <div
-                                                key={action.id}
-                                                style={{
-                                                    padding: "0.75rem 1rem",
-                                                    background: "var(--bg-secondary)",
-                                                    borderRadius: "0.5rem",
-                                                    borderLeft: "3px solid var(--accent)",
-                                                }}
-                                            >
-                                                <div className="flex items-center justify-between" style={{ marginBottom: "0.25rem" }}>
-                                                    <span className="flex items-center gap-2" style={{ fontWeight: 500, fontSize: "0.875rem" }}>
-                                                        {actionTypeIcons[action.actionType] || <Clock size={14} />}
-                                                        {action.actionType.replace("_", " ")}
-                                                    </span>
-                                                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                                                        {formatTimeSince(action.createdAt)}
-                                                    </span>
-                                                </div>
-                                                {action.notes && (
-                                                    <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: "0.25rem" }}>
-                                                        {action.notes}
-                                                    </p>
-                                                )}
-                                                <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
-                                                    by {action.user.name || "Unknown"}
-                                                </span>
+                    {/* Content */}
+                    <div className="modal-content">
+                        {activeTab === "actions" ? (
+                            <div className="actions-tab">
+                                {isActive && (
+                                    <>
+                                        <div className="action-input">
+                                            <textarea
+                                                placeholder="Add notes about your action..."
+                                                value={noteInput}
+                                                onChange={(e) => setNoteInput(e.target.value)}
+                                            />
+                                            <div className="action-btns">
+                                                <button onClick={() => handleAction("CALLED")} disabled={actionLoading || !noteInput.trim()}>
+                                                    <PhoneCall size={14} /> Called
+                                                </button>
+                                                <button onClick={() => handleAction("EMAILED")} disabled={actionLoading || !noteInput.trim()}>
+                                                    <Send size={14} /> Emailed
+                                                </button>
+                                                <button onClick={() => handleAction("TEXTED")} disabled={actionLoading || !noteInput.trim()}>
+                                                    <MessageCircle size={14} /> Texted
+                                                </button>
+                                                <button onClick={handleAddNote} disabled={actionLoading || !noteInput.trim()}>
+                                                    <MessageSquare size={14} /> Note
+                                                </button>
                                             </div>
-                                        ))
-                                    ) : (
-                                        <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", textAlign: "center", padding: "2rem" }}>
-                                            No activity recorded yet
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col gap-4">
-                            {/* Contact Info */}
-                            <div>
-                                <h4 style={{ fontSize: "0.9rem", fontWeight: 600, marginBottom: "0.75rem", color: "var(--text-secondary)" }}>
-                                    Contact Information
-                                </h4>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-                                    <div style={{ padding: "0.75rem", background: "var(--bg-secondary)", borderRadius: "0.5rem" }}>
-                                        <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>Email</p>
-                                        <p style={{ fontSize: "0.875rem" }}>{quote.clientEmail || "—"}</p>
-                                    </div>
-                                    <div style={{ padding: "0.75rem", background: "var(--bg-secondary)", borderRadius: "0.5rem" }}>
-                                        <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>Phone</p>
-                                        <p style={{ fontSize: "0.875rem" }}>{quote.clientPhone || "—"}</p>
-                                    </div>
-                                </div>
-                            </div>
+                                        </div>
 
-                            {/* Service Details */}
-                            <div>
-                                <h4 style={{ fontSize: "0.9rem", fontWeight: 600, marginBottom: "0.75rem", color: "var(--text-secondary)" }}>
-                                    Service Details
-                                </h4>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-                                    <div style={{ padding: "0.75rem", background: "var(--bg-secondary)", borderRadius: "0.5rem" }}>
-                                        <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>Service Type</p>
-                                        <p style={{ fontSize: "0.875rem" }}>{quote.serviceType}</p>
+                                        <div className="outcome-btns">
+                                            <button className="won" onClick={() => setShowOutcomeModal("WON")}>
+                                                <Trophy size={16} /> Mark as Won
+                                            </button>
+                                            <button className="lost" onClick={() => setShowOutcomeModal("LOST")}>
+                                                <ThumbsDown size={16} /> Mark as Lost
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+
+                                {quote.outcome && (
+                                    <div className={`outcome-box ${quote.outcome === "WON" ? "won" : "lost"}`}>
+                                        <div className="outcome-header">
+                                            {quote.outcome === "WON" ? <Trophy size={18} /> : <ThumbsDown size={18} />}
+                                            <span>Quote {quote.outcome === "WON" ? "Won" : "Lost"}</span>
+                                            {quote.outcomeAt && (
+                                                <span className="outcome-date">• {new Date(quote.outcomeAt).toLocaleDateString()}</span>
+                                            )}
+                                        </div>
+                                        {quote.outcomeReason && <p>{quote.outcomeReason}</p>}
                                     </div>
-                                    <div style={{ padding: "0.75rem", background: "var(--bg-secondary)", borderRadius: "0.5rem" }}>
-                                        <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>Source</p>
-                                        <p style={{ fontSize: "0.875rem" }}>{quote.source || "—"}</p>
-                                    </div>
-                                    <div style={{ padding: "0.75rem", background: "var(--bg-secondary)", borderRadius: "0.5rem" }}>
-                                        <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>Date of Service</p>
-                                        <p style={{ fontSize: "0.875rem" }}>
-                                            {quote.dateOfService ? new Date(quote.dateOfService).toLocaleDateString() : "—"}
-                                        </p>
-                                    </div>
-                                    <div style={{ padding: "0.75rem", background: "var(--bg-secondary)", borderRadius: "0.5rem" }}>
-                                        <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>Estimated Amount</p>
-                                        <p style={{ fontSize: "0.875rem" }}>
-                                            {quote.estimatedAmount ? `$${quote.estimatedAmount.toLocaleString()}` : "—"}
-                                        </p>
+                                )}
+
+                                <div className="activity-section">
+                                    <h4>Activity History</h4>
+                                    <div className="activity-list">
+                                        {quote.actions && quote.actions.length > 0 ? (
+                                            quote.actions.map((action) => (
+                                                <div key={action.id} className="activity-item">
+                                                    <div className="activity-header">
+                                                        <span className="activity-type">
+                                                            {actionTypeIcons[action.actionType] || <Clock size={14} />}
+                                                            {action.actionType.replace("_", " ")}
+                                                        </span>
+                                                        <span className="activity-time">{formatTimeSince(action.createdAt)}</span>
+                                                    </div>
+                                                    {action.notes && <p className="activity-notes">{action.notes}</p>}
+                                                    <span className="activity-user">by {action.user.name || "Unknown"}</span>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="no-activity">No activity recorded yet</p>
+                                        )}
                                     </div>
                                 </div>
                             </div>
-
-                            {/* Notes */}
-                            {quote.notes && (
-                                <div>
-                                    <h4 style={{ fontSize: "0.9rem", fontWeight: 600, marginBottom: "0.75rem", color: "var(--text-secondary)" }}>
-                                        Notes
-                                    </h4>
-                                    <div style={{ padding: "0.75rem", background: "var(--bg-secondary)", borderRadius: "0.5rem" }}>
-                                        <p style={{ fontSize: "0.875rem", whiteSpace: "pre-wrap" }}>{quote.notes}</p>
+                        ) : (
+                            <div className="details-tab">
+                                <div className="detail-section">
+                                    <h4>Contact Information</h4>
+                                    <div className="detail-grid">
+                                        <div className="detail-item">
+                                            <span className="label">Email</span>
+                                            <span className="value">{quote.clientEmail || "—"}</span>
+                                        </div>
+                                        <div className="detail-item">
+                                            <span className="label">Phone</span>
+                                            <span className="value">{quote.clientPhone || "—"}</span>
+                                        </div>
                                     </div>
                                 </div>
-                            )}
 
-                            {/* Meta info */}
-                            <div style={{ marginTop: "0.5rem", padding: "1rem", background: "var(--bg-secondary)", borderRadius: "0.5rem" }}>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem", fontSize: "0.8rem" }}>
-                                    <div>
-                                        <span style={{ color: "var(--text-muted)" }}>Created by: </span>
-                                        <span>{quote.createdBy.name || "Unknown"}</span>
+                                <div className="detail-section">
+                                    <h4>Service Details</h4>
+                                    <div className="detail-grid">
+                                        <div className="detail-item">
+                                            <span className="label">Service Type</span>
+                                            <span className="value">{quote.serviceType}</span>
+                                        </div>
+                                        <div className="detail-item">
+                                            <span className="label">Source</span>
+                                            <span className="value">{quote.source || "—"}</span>
+                                        </div>
+                                        <div className="detail-item">
+                                            <span className="label">Date of Service</span>
+                                            <span className="value">{quote.dateOfService ? new Date(quote.dateOfService).toLocaleDateString() : "—"}</span>
+                                        </div>
+                                        <div className="detail-item">
+                                            <span className="label">Estimated Amount</span>
+                                            <span className="value">{quote.estimatedAmount ? `$${quote.estimatedAmount.toLocaleString()}` : "—"}</span>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <span style={{ color: "var(--text-muted)" }}>Created: </span>
-                                        <span>{new Date(quote.createdAt).toLocaleString()}</span>
+                                </div>
+
+                                {quote.notes && (
+                                    <div className="detail-section">
+                                        <h4>Notes</h4>
+                                        <p className="notes-text">{quote.notes}</p>
                                     </div>
-                                    <div>
-                                        <span style={{ color: "var(--text-muted)" }}>Assigned to: </span>
-                                        <span>{quote.assignedTo?.name || "Unassigned"}</span>
+                                )}
+
+                                <div className="meta-section">
+                                    <div className="meta-row">
+                                        <span>Created by: {quote.createdBy.name || "Unknown"}</span>
+                                        <span>Created: {new Date(quote.createdAt).toLocaleString()}</span>
                                     </div>
-                                    <div>
-                                        <span style={{ color: "var(--text-muted)" }}>Expires: </span>
-                                        <span>{new Date(quote.expiresAt).toLocaleString()}</span>
+                                    <div className="meta-row">
+                                        <span>Assigned to: {quote.assignedTo?.name || "Unassigned"}</span>
+                                        <span>Expires: {new Date(quote.expiresAt).toLocaleString()}</span>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
             </div>
 
-            {/* Outcome Modal */}
             {showOutcomeModal && (
-                <div
-                    style={{
-                        position: "fixed",
-                        inset: 0,
-                        background: "rgba(0, 0, 0, 0.9)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        zIndex: 130,
-                        padding: "1rem",
-                    }}
-                    onClick={(e) => e.target === e.currentTarget && setShowOutcomeModal(null)}
-                >
-                    <div
-                        className="glass-card animate-fade-in-scale"
-                        style={{ width: "100%", maxWidth: "400px" }}
-                    >
-                        <h3 className="font-display" style={{ fontSize: "1.25rem", marginBottom: "1rem" }}>
-                            {showOutcomeModal === "WON" ? "Mark Quote as Won" : "Mark Quote as Lost"}
-                        </h3>
-                        <div style={{ marginBottom: "1rem" }}>
-                            <label className="input-label">Reason (optional)</label>
+                <div className="outcome-overlay" onClick={(e) => e.target === e.currentTarget && setShowOutcomeModal(null)}>
+                    <div className="outcome-modal">
+                        <h3>{showOutcomeModal === "WON" ? "Mark Quote as Won" : "Mark Quote as Lost"}</h3>
+                        <div className="form-group">
+                            <label>Reason (optional)</label>
                             <textarea
-                                className="input"
                                 placeholder={showOutcomeModal === "WON" ? "Booking details..." : "Reason for loss..."}
                                 value={outcomeReason}
                                 onChange={(e) => setOutcomeReason(e.target.value)}
-                                style={{ height: "80px", resize: "none" }}
                             />
                         </div>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={handleOutcome}
-                                className={`btn ${showOutcomeModal === "WON" ? "btn-success" : "btn-danger"}`}
-                                style={{ flex: 1 }}
-                                disabled={actionLoading}
-                            >
+                        <div className="outcome-actions">
+                            <button onClick={handleOutcome} className={showOutcomeModal === "WON" ? "btn-success" : "btn-danger"} disabled={actionLoading}>
                                 {actionLoading ? "Saving..." : "Confirm"}
                             </button>
-                            <button
-                                onClick={() => setShowOutcomeModal(null)}
-                                className="btn btn-secondary"
-                            >
-                                Cancel
-                            </button>
+                            <button onClick={() => setShowOutcomeModal(null)} className="btn-secondary">Cancel</button>
                         </div>
                     </div>
                 </div>
             )}
-        </div>
+
+            <style jsx>{`
+                .modal-overlay {
+                    position: fixed;
+                    inset: 0;
+                    background: rgba(0, 0, 0, 0.8);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 120;
+                    padding: 1rem;
+                }
+
+                .detail-modal {
+                    width: 100%;
+                    max-width: 700px;
+                    max-height: 90vh;
+                    background: var(--bg-primary);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-lg);
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                    animation: modalIn 0.2s ease;
+                }
+
+                @keyframes modalIn {
+                    from { opacity: 0; transform: scale(0.95); }
+                    to { opacity: 1; transform: scale(1); }
+                }
+
+                .modal-header {
+                    padding: 1.25rem 1.5rem;
+                    border-bottom: 1px solid var(--border);
+                    display: flex;
+                    justify-content: space-between;
+                }
+
+                .header-left {
+                    flex: 1;
+                }
+
+                .header-title {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    margin-bottom: 0.25rem;
+                }
+
+                .header-title :global(.flag) {
+                    color: var(--danger);
+                }
+
+                .header-title h2 {
+                    font-size: 1.25rem;
+                    font-weight: 600;
+                }
+
+                .header-title .status {
+                    padding: 0.25rem 0.75rem;
+                    border-radius: 9999px;
+                    font-size: 0.7rem;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                }
+
+                .header-subtitle {
+                    color: var(--text-secondary);
+                    font-size: 0.9rem;
+                }
+
+                .btn-close {
+                    padding: 0.5rem;
+                    background: none;
+                    border: none;
+                    color: var(--text-secondary);
+                    cursor: pointer;
+                    border-radius: var(--radius-md);
+                }
+
+                .stats-row {
+                    padding: 0.75rem 1.5rem;
+                    background: var(--bg-secondary);
+                    display: flex;
+                    gap: 1.5rem;
+                    font-size: 0.8rem;
+                    color: var(--text-secondary);
+                    flex-wrap: wrap;
+                }
+
+                .stats-row span {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.375rem;
+                }
+
+                .stats-row .urgent {
+                    color: var(--danger);
+                }
+
+                .tabs {
+                    padding: 0.75rem 1.5rem;
+                    border-bottom: 1px solid var(--border);
+                    display: flex;
+                    gap: 0.5rem;
+                }
+
+                .tabs button {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.375rem;
+                    padding: 0.5rem 1rem;
+                    border-radius: var(--radius-md);
+                    border: none;
+                    background: transparent;
+                    color: var(--text-secondary);
+                    font-size: 0.8rem;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.15s;
+                }
+
+                .tabs button:hover {
+                    background: var(--bg-hover);
+                }
+
+                .tabs button.active {
+                    background: var(--primary-soft);
+                    color: var(--primary);
+                }
+
+                .modal-content {
+                    flex: 1;
+                    overflow: auto;
+                    padding: 1.25rem 1.5rem;
+                }
+
+                .actions-tab {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1.25rem;
+                }
+
+                .action-input {
+                    background: var(--bg-secondary);
+                    border-radius: var(--radius-md);
+                    padding: 1rem;
+                }
+
+                .action-input textarea {
+                    width: 100%;
+                    height: 70px;
+                    padding: 0.75rem;
+                    background: var(--bg-primary);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-md);
+                    color: var(--text-primary);
+                    font-family: inherit;
+                    font-size: 0.9rem;
+                    resize: none;
+                    margin-bottom: 0.75rem;
+                }
+
+                .action-input textarea:focus {
+                    outline: none;
+                    border-color: var(--primary);
+                }
+
+                .action-btns {
+                    display: flex;
+                    gap: 0.5rem;
+                    flex-wrap: wrap;
+                }
+
+                .action-btns button {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.375rem;
+                    padding: 0.5rem 0.75rem;
+                    background: var(--bg-primary);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-md);
+                    color: var(--text-primary);
+                    font-size: 0.8rem;
+                    cursor: pointer;
+                    transition: all 0.15s;
+                }
+
+                .action-btns button:hover:not(:disabled) {
+                    background: var(--bg-hover);
+                    border-color: var(--primary);
+                }
+
+                .action-btns button:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                }
+
+                .outcome-btns {
+                    display: flex;
+                    gap: 0.75rem;
+                }
+
+                .outcome-btns button {
+                    flex: 1;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 0.5rem;
+                    padding: 0.75rem;
+                    border-radius: var(--radius-md);
+                    font-size: 0.875rem;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.15s;
+                }
+
+                .outcome-btns .won {
+                    background: var(--success-bg);
+                    border: 1px solid var(--success-border);
+                    color: var(--success);
+                }
+
+                .outcome-btns .won:hover {
+                    background: var(--success);
+                    color: white;
+                }
+
+                .outcome-btns .lost {
+                    background: var(--danger-bg);
+                    border: 1px solid var(--danger-border);
+                    color: var(--danger);
+                }
+
+                .outcome-btns .lost:hover {
+                    background: var(--danger);
+                    color: white;
+                }
+
+                .outcome-box {
+                    padding: 1rem;
+                    border-radius: var(--radius-md);
+                }
+
+                .outcome-box.won {
+                    background: var(--success-bg);
+                    border: 1px solid var(--success-border);
+                }
+
+                .outcome-box.lost {
+                    background: var(--danger-bg);
+                    border: 1px solid var(--danger-border);
+                }
+
+                .outcome-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    margin-bottom: 0.5rem;
+                    font-weight: 600;
+                }
+
+                .outcome-box.won .outcome-header {
+                    color: var(--success);
+                }
+
+                .outcome-box.lost .outcome-header {
+                    color: var(--danger);
+                }
+
+                .outcome-date {
+                    font-size: 0.8rem;
+                    font-weight: 400;
+                    color: var(--text-muted);
+                }
+
+                .outcome-box p {
+                    font-size: 0.875rem;
+                    color: var(--text-secondary);
+                }
+
+                .activity-section h4 {
+                    font-size: 0.9rem;
+                    font-weight: 600;
+                    color: var(--text-secondary);
+                    margin-bottom: 0.75rem;
+                }
+
+                .activity-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.5rem;
+                }
+
+                .activity-item {
+                    padding: 0.75rem 1rem;
+                    background: var(--bg-secondary);
+                    border-radius: var(--radius-md);
+                    border-left: 3px solid var(--primary);
+                }
+
+                .activity-header {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-bottom: 0.25rem;
+                }
+
+                .activity-type {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.375rem;
+                    font-weight: 500;
+                    font-size: 0.875rem;
+                }
+
+                .activity-time {
+                    font-size: 0.75rem;
+                    color: var(--text-muted);
+                }
+
+                .activity-notes {
+                    font-size: 0.8rem;
+                    color: var(--text-secondary);
+                    margin-bottom: 0.25rem;
+                }
+
+                .activity-user {
+                    font-size: 0.7rem;
+                    color: var(--text-muted);
+                }
+
+                .no-activity {
+                    text-align: center;
+                    padding: 2rem;
+                    color: var(--text-muted);
+                    font-size: 0.875rem;
+                }
+
+                .details-tab {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1.25rem;
+                }
+
+                .detail-section h4 {
+                    font-size: 0.9rem;
+                    font-weight: 600;
+                    color: var(--text-secondary);
+                    margin-bottom: 0.75rem;
+                }
+
+                .detail-grid {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 0.75rem;
+                }
+
+                .detail-item {
+                    padding: 0.75rem;
+                    background: var(--bg-secondary);
+                    border-radius: var(--radius-md);
+                }
+
+                .detail-item .label {
+                    display: block;
+                    font-size: 0.7rem;
+                    color: var(--text-muted);
+                    margin-bottom: 0.25rem;
+                }
+
+                .detail-item .value {
+                    font-size: 0.875rem;
+                    color: var(--text-primary);
+                }
+
+                .notes-text {
+                    padding: 0.75rem;
+                    background: var(--bg-secondary);
+                    border-radius: var(--radius-md);
+                    font-size: 0.875rem;
+                    white-space: pre-wrap;
+                }
+
+                .meta-section {
+                    padding: 1rem;
+                    background: var(--bg-secondary);
+                    border-radius: var(--radius-md);
+                }
+
+                .meta-row {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 0.5rem;
+                    font-size: 0.8rem;
+                }
+
+                .meta-row:first-child {
+                    margin-bottom: 0.5rem;
+                }
+
+                .meta-row span:first-child {
+                    color: var(--text-muted);
+                }
+
+                /* Outcome Modal */
+                .outcome-overlay {
+                    position: fixed;
+                    inset: 0;
+                    background: rgba(0, 0, 0, 0.9);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 130;
+                    padding: 1rem;
+                }
+
+                .outcome-modal {
+                    width: 100%;
+                    max-width: 400px;
+                    background: var(--bg-primary);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-lg);
+                    padding: 1.5rem;
+                    animation: modalIn 0.2s ease;
+                }
+
+                .outcome-modal h3 {
+                    font-size: 1.125rem;
+                    margin-bottom: 1rem;
+                }
+
+                .outcome-modal .form-group {
+                    margin-bottom: 1rem;
+                }
+
+                .outcome-modal .form-group label {
+                    display: block;
+                    font-size: 0.75rem;
+                    font-weight: 600;
+                    color: var(--text-secondary);
+                    text-transform: uppercase;
+                    margin-bottom: 0.375rem;
+                }
+
+                .outcome-modal textarea {
+                    width: 100%;
+                    height: 80px;
+                    padding: 0.75rem;
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-md);
+                    color: var(--text-primary);
+                    font-family: inherit;
+                    resize: none;
+                }
+
+                .outcome-actions {
+                    display: flex;
+                    gap: 0.75rem;
+                }
+
+                .btn-success {
+                    flex: 1;
+                    padding: 0.75rem;
+                    background: var(--success);
+                    color: white;
+                    border: none;
+                    border-radius: var(--radius-md);
+                    font-weight: 500;
+                    cursor: pointer;
+                }
+
+                .btn-danger {
+                    flex: 1;
+                    padding: 0.75rem;
+                    background: var(--danger);
+                    color: white;
+                    border: none;
+                    border-radius: var(--radius-md);
+                    font-weight: 500;
+                    cursor: pointer;
+                }
+
+                .btn-secondary {
+                    padding: 0.75rem 1rem;
+                    background: var(--bg-secondary);
+                    color: var(--text-primary);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-md);
+                    cursor: pointer;
+                }
+            `}</style>
+        </>
     );
 }

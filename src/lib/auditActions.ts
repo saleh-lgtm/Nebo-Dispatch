@@ -36,7 +36,8 @@ export type AuditEntity =
     | "TimeOffRequest"
     | "ShiftSwapRequest"
     | "Event"
-    | "AdminTask";
+    | "AdminTask"
+    | "SOP";
 
 /**
  * Create an audit log entry

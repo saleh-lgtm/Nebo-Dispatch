@@ -12,7 +12,7 @@ import {
     Crown,
     Users,
     ArrowRight,
-    Sparkles,
+    PlayCircle,
 } from "lucide-react";
 import { createActiveShift } from "@/lib/actions";
 import { useState } from "react";
@@ -35,15 +35,23 @@ interface Quote {
     clientEmail: string | null;
     clientPhone: string | null;
     serviceType: string;
+    source: string | null;
+    dateOfService: Date | null;
     pickupDate: Date | null;
     pickupLocation: string | null;
     dropoffLocation: string | null;
     estimatedAmount: number | null;
     notes: string | null;
     status: "PENDING" | "FOLLOWING_UP" | "CONVERTED" | "LOST" | "EXPIRED";
+    outcome: "WON" | "LOST" | null;
+    outcomeReason: string | null;
     followUpCount: number;
     lastFollowUp: Date | null;
     nextFollowUp: Date | null;
+    lastActionAt: Date | null;
+    actionCount: number;
+    isFlagged: boolean;
+    expiresAt: Date;
     followUpNotes: string | null;
     createdBy: { id: string; name: string | null };
     assignedTo: { id: string; name: string | null } | null;
@@ -175,28 +183,20 @@ export default function DashboardClient({
     };
 
     return (
-        <div className="dashboard-container">
-            {/* Header Section */}
-            <header className="dashboard-header animate-fade-in">
-                <div className="header-content">
-                    <div className="greeting-row">
-                        <h1 className="page-title">
-                            Welcome back, <span className="name-highlight">{session.user.name}</span>
-                        </h1>
+        <div className="dashboard">
+            {/* Header */}
+            <header className="dashboard-header">
+                <div>
+                    <div className="header-top">
+                        <h1>Welcome back, {session.user.name}</h1>
                         {isSuperAdmin && (
-                            <span className="super-admin-badge">
+                            <span className="admin-badge">
                                 <Crown size={12} />
                                 Super Admin
                             </span>
                         )}
                     </div>
-                    <p className="page-subtitle">
-                        {isSuperAdmin
-                            ? "Super Administrator Dashboard"
-                            : isAdmin
-                            ? "Administrator Dashboard"
-                            : "Dispatcher Portal"}{" "}
-                        &bull;{" "}
+                    <p className="header-subtitle">
                         {new Date().toLocaleDateString("en-US", {
                             weekday: "long",
                             year: "numeric",
@@ -205,99 +205,99 @@ export default function DashboardClient({
                         })}
                     </p>
                 </div>
-                <div className="header-accent" />
             </header>
 
             {/* Stats Grid */}
             <div className="stats-grid">
-                {/* Clock In/Out - Only for non-super-admin */}
+                {/* Clock In/Out */}
                 {!isSuperAdmin && (
-                    <div className={`stat-card stat-card-clock ${hasActiveShift ? 'active' : ''} animate-fade-in stagger-1`}>
-                        <div className="stat-card-inner">
-                            <div className="stat-icon-box" style={{ background: hasActiveShift ? 'var(--success-bg)' : 'var(--accent-soft)' }}>
-                                <Clock size={22} style={{ color: hasActiveShift ? 'var(--success)' : 'var(--accent)' }} />
+                    <div className={`stat-card ${hasActiveShift ? 'stat-active' : ''}`}>
+                        <div className="stat-content">
+                            <div className={`stat-icon ${hasActiveShift ? 'icon-success' : 'icon-primary'}`}>
+                                <Clock size={22} />
                             </div>
-                            <div className="stat-info">
-                                <p className="stat-label">Status</p>
-                                <h3 className="stat-title">
-                                    {hasActiveShift ? "Shift Active" : "Off Duty"}
-                                </h3>
+                            <div className="stat-text">
+                                <span className="stat-label">Status</span>
+                                <span className="stat-value">{hasActiveShift ? "On Shift" : "Off Duty"}</span>
                             </div>
                         </div>
                         <button
                             onClick={handleClockToggle}
-                            className={`stat-action-btn ${hasActiveShift ? 'btn-shift-active' : ''}`}
+                            className={`stat-btn ${hasActiveShift ? 'btn-success' : 'btn-primary'}`}
                             disabled={loading}
                         >
-                            <span>{hasActiveShift ? "Submit Report" : "Clock In"}</span>
+                            {hasActiveShift ? "Submit Report" : "Clock In"}
                             <ArrowRight size={16} />
                         </button>
-                        {hasActiveShift && <div className="pulse-indicator" />}
+                        {hasActiveShift && <div className="live-dot" />}
                     </div>
                 )}
 
-                {/* Active Users - For admins */}
+                {/* Online Users */}
                 {isAdmin && (
-                    <div className="stat-card animate-fade-in stagger-2">
-                        <div className="stat-card-inner">
-                            <div className="stat-icon-box" style={{ background: 'var(--success-bg)' }}>
-                                <Users size={22} style={{ color: 'var(--success)' }} />
+                    <div className="stat-card">
+                        <div className="stat-content">
+                            <div className="stat-icon icon-success">
+                                <Users size={22} />
                             </div>
-                            <div className="stat-info">
-                                <p className="stat-label">Online Now</p>
-                                <h3 className="stat-title">{onlineUsers.length} Active</h3>
+                            <div className="stat-text">
+                                <span className="stat-label">Online Now</span>
+                                <span className="stat-value">{onlineUsers.length} users</span>
                             </div>
                         </div>
-                        <p className="stat-meta">
-                            <Sparkles size={12} />
-                            {activeShiftUsers.length} on shift
-                        </p>
+                        <div className="stat-footer">
+                            <PlayCircle size={14} />
+                            <span>{activeShiftUsers.length} on active shift</span>
+                        </div>
                     </div>
                 )}
 
-                {/* Total Users - For admins */}
+                {/* Total Users */}
                 {isAdmin && (
-                    <div className="stat-card animate-fade-in stagger-3">
-                        <div className="stat-card-inner">
-                            <div className="stat-icon-box" style={{ background: 'var(--accent-soft)' }}>
-                                <Shield size={22} style={{ color: 'var(--accent)' }} />
+                    <div className="stat-card">
+                        <div className="stat-content">
+                            <div className="stat-icon icon-info">
+                                <Shield size={22} />
                             </div>
-                            <div className="stat-info">
-                                <p className="stat-label">Total Users</p>
-                                <h3 className="stat-title">{initialStats.userCount} Registered</h3>
+                            <div className="stat-text">
+                                <span className="stat-label">Team Members</span>
+                                <span className="stat-value">{initialStats.userCount} total</span>
                             </div>
                         </div>
-                        <p className="stat-meta">Manage team access</p>
+                        <div className="stat-footer">
+                            <span>Manage team access</span>
+                        </div>
                     </div>
                 )}
 
                 {/* Pending Quotes */}
-                <div className="stat-card animate-fade-in stagger-4">
-                    <div className="stat-card-inner">
-                        <div className="stat-icon-box" style={{ background: 'var(--warning-bg)' }}>
-                            <TrendingUp size={22} style={{ color: 'var(--warning)' }} />
+                <div className="stat-card">
+                    <div className="stat-content">
+                        <div className="stat-icon icon-warning">
+                            <TrendingUp size={22} />
                         </div>
-                        <div className="stat-info">
-                            <p className="stat-label">Pending Quotes</p>
-                            <h3 className="stat-title">
-                                {pendingQuotes.filter((q) => q.status === "PENDING" || q.status === "FOLLOWING_UP").length}{" "}
-                                to Follow
-                            </h3>
+                        <div className="stat-text">
+                            <span className="stat-label">Pending Quotes</span>
+                            <span className="stat-value">
+                                {pendingQuotes.filter((q) => q.status === "PENDING" || q.status === "FOLLOWING_UP").length} leads
+                            </span>
                         </div>
                     </div>
-                    <p className="stat-meta">Track & convert leads</p>
+                    <div className="stat-footer">
+                        <span>Track & convert leads</span>
+                    </div>
                 </div>
 
-                {/* Schedule - For non-super-admin */}
+                {/* Next Shift */}
                 {!isSuperAdmin && (
-                    <div className="stat-card animate-fade-in stagger-5">
-                        <div className="stat-card-inner">
-                            <div className="stat-icon-box" style={{ background: 'var(--info-bg)' }}>
-                                <Calendar size={22} style={{ color: 'var(--info)' }} />
+                    <div className="stat-card">
+                        <div className="stat-content">
+                            <div className="stat-icon icon-info">
+                                <Calendar size={22} />
                             </div>
-                            <div className="stat-info">
-                                <p className="stat-label">Next Shift</p>
-                                <h3 className="stat-title">
+                            <div className="stat-text">
+                                <span className="stat-label">Next Shift</span>
+                                <span className="stat-value">
                                     {nextShift ? (
                                         new Date(nextShift.shiftStart).toLocaleDateString(undefined, {
                                             weekday: 'short',
@@ -305,14 +305,14 @@ export default function DashboardClient({
                                             day: 'numeric',
                                         })
                                     ) : (
-                                        "No Upcoming"
+                                        "Not scheduled"
                                     )}
-                                </h3>
+                                </span>
                             </div>
                         </div>
-                        <p className="stat-meta">
+                        <div className="stat-footer">
                             {nextShift ? (
-                                <>
+                                <span>
                                     {new Date(nextShift.shiftStart).toLocaleTimeString(undefined, {
                                         hour: 'numeric',
                                         minute: '2-digit',
@@ -322,23 +322,19 @@ export default function DashboardClient({
                                         hour: 'numeric',
                                         minute: '2-digit',
                                     })}
-                                </>
+                                </span>
                             ) : (
-                                "Check schedule for updates"
+                                <span>Check schedule</span>
                             )}
-                        </p>
+                        </div>
                     </div>
                 )}
             </div>
 
-            {/* Main Content Grid */}
+            {/* Main Content */}
             <div className="content-grid">
-                {/* Left Column */}
-                <div className="content-column animate-fade-in stagger-6">
-                    {/* Quotes Follow-up Panel */}
-                    <QuotesPanel quotes={pendingQuotes} userId={userId} isAdmin={isAdmin} />
-
-                    {/* Recent Reports */}
+                <div className="content-col">
+                    <QuotesPanel quotes={pendingQuotes} />
                     <RecentReportsPanel
                         reports={recentReports}
                         isAdmin={isSuperAdmin}
@@ -346,12 +342,9 @@ export default function DashboardClient({
                     />
                 </div>
 
-                {/* Right Column */}
-                <div className="content-column animate-fade-in stagger-7">
-                    {/* Upcoming Events Panel */}
+                <div className="content-col">
                     <EventsPanel events={upcomingEvents} isAdmin={isAdmin} />
 
-                    {/* Active Users Panel - For admins */}
                     {isAdmin && (
                         <ActiveUsersPanel
                             initialOnlineUsers={onlineUsers}
@@ -361,353 +354,322 @@ export default function DashboardClient({
                     )}
 
                     {/* Global Notes */}
-                    <section className="notes-section glass-card">
-                        <div className="section-header">
-                            <div className="section-icon">
-                                <StickyNote size={18} />
-                            </div>
-                            <h2 className="section-title">Global Notes</h2>
+                    <div className="card notes-card">
+                        <div className="card-header">
+                            <StickyNote size={18} className="header-icon" />
+                            <h3>Global Notes</h3>
                         </div>
                         <div className="notes-list">
                             {globalNotes.length > 0 ? (
-                                globalNotes.slice(0, 5).map((note, index) => (
-                                    <div
-                                        key={note.id}
-                                        className="note-card"
-                                        style={{ animationDelay: `${index * 0.05}s` }}
-                                    >
-                                        <h4 className="note-title">{note.title}</h4>
-                                        <p className="note-content">
-                                            {note.content.length > 150
-                                                ? `${note.content.slice(0, 150)}...`
+                                globalNotes.slice(0, 5).map((note) => (
+                                    <div key={note.id} className="note-item">
+                                        <h4>{note.title}</h4>
+                                        <p>
+                                            {note.content.length > 120
+                                                ? `${note.content.slice(0, 120)}...`
                                                 : note.content}
                                         </p>
                                         <div className="note-meta">
-                                            <span className="note-author">
-                                                <User size={10} />
-                                                {note.author.name || "Admin"}
-                                            </span>
+                                            <span><User size={10} /> {note.author.name || "Admin"}</span>
                                             <span>{formatDate(note.createdAt)}</span>
                                         </div>
                                     </div>
                                 ))
                             ) : (
-                                <div className="empty-notes">
+                                <div className="empty-state">
                                     <StickyNote size={32} />
-                                    <p>No announcements at this time.</p>
+                                    <p>No announcements</p>
                                 </div>
                             )}
                         </div>
-                    </section>
+                    </div>
                 </div>
             </div>
 
             <style jsx>{`
-                .dashboard-container {
-                    padding: 2rem;
-                    max-width: 1600px;
+                .dashboard {
+                    padding: 1.5rem;
+                    max-width: 1500px;
                     margin: 0 auto;
                 }
 
                 .dashboard-header {
-                    position: relative;
-                    margin-bottom: 2.5rem;
-                    padding-bottom: 1.5rem;
+                    margin-bottom: 1.5rem;
                 }
 
-                .header-accent {
-                    position: absolute;
-                    bottom: 0;
-                    left: 0;
-                    width: 80px;
-                    height: 3px;
-                    background: linear-gradient(90deg, var(--accent) 0%, transparent 100%);
-                    border-radius: 2px;
-                }
-
-                .greeting-row {
+                .header-top {
                     display: flex;
                     align-items: center;
-                    gap: 1rem;
+                    gap: 0.75rem;
                     flex-wrap: wrap;
-                    margin-bottom: 0.5rem;
                 }
 
-                .page-title {
-                    font-family: 'Cormorant', Georgia, serif;
-                    font-size: 2.25rem;
+                .dashboard-header h1 {
+                    font-size: 1.5rem;
                     font-weight: 600;
                     color: var(--text-primary);
-                    letter-spacing: -0.02em;
                 }
 
-                .name-highlight {
-                    background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent) 100%);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    background-clip: text;
-                }
-
-                .super-admin-badge {
+                .admin-badge {
                     display: inline-flex;
                     align-items: center;
-                    gap: 0.375rem;
-                    padding: 0.375rem 0.875rem;
-                    background: linear-gradient(135deg, rgba(248, 113, 113, 0.15), rgba(251, 191, 36, 0.15));
-                    border: 1px solid rgba(248, 113, 113, 0.25);
+                    gap: 0.25rem;
+                    padding: 0.25rem 0.625rem;
+                    background: var(--danger-bg);
+                    border: 1px solid var(--danger-border);
                     border-radius: 9999px;
-                    font-size: 0.6875rem;
+                    font-size: 0.625rem;
                     font-weight: 600;
                     color: var(--danger);
-                    letter-spacing: 0.05em;
                     text-transform: uppercase;
+                    letter-spacing: 0.05em;
                 }
 
-                .page-subtitle {
-                    font-size: 0.9375rem;
+                .header-subtitle {
                     color: var(--text-secondary);
+                    font-size: 0.875rem;
+                    margin-top: 0.25rem;
                 }
 
                 /* Stats Grid */
                 .stats-grid {
                     display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-                    gap: 1.25rem;
-                    margin-bottom: 2.5rem;
+                    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+                    gap: 1rem;
+                    margin-bottom: 1.5rem;
                 }
 
                 .stat-card {
                     position: relative;
-                    background: var(--glass);
-                    backdrop-filter: blur(24px);
-                    -webkit-backdrop-filter: blur(24px);
-                    border: 1px solid var(--glass-border);
-                    border-radius: var(--radius-xl);
-                    padding: 1.5rem;
-                    transition: all 0.25s ease;
-                    overflow: hidden;
-                }
-
-                .stat-card::before {
-                    content: '';
-                    position: absolute;
-                    top: 0;
-                    right: 0;
-                    width: 100px;
-                    height: 100px;
-                    background: radial-gradient(circle at top right, var(--accent-soft) 0%, transparent 60%);
-                    opacity: 0.5;
-                    transition: opacity 0.25s;
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-lg);
+                    padding: 1.25rem;
+                    transition: all 0.2s ease;
                 }
 
                 .stat-card:hover {
                     border-color: var(--border-hover);
-                    box-shadow: var(--shadow-lg);
-                    transform: translateY(-2px);
                 }
 
-                .stat-card:hover::before {
-                    opacity: 1;
-                }
-
-                .stat-card-clock.active {
+                .stat-card.stat-active {
                     border-color: var(--success-border);
-                    background: linear-gradient(135deg, var(--success-bg) 0%, var(--glass) 100%);
+                    background: linear-gradient(135deg, var(--success-bg) 0%, var(--bg-card) 100%);
                 }
 
-                .stat-card-inner {
+                .stat-content {
                     display: flex;
                     align-items: center;
                     gap: 1rem;
                     margin-bottom: 1rem;
-                    position: relative;
-                    z-index: 1;
                 }
 
-                .stat-icon-box {
+                .stat-icon {
+                    width: 44px;
+                    height: 44px;
+                    border-radius: var(--radius-md);
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    width: 48px;
-                    height: 48px;
-                    border-radius: 12px;
                     flex-shrink: 0;
                 }
 
-                .stat-info {
-                    flex: 1;
-                    min-width: 0;
+                .icon-primary {
+                    background: var(--primary-soft);
+                    color: var(--primary);
+                }
+
+                .icon-success {
+                    background: var(--success-bg);
+                    color: var(--success);
+                }
+
+                .icon-warning {
+                    background: var(--warning-bg);
+                    color: var(--warning);
+                }
+
+                .icon-info {
+                    background: var(--info-bg);
+                    color: var(--info);
+                }
+
+                .stat-text {
+                    display: flex;
+                    flex-direction: column;
                 }
 
                 .stat-label {
-                    font-size: 0.8125rem;
-                    color: var(--text-secondary);
-                    margin-bottom: 0.25rem;
+                    font-size: 0.75rem;
+                    color: var(--text-muted);
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
                 }
 
-                .stat-title {
+                .stat-value {
                     font-size: 1.125rem;
                     font-weight: 600;
                     color: var(--text-primary);
                 }
 
-                .stat-meta {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.375rem;
-                    font-size: 0.8125rem;
-                    color: var(--text-secondary);
-                    position: relative;
-                    z-index: 1;
-                }
-
-                .stat-action-btn {
+                .stat-btn {
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     gap: 0.5rem;
                     width: 100%;
-                    padding: 0.75rem 1rem;
-                    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+                    padding: 0.625rem 1rem;
                     border: none;
-                    border-radius: 0.625rem;
-                    color: var(--text-inverse);
+                    border-radius: var(--radius-md);
                     font-size: 0.875rem;
-                    font-weight: 600;
-                    font-family: 'Outfit', sans-serif;
+                    font-weight: 500;
+                    font-family: inherit;
                     cursor: pointer;
-                    transition: all 0.25s;
-                    position: relative;
-                    z-index: 1;
+                    transition: all 0.15s ease;
                 }
 
-                .stat-action-btn:hover:not(:disabled) {
-                    transform: translateY(-1px);
-                    box-shadow: 0 4px 16px var(--accent-glow);
+                .stat-btn.btn-primary {
+                    background: var(--primary);
+                    color: white;
                 }
 
-                .stat-action-btn.btn-shift-active {
-                    background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+                .stat-btn.btn-primary:hover:not(:disabled) {
+                    background: var(--primary-hover);
                 }
 
-                .stat-action-btn:disabled {
-                    opacity: 0.6;
+                .stat-btn.btn-success {
+                    background: var(--success);
+                    color: var(--text-inverse);
+                }
+
+                .stat-btn.btn-success:hover:not(:disabled) {
+                    background: #16A34A;
+                }
+
+                .stat-btn:disabled {
+                    opacity: 0.5;
                     cursor: not-allowed;
                 }
 
-                .pulse-indicator {
+                .stat-footer {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.375rem;
+                    font-size: 0.8125rem;
+                    color: var(--text-secondary);
+                }
+
+                .live-dot {
                     position: absolute;
                     top: 1rem;
                     right: 1rem;
-                    width: 10px;
-                    height: 10px;
+                    width: 8px;
+                    height: 8px;
                     background: var(--success);
                     border-radius: 50%;
-                    animation: pulse 2s ease-in-out infinite;
+                    animation: pulse 2s infinite;
                 }
 
                 @keyframes pulse {
-                    0%, 100% { opacity: 1; transform: scale(1); }
-                    50% { opacity: 0.5; transform: scale(1.2); }
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.4; }
                 }
 
                 /* Content Grid */
                 .content-grid {
                     display: grid;
-                    grid-template-columns: ${isSuperAdmin ? '2fr 1fr' : '1fr 1fr'};
+                    grid-template-columns: 1fr 1fr;
                     gap: 1.5rem;
                 }
 
-                .content-column {
+                .content-col {
                     display: flex;
                     flex-direction: column;
                     gap: 1.5rem;
                 }
 
-                /* Notes Section */
-                .notes-section {
-                    background: var(--bg-secondary);
+                /* Notes Card */
+                .notes-card {
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-lg);
+                    padding: 1.25rem;
                 }
 
-                .section-header {
+                .card-header {
                     display: flex;
                     align-items: center;
-                    gap: 0.75rem;
-                    margin-bottom: 1.5rem;
+                    gap: 0.5rem;
+                    margin-bottom: 1rem;
                 }
 
-                .section-icon {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    color: var(--accent);
+                .card-header :global(.header-icon) {
+                    color: var(--primary);
                 }
 
-                .section-title {
-                    font-family: 'Cormorant', serif;
-                    font-size: 1.25rem;
+                .card-header h3 {
+                    font-size: 1rem;
                     font-weight: 600;
                 }
 
                 .notes-list {
                     display: flex;
                     flex-direction: column;
-                    gap: 1rem;
+                    gap: 0.75rem;
                 }
 
-                .note-card {
-                    padding: 1rem;
-                    border-left: 3px solid var(--accent);
-                    background: var(--bg-primary);
-                    border-radius: 0 0.625rem 0.625rem 0;
-                    transition: all 0.2s;
+                .note-item {
+                    padding: 0.875rem;
+                    background: var(--bg-secondary);
+                    border-left: 3px solid var(--primary);
+                    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+                    transition: background 0.15s;
                 }
 
-                .note-card:hover {
-                    background: var(--bg-elevated);
-                    border-left-color: var(--accent-hover);
+                .note-item:hover {
+                    background: var(--bg-hover);
                 }
 
-                .note-title {
-                    font-size: 0.9375rem;
-                    font-weight: 600;
-                    color: var(--accent);
-                    margin-bottom: 0.5rem;
-                }
-
-                .note-content {
+                .note-item h4 {
                     font-size: 0.875rem;
+                    font-weight: 600;
+                    color: var(--primary);
+                    margin-bottom: 0.375rem;
+                }
+
+                .note-item p {
+                    font-size: 0.8125rem;
                     color: var(--text-secondary);
-                    line-height: 1.6;
-                    margin-bottom: 0.75rem;
+                    line-height: 1.5;
+                    margin-bottom: 0.5rem;
                 }
 
                 .note-meta {
                     display: flex;
                     align-items: center;
-                    gap: 1rem;
+                    gap: 0.75rem;
                     font-size: 0.6875rem;
                     color: var(--text-muted);
                 }
 
-                .note-author {
+                .note-meta span {
                     display: flex;
                     align-items: center;
                     gap: 0.25rem;
                 }
 
-                .empty-notes {
+                .empty-state {
                     text-align: center;
                     padding: 2rem 0;
-                    color: var(--text-secondary);
+                    color: var(--text-muted);
                 }
 
-                .empty-notes :global(svg) {
-                    opacity: 0.2;
-                    margin-bottom: 0.75rem;
+                .empty-state :global(svg) {
+                    opacity: 0.3;
+                    margin-bottom: 0.5rem;
                 }
 
-                .empty-notes p {
+                .empty-state p {
                     font-size: 0.875rem;
                 }
 
@@ -716,19 +678,15 @@ export default function DashboardClient({
                     .content-grid {
                         grid-template-columns: 1fr;
                     }
-
-                    .dashboard-container {
-                        padding: 1.5rem;
-                    }
                 }
 
                 @media (max-width: 768px) {
-                    .dashboard-container {
+                    .dashboard {
                         padding: 1rem;
                     }
 
-                    .page-title {
-                        font-size: 1.75rem;
+                    .dashboard-header h1 {
+                        font-size: 1.25rem;
                     }
 
                     .stats-grid {
