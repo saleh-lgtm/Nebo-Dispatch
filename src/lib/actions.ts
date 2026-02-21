@@ -199,7 +199,8 @@ export async function submitAffiliate(data: {
     name: string;
     email: string;
     phone?: string;
-    market: string;
+    state: string;
+    cities: string[];
     notes?: string;
     cityTransferRate?: string;
     submittedById: string;
@@ -223,7 +224,7 @@ export async function submitAffiliate(data: {
         "CREATE",
         "Affiliate",
         affiliate.id,
-        { name: data.name, market: data.market }
+        { name: data.name, state: data.state, cities: data.cities.join(", ") }
     );
 
     revalidatePath("/affiliates");

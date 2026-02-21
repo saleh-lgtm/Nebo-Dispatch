@@ -89,7 +89,9 @@ export async function updateAffiliate(
     data: {
         name?: string;
         email?: string;
-        market?: string;
+        phone?: string;
+        state?: string;
+        cities?: string[];
         notes?: string;
         cityTransferRate?: string;
     }
@@ -106,7 +108,7 @@ export async function updateAffiliate(
         "UPDATE",
         "Affiliate",
         id,
-        data
+        { ...data, cities: data.cities?.join(", ") }
     );
 
     revalidatePath("/affiliates");

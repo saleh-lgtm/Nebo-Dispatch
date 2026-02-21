@@ -17,9 +17,11 @@ import {
     X,
     MoreVertical,
     Trash2,
+    Edit3,
+    Building2,
 } from "lucide-react";
 import { submitAffiliate } from "@/lib/actions";
-import { approveAffiliate, rejectAffiliate, deleteAffiliate } from "@/lib/affiliateActions";
+import { approveAffiliate, rejectAffiliate, deleteAffiliate, updateAffiliate } from "@/lib/affiliateActions";
 import { useToast } from "@/hooks/useToast";
 import Modal from "@/components/ui/Modal";
 
@@ -28,7 +30,8 @@ interface Affiliate {
     name: string;
     email: string;
     phone: string | null;
-    market: string;
+    state: string;
+    cities: string[];
     notes: string | null;
     cityTransferRate: string | null;
     isApproved: boolean;
@@ -59,14 +62,29 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
         name: "",
         email: "",
         phone: "",
-        market: "",
+        state: "",
+        cities: [] as string[],
+        cityInput: "",
+        cityTransferRate: "",
+        notes: ""
+    });
+
+    const [editModal, setEditModal] = useState<{ open: boolean; affiliate: Affiliate | null }>({ open: false, affiliate: null });
+    const [editData, setEditData] = useState({
+        name: "",
+        email: "",
+        phone: "",
+        state: "",
+        cities: [] as string[],
+        cityInput: "",
         cityTransferRate: "",
         notes: ""
     });
 
     const filteredAffiliates = affiliates.filter((a) => {
         const matchesSearch = a.name.toLowerCase().includes(search.toLowerCase()) ||
-            a.market.toLowerCase().includes(search.toLowerCase());
+            a.state.toLowerCase().includes(search.toLowerCase()) ||
+            a.cities.some(c => c.toLowerCase().includes(search.toLowerCase()));
 
         if (!isAdmin) return matchesSearch && a.isApproved;
 
@@ -77,14 +95,24 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (formData.cities.length === 0) {
+            addToast("Please add at least one city", "error");
+            return;
+        }
         setLoading(true);
         try {
             await submitAffiliate({
-                ...formData,
+                name: formData.name,
+                email: formData.email,
+                phone: formData.phone || undefined,
+                state: formData.state,
+                cities: formData.cities,
+                cityTransferRate: formData.cityTransferRate || undefined,
+                notes: formData.notes || undefined,
                 submittedById: session.user.id
             });
             setShowForm(false);
-            setFormData({ name: "", email: "", phone: "", market: "", cityTransferRate: "", notes: "" });
+            setFormData({ name: "", email: "", phone: "", state: "", cities: [], cityInput: "", cityTransferRate: "", notes: "" });
             addToast("Affiliate submitted for admin approval!", "success");
             router.refresh();
         } catch {
@@ -92,6 +120,64 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleEdit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editModal.affiliate) return;
+        if (editData.cities.length === 0) {
+            addToast("Please add at least one city", "error");
+            return;
+        }
+        setLoading(true);
+        try {
+            await updateAffiliate(editModal.affiliate.id, {
+                name: editData.name,
+                email: editData.email,
+                phone: editData.phone || undefined,
+                state: editData.state,
+                cities: editData.cities,
+                cityTransferRate: editData.cityTransferRate || undefined,
+                notes: editData.notes || undefined,
+            });
+            setEditModal({ open: false, affiliate: null });
+            addToast("Affiliate updated successfully!", "success");
+            router.refresh();
+        } catch {
+            addToast("Failed to update affiliate", "error");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const openEditModal = (affiliate: Affiliate) => {
+        setEditData({
+            name: affiliate.name,
+            email: affiliate.email,
+            phone: affiliate.phone || "",
+            state: affiliate.state,
+            cities: affiliate.cities,
+            cityInput: "",
+            cityTransferRate: affiliate.cityTransferRate || "",
+            notes: affiliate.notes || ""
+        });
+        setEditModal({ open: true, affiliate });
+        setActionDropdown(null);
+    };
+
+    const addCity = (isEdit = false) => {
+        const data = isEdit ? editData : formData;
+        const setData = isEdit ? setEditData : setFormData;
+        const city = data.cityInput.trim();
+        if (city && !data.cities.includes(city)) {
+            setData({ ...data, cities: [...data.cities, city], cityInput: "" });
+        }
+    };
+
+    const removeCity = (cityToRemove: string, isEdit = false) => {
+        const data = isEdit ? editData : formData;
+        const setData = isEdit ? setEditData : setFormData;
+        setData({ ...data, cities: data.cities.filter(c => c !== cityToRemove) });
     };
 
     const handleApprove = async (affiliate: Affiliate) => {
@@ -240,6 +326,12 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
                                                     zIndex: 10,
                                                 }}
                                             >
+                                                <button
+                                                    onClick={() => openEditModal(affiliate)}
+                                                    style={{ display: "flex", alignItems: "center", gap: "0.5rem", width: "100%", padding: "0.75rem 1rem", background: "none", border: "none", cursor: "pointer", color: "var(--text-primary)", textAlign: "left" }}
+                                                >
+                                                    <Edit3 size={16} /> Edit
+                                                </button>
                                                 {!affiliate.isApproved && (
                                                     <>
                                                         <button
@@ -276,8 +368,18 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
 
                         <div className="flex flex-col gap-2">
                             <div className="flex items-center gap-2" style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-                                <MapPin size={14} className="text-accent" />
-                                <span>{affiliate.market}</span>
+                                <Building2 size={14} className="text-accent" />
+                                <span>{affiliate.state}</span>
+                            </div>
+                            <div className="flex items-start gap-2" style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+                                <MapPin size={14} className="text-accent" style={{ marginTop: "0.125rem", flexShrink: 0 }} />
+                                <div className="flex flex-wrap gap-1">
+                                    {affiliate.cities.map((city) => (
+                                        <span key={city} style={{ background: "var(--accent-soft)", color: "var(--accent)", padding: "0.125rem 0.5rem", borderRadius: "0.25rem", fontSize: "0.75rem" }}>
+                                            {city}
+                                        </span>
+                                    ))}
+                                </div>
                             </div>
                             <div className="flex items-center gap-2" style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
                                 <Mail size={14} className="text-accent" />
@@ -363,13 +465,14 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
                     <div className="flex gap-4 flex-wrap">
                         <div className="flex flex-col gap-1 flex-1" style={{ minWidth: "150px" }}>
                             <label style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
-                                Market (City/State) *
+                                State *
                             </label>
                             <input
                                 required
                                 className="input"
-                                value={formData.market}
-                                onChange={(e) => setFormData({ ...formData, market: e.target.value })}
+                                placeholder="e.g., TX, CA, NY"
+                                value={formData.state}
+                                onChange={(e) => setFormData({ ...formData, state: e.target.value.toUpperCase() })}
                             />
                         </div>
                         <div className="flex flex-col gap-1 flex-1" style={{ minWidth: "150px" }}>
@@ -382,6 +485,36 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
                                 onChange={(e) => setFormData({ ...formData, cityTransferRate: e.target.value })}
                             />
                         </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+                            Cities Served *
+                        </label>
+                        <div className="flex gap-2">
+                            <input
+                                className="input"
+                                style={{ flex: 1 }}
+                                placeholder="Enter city name and press Add"
+                                value={formData.cityInput}
+                                onChange={(e) => setFormData({ ...formData, cityInput: e.target.value })}
+                                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCity(false); } }}
+                            />
+                            <button type="button" onClick={() => addCity(false)} className="btn btn-ghost">
+                                Add
+                            </button>
+                        </div>
+                        {formData.cities.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                                {formData.cities.map((city) => (
+                                    <span key={city} style={{ background: "var(--accent-soft)", color: "var(--accent)", padding: "0.25rem 0.75rem", borderRadius: "0.375rem", fontSize: "0.875rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                        {city}
+                                        <button type="button" onClick={() => removeCity(city, false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent)", padding: 0, display: "flex" }}>
+                                            <X size={14} />
+                                        </button>
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                     </div>
                     <div className="flex flex-col gap-1">
                         <label style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
@@ -435,6 +568,127 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
                         {loading ? "Rejecting..." : "Reject"}
                     </button>
                 </div>
+            </Modal>
+
+            {/* Edit Modal */}
+            <Modal
+                isOpen={editModal.open}
+                onClose={() => setEditModal({ open: false, affiliate: null })}
+                title="Edit Affiliate"
+                size="lg"
+            >
+                <form onSubmit={handleEdit} className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-1">
+                        <label style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+                            Company Name *
+                        </label>
+                        <input
+                            required
+                            className="input"
+                            value={editData.name}
+                            onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                        />
+                    </div>
+                    <div className="flex gap-4 flex-wrap">
+                        <div className="flex flex-col gap-1 flex-1" style={{ minWidth: "150px" }}>
+                            <label style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+                                Email Address *
+                            </label>
+                            <input
+                                required
+                                type="email"
+                                className="input"
+                                value={editData.email}
+                                onChange={(e) => setEditData({ ...editData, email: e.target.value })}
+                            />
+                        </div>
+                        <div className="flex flex-col gap-1 flex-1" style={{ minWidth: "150px" }}>
+                            <label style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+                                Phone Number
+                            </label>
+                            <input
+                                type="tel"
+                                className="input"
+                                placeholder="(555) 123-4567"
+                                value={editData.phone}
+                                onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
+                            />
+                        </div>
+                    </div>
+                    <div className="flex gap-4 flex-wrap">
+                        <div className="flex flex-col gap-1 flex-1" style={{ minWidth: "150px" }}>
+                            <label style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+                                State *
+                            </label>
+                            <input
+                                required
+                                className="input"
+                                placeholder="e.g., TX, CA, NY"
+                                value={editData.state}
+                                onChange={(e) => setEditData({ ...editData, state: e.target.value.toUpperCase() })}
+                            />
+                        </div>
+                        <div className="flex flex-col gap-1 flex-1" style={{ minWidth: "150px" }}>
+                            <label style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+                                Transfer Rate
+                            </label>
+                            <input
+                                className="input"
+                                value={editData.cityTransferRate}
+                                onChange={(e) => setEditData({ ...editData, cityTransferRate: e.target.value })}
+                            />
+                        </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+                            Cities Served *
+                        </label>
+                        <div className="flex gap-2">
+                            <input
+                                className="input"
+                                style={{ flex: 1 }}
+                                placeholder="Enter city name and press Add"
+                                value={editData.cityInput}
+                                onChange={(e) => setEditData({ ...editData, cityInput: e.target.value })}
+                                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCity(true); } }}
+                            />
+                            <button type="button" onClick={() => addCity(true)} className="btn btn-ghost">
+                                Add
+                            </button>
+                        </div>
+                        {editData.cities.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                                {editData.cities.map((city) => (
+                                    <span key={city} style={{ background: "var(--accent-soft)", color: "var(--accent)", padding: "0.25rem 0.75rem", borderRadius: "0.375rem", fontSize: "0.875rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                        {city}
+                                        <button type="button" onClick={() => removeCity(city, true)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent)", padding: 0, display: "flex" }}>
+                                            <X size={14} />
+                                        </button>
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+                            Additional Notes
+                        </label>
+                        <textarea
+                            className="input"
+                            style={{ minHeight: "100px", resize: "vertical" }}
+                            value={editData.notes}
+                            onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
+                        />
+                    </div>
+                    <div className="flex justify-end gap-3 mt-4 flex-wrap">
+                        <button type="button" onClick={() => setEditModal({ open: false, affiliate: null })} className="btn btn-ghost">
+                            Cancel
+                        </button>
+                        <button type="submit" className="btn btn-primary" disabled={loading}>
+                            {loading ? "Saving..." : "Save Changes"}
+                        </button>
+                    </div>
+                </form>
             </Modal>
         </div>
     );

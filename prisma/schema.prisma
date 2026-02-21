@@ -225,14 +225,15 @@ model Schedule {
 }
 
 model Affiliate {
-  id               String  @id @default(cuid())
+  id               String   @id @default(cuid())
   name             String
   email            String
-  phone            String? // Contact phone number
-  market           String // Region/Area
-  notes            String? @db.Text
-  cityTransferRate String? // Pricing/Rate info
-  isApproved       Boolean @default(false)
+  phone            String?  // Contact phone number
+  state            String   // State (e.g., "TX", "CA")
+  cities           String[] // Cities served in that state
+  notes            String?  @db.Text
+  cityTransferRate String?  // Pricing/Rate info
+  isApproved       Boolean  @default(false)
 
   submittedById String
   submittedBy   User   @relation(fields: [submittedById], references: [id])
