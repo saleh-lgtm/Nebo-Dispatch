@@ -117,3 +117,90 @@ export async function getWeeklyHoursTrend(userId: string, weeks: number = 4) {
 
     return results;
 }
+
+// Get all shifts for a date range with pagination
+export async function getAllShifts(options: {
+    startDate?: Date;
+    endDate?: Date;
+    userId?: string;
+    limit?: number;
+    offset?: number;
+}) {
+    await requireAdmin();
+
+    const where: Record<string, unknown> = {};
+
+    if (options.userId) {
+        where.userId = options.userId;
+    }
+
+    if (options.startDate || options.endDate) {
+        where.clockIn = {};
+        if (options.startDate) {
+            (where.clockIn as Record<string, Date>).gte = options.startDate;
+        }
+        if (options.endDate) {
+            (where.clockIn as Record<string, Date>).lte = options.endDate;
+        }
+    }
+
+    const [shifts, total] = await Promise.all([
+        prisma.shift.findMany({
+            where,
+            include: {
+                user: { select: { id: true, name: true, email: true } },
+            },
+            orderBy: { clockIn: "desc" },
+            take: options.limit || 50,
+            skip: options.offset || 0,
+        }),
+        prisma.shift.count({ where }),
+    ]);
+
+    return { shifts, total };
+}
+
+// Get currently active shifts
+export async function getActiveShifts() {
+    await requireAdmin();
+
+    const activeShifts = await prisma.shift.findMany({
+        where: { clockOut: null },
+        include: {
+            user: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { clockIn: "asc" },
+    });
+
+    return activeShifts.map((shift) => {
+        const now = new Date();
+        const hoursWorking = (now.getTime() - shift.clockIn.getTime()) / (1000 * 60 * 60);
+        return {
+            ...shift,
+            currentHours: Math.round(hoursWorking * 100) / 100,
+        };
+    });
+}
+
+// Get team totals for a date range
+export async function getTeamTotals(startDate: Date, endDate: Date) {
+    await requireAdmin();
+
+    const shifts = await prisma.shift.findMany({
+        where: {
+            clockIn: { gte: startDate },
+            clockOut: { not: null, lte: endDate },
+        },
+        select: { totalHours: true },
+    });
+
+    const totalHours = shifts.reduce((sum, s) => sum + (s.totalHours || 0), 0);
+    const totalShifts = shifts.length;
+    const avgHoursPerShift = totalShifts > 0 ? totalHours / totalShifts : 0;
+
+    return {
+        totalHours: Math.round(totalHours * 100) / 100,
+        totalShifts,
+        avgHoursPerShift: Math.round(avgHoursPerShift * 100) / 100,
+    };
+}

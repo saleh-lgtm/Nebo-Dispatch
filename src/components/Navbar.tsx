@@ -26,6 +26,7 @@ import {
     UserCog,
     CheckSquare,
     BookOpen,
+    Clock,
 } from "lucide-react";
 
 interface NavLinkProps {
@@ -191,6 +192,7 @@ export default function Navbar() {
                                         <NavLink href="/admin/notes" icon={<StickyNote size={16} />} label="Global Notes" />
                                         <NavLink href="/admin/sops" icon={<BookOpen size={16} />} label="Manage SOPs" />
                                         <NavLink href="/admin/reports" icon={<FileText size={16} />} label="Shift Reports" />
+                                        <NavLink href="/admin/hours" icon={<Clock size={16} />} label="Hours Tracking" />
                                         <NavLink href="/admin/analytics" icon={<BarChart3 size={16} />} label="Analytics" />
                                     </div>
                                     {isSuperAdmin && (
@@ -294,6 +296,7 @@ export default function Navbar() {
                             <NavLink href="/admin/notes" icon={<StickyNote size={18} />} label="Global Notes" onClick={closeMobileMenu} />
                             <NavLink href="/admin/sops" icon={<BookOpen size={18} />} label="Manage SOPs" onClick={closeMobileMenu} />
                             <NavLink href="/admin/reports" icon={<FileText size={18} />} label="Shift Reports" onClick={closeMobileMenu} />
+                            <NavLink href="/admin/hours" icon={<Clock size={18} />} label="Hours Tracking" onClick={closeMobileMenu} />
                             <NavLink href="/admin/analytics" icon={<BarChart3 size={18} />} label="Analytics" onClick={closeMobileMenu} />
                         </div>
                     )}

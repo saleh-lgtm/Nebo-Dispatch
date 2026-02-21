@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
     FileText,
     Phone,
@@ -123,6 +124,11 @@ export default function QuotesPanel({ quotes }: Props) {
                 <div className="trigger-content">
                     <div className={`trigger-icon ${hasUrgent ? "urgent" : ""}`}>
                         <FileText size={24} />
+                        {hasUrgent && (
+                            <span className="timer-indicator">
+                                <Timer size={12} />
+                            </span>
+                        )}
                     </div>
                     <div className="trigger-text">
                         <h3>Quote Follow-ups</h3>
@@ -140,7 +146,7 @@ export default function QuotesPanel({ quotes }: Props) {
                                     )}
                                     {expiringCount > 0 && (
                                         <span className="stat-expiring">
-                                            <Hourglass size={12} />
+                                            <Timer size={12} />
                                             {expiringCount} expiring
                                         </span>
                                     )}
@@ -193,11 +199,32 @@ export default function QuotesPanel({ quotes }: Props) {
                         align-items: center;
                         justify-content: center;
                         color: var(--primary);
+                        position: relative;
                     }
 
                     .trigger-icon.urgent {
                         background: var(--danger-bg);
                         color: var(--danger);
+                    }
+
+                    .trigger-icon :global(.timer-indicator) {
+                        position: absolute;
+                        top: -4px;
+                        right: -4px;
+                        width: 20px;
+                        height: 20px;
+                        background: var(--warning);
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: white;
+                        animation: pulse 2s infinite;
+                    }
+
+                    @keyframes pulse {
+                        0%, 100% { transform: scale(1); opacity: 1; }
+                        50% { transform: scale(1.1); opacity: 0.8; }
                     }
 
                     .trigger-text h3 {
@@ -697,6 +724,7 @@ function QuotesModal({ quotes, onClose }: { quotes: Quote[]; onClose: () => void
 
 function AddQuoteModal({ onClose }: { onClose: () => void }) {
     const { data: session } = useSession();
+    const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [form, setForm] = useState({
         clientName: "",
@@ -725,6 +753,7 @@ function AddQuoteModal({ onClose }: { onClose: () => void }) {
                 estimatedAmount: form.estimatedAmount ? parseFloat(form.estimatedAmount) : undefined,
                 notes: form.notes || undefined,
             });
+            router.refresh(); // Refresh the page data
             onClose();
         } catch (e) {
             console.error(e);
@@ -1025,6 +1054,7 @@ function AddQuoteModal({ onClose }: { onClose: () => void }) {
 }
 
 function QuoteDetailModal({ quoteId, onClose }: { quoteId: string; onClose: () => void }) {
+    const router = useRouter();
     const [quote, setQuote] = useState<Quote | null>(null);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
@@ -1041,7 +1071,7 @@ function QuoteDetailModal({ quoteId, onClose }: { quoteId: string; onClose: () =
         setLoading(true);
         try {
             const data = await getQuoteWithHistory(quoteId);
-            setQuote(data as Quote);
+            setQuote(data as unknown as Quote);
         } catch (e) {
             console.error(e);
         }
@@ -1055,6 +1085,7 @@ function QuoteDetailModal({ quoteId, onClose }: { quoteId: string; onClose: () =
             await recordQuoteAction(quoteId, actionType, noteInput);
             setNoteInput("");
             await loadQuote();
+            router.refresh();
         } catch (e) {
             console.error(e);
         }
@@ -1068,6 +1099,7 @@ function QuoteDetailModal({ quoteId, onClose }: { quoteId: string; onClose: () =
             await addQuoteNote(quoteId, noteInput);
             setNoteInput("");
             await loadQuote();
+            router.refresh();
         } catch (e) {
             console.error(e);
         }
@@ -1082,6 +1114,7 @@ function QuoteDetailModal({ quoteId, onClose }: { quoteId: string; onClose: () =
             setShowOutcomeModal(null);
             setOutcomeReason("");
             await loadQuote();
+            router.refresh();
         } catch (e) {
             console.error(e);
         }

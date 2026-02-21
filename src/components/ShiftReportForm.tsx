@@ -104,24 +104,30 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
 
     const handleSubmit = async () => {
         setIsSubmitting(true);
-        const data = {
-            shiftId: activeShift.id,
-            userId: session.user.id,
-            callsReceived: metrics.calls,
-            emailsSent: metrics.emails,
-            quotesGiven: quotes.length,
-            totalReservationsHandled: metrics.totalReservationsHandled,
-            generalComments: narrative.comments,
-            incidents: narrative.incidents,
-            newIdeas: narrative.ideas,
-            acceptedReservations: accepted,
-            modifiedReservations: modified,
-            cancelledReservations: cancelled,
-            clockOut: true
-        };
+        try {
+            const data = {
+                shiftId: activeShift.id,
+                userId: session.user.id,
+                callsReceived: metrics.calls,
+                emailsSent: metrics.emails,
+                quotesGiven: quotes.length,
+                totalReservationsHandled: metrics.totalReservationsHandled,
+                generalComments: narrative.comments || undefined,
+                incidents: narrative.incidents || undefined,
+                newIdeas: narrative.ideas || undefined,
+                acceptedReservations: accepted.length > 0 ? accepted : undefined,
+                modifiedReservations: modified.length > 0 ? modified : undefined,
+                cancelledReservations: cancelled.length > 0 ? cancelled : undefined,
+                clockOut: true
+            };
 
-        await saveShiftReport(data);
-        window.location.href = "/dashboard";
+            await saveShiftReport(data);
+            window.location.href = "/dashboard";
+        } catch (error) {
+            console.error("Failed to save shift report:", error);
+            setIsSubmitting(false);
+            alert("Failed to submit shift report. Please try again.");
+        }
     };
 
     const completedTasks = tasks.filter((t: any) => t.isCompleted).length;

@@ -58,7 +58,7 @@ export default async function DashboardPage() {
             where: isSuperAdmin ? {} : { userId: session.user.id },
             include: {
                 user: { select: { id: true, name: true } },
-                shift: { select: { clockIn: true, clockOut: true } },
+                shift: { select: { clockIn: true, clockOut: true, totalHours: true } },
             },
             orderBy: { createdAt: "desc" },
             take: 10,
@@ -81,10 +81,10 @@ export default async function DashboardPage() {
         <DashboardClient
             initialStats={stats}
             globalNotes={globalNotes}
-            pendingQuotes={pendingQuotes}
+            pendingQuotes={pendingQuotes as unknown as Parameters<typeof DashboardClient>[0]["pendingQuotes"]}
             onlineUsers={onlineUsers}
             activeShiftUsers={activeShiftUsers}
-            recentReports={recentReports}
+            recentReports={recentReports as unknown as Parameters<typeof DashboardClient>[0]["recentReports"]}
             upcomingEvents={upcomingEvents}
             nextShift={nextShift}
             userId={session.user.id}

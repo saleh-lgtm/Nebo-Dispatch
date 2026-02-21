@@ -80,16 +80,31 @@ export async function saveShiftReport(data: Record<string, unknown> & {
 
     // Also clock out if requested (often reports are done at shift end)
     if (clockOut) {
+        // Get shift to calculate total hours
+        const shift = await prisma.shift.findUnique({
+            where: { id: shiftId },
+            select: { clockIn: true },
+        });
+
+        const clockOutTime = new Date();
+        const totalHours = shift
+            ? (clockOutTime.getTime() - shift.clockIn.getTime()) / (1000 * 60 * 60)
+            : null;
+
         await prisma.shift.update({
             where: { id: shiftId },
-            data: { clockOut: new Date() },
+            data: {
+                clockOut: clockOutTime,
+                totalHours: totalHours ? Math.round(totalHours * 100) / 100 : null,
+            },
         });
 
         await createAuditLog(
             session.user.id,
             "CLOCK_OUT",
             "Shift",
-            shiftId
+            shiftId,
+            { totalHours: totalHours ? Math.round(totalHours * 100) / 100 : null }
         );
     }
 
@@ -204,6 +219,7 @@ export async function submitAffiliate(data: {
     notes?: string;
     cityTransferRate?: string;
     submittedById: string;
+    type: "FARM_IN" | "FARM_OUT";
 }) {
     const session = await requireAuth();
 
@@ -224,7 +240,7 @@ export async function submitAffiliate(data: {
         "CREATE",
         "Affiliate",
         affiliate.id,
-        { name: data.name, state: data.state, cities: data.cities.join(", ") }
+        { name: data.name, state: data.state, cities: data.cities.join(", "), type: data.type }
     );
 
     revalidatePath("/affiliates");
