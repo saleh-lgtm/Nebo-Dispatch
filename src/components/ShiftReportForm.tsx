@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, memo } from "react";
-import { Plus, Trash2, ClipboardCheck, Send, AlertCircle, Bookmark, Phone, Mail, FileText, TrendingUp, MessageSquare, Lightbulb, Award, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, ClipboardCheck, Send, AlertCircle, Bookmark, Phone, Mail, FileText, TrendingUp, MessageSquare, Lightbulb } from "lucide-react";
 import { toggleTask, saveShiftReport } from "@/lib/actions";
 
 interface ReservationEntry {
@@ -20,8 +20,6 @@ interface Narrative {
     comments: string;
     incidents: string;
     ideas: string;
-    achievements: string;
-    challenges: string;
 }
 
 export default function ShiftReportPage({ session, activeShift, initialTasks }: any) {
@@ -37,9 +35,7 @@ export default function ShiftReportPage({ session, activeShift, initialTasks }: 
     const [narrative, setNarrative] = useState<Narrative>({
         comments: "",
         incidents: "",
-        ideas: "",
-        achievements: "",
-        challenges: ""
+        ideas: ""
     });
     const [tasks, setTasks] = useState(initialTasks || []);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -73,8 +69,6 @@ export default function ShiftReportPage({ session, activeShift, initialTasks }: 
             generalComments: narrative.comments,
             incidents: narrative.incidents,
             newIdeas: narrative.ideas,
-            achievements: narrative.achievements,
-            challenges: narrative.challenges,
             acceptedReservations: accepted,
             modifiedReservations: modified,
             cancelledReservations: cancelled,
