@@ -5,12 +5,12 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "./auth-helpers";
 import { createAuditLog } from "./auditActions";
 
-// Helper to get start of week (Sunday 00:00:00) - internal use only
+// Helper to get start of week (Sunday 00:00:00 UTC) - internal use only
 function getWeekStartInternal(date: Date): Date {
     const d = new Date(date);
-    const day = d.getDay();
-    d.setDate(d.getDate() - day);
-    d.setHours(0, 0, 0, 0);
+    const day = d.getUTCDay();
+    d.setUTCDate(d.getUTCDate() - day);
+    d.setUTCHours(0, 0, 0, 0);
     return d;
 }
 

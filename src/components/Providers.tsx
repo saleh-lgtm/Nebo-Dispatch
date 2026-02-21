@@ -1,7 +1,7 @@
 "use client";
 
 import { SessionProvider } from "next-auth/react";
-import { ToastProvider } from "@/components/ui/Toast";
+import { ToastProvider } from "@/components/ui/ToastProvider";
 
 export const Providers = ({ children }: { children: React.ReactNode }) => {
     return (

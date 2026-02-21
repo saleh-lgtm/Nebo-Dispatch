@@ -16,7 +16,7 @@ import {
     RefreshCw,
 } from "lucide-react";
 import { getAuditLogs } from "@/lib/auditActions";
-import { useToast } from "@/components/ui/Toast";
+import { useToast } from "@/hooks/useToast";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type JsonValue = string | number | boolean | null | { [key: string]: any } | any[];

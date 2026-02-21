@@ -4,12 +4,12 @@ import { redirect } from "next/navigation";
 import { getDispatchers, getWeekSchedules } from "@/lib/schedulerActions";
 import SchedulerClient from "./SchedulerClient";
 
-// Helper to get start of week (Sunday 00:00:00)
+// Helper to get start of week (Sunday 00:00:00 UTC)
 function getWeekStart(date: Date): Date {
     const d = new Date(date);
-    const day = d.getDay();
-    d.setDate(d.getDate() - day);
-    d.setHours(0, 0, 0, 0);
+    const day = d.getUTCDay();
+    d.setUTCDate(d.getUTCDate() - day);
+    d.setUTCHours(0, 0, 0, 0);
     return d;
 }
 

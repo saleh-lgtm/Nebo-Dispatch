@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { submitAffiliate } from "@/lib/actions";
 import { approveAffiliate, rejectAffiliate, deleteAffiliate } from "@/lib/affiliateActions";
-import { useToast } from "@/components/ui/Toast";
+import { useToast } from "@/hooks/useToast";
 import Modal from "@/components/ui/Modal";
 
 interface Affiliate {

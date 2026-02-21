@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Shield, Mail, Lock, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
@@ -72,7 +73,20 @@ export default function LoginPage() {
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <label style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Password</label>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <label style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Password</label>
+                            <Link
+                                href="/forgot-password"
+                                style={{
+                                    fontSize: '0.8rem',
+                                    color: 'var(--accent)',
+                                    textDecoration: 'none',
+                                    transition: 'opacity 0.2s',
+                                }}
+                            >
+                                Forgot password?
+                            </Link>
+                        </div>
                         <div style={{ position: 'relative' }}>
                             <Lock size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
                             <input

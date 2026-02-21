@@ -15,7 +15,14 @@ export type AuditAction =
     | "CLOCK_IN"
     | "CLOCK_OUT"
     | "PASSWORD_CHANGE"
-    | "ROLE_CHANGE";
+    | "PASSWORD_RESET"
+    | "ROLE_CHANGE"
+    | "FOLLOW_UP"
+    | "CONVERT"
+    | "UPDATE_STATUS"
+    | "ASSIGN"
+    | "CANCEL"
+    | "ACCEPT";
 
 export type AuditEntity =
     | "User"
@@ -24,7 +31,11 @@ export type AuditEntity =
     | "Affiliate"
     | "GlobalNote"
     | "SchedulingRequest"
-    | "Shift";
+    | "Shift"
+    | "Quote"
+    | "TimeOffRequest"
+    | "ShiftSwapRequest"
+    | "Event";
 
 /**
  * Create an audit log entry

@@ -17,7 +17,7 @@ import {
     UserCheck,
 } from "lucide-react";
 import { approveRequest, rejectRequest } from "@/lib/adminRequestActions";
-import { approveShiftSwap } from "@/lib/timeOffActions";
+import { adminApproveSwap } from "@/lib/shiftSwapActions";
 
 interface ScheduleData {
     id: string;
@@ -119,7 +119,7 @@ export default function RequestsClient({ pendingRequests, allRequests, counts }:
                         setLoading(false);
                         return;
                     }
-                    await approveShiftSwap(actionModal.request.id, adminNotes || undefined);
+                    await adminApproveSwap(actionModal.request.id, adminNotes || undefined);
                 } else {
                     await approveRequest(actionModal.request.id, adminNotes || undefined, applyChanges);
                 }

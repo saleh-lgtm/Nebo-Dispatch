@@ -71,8 +71,20 @@ model User {
   schedules       Schedule[]
   requests        SchedulingRequest[]
   swapRequests    SchedulingRequest[] @relation("SwapTarget")
-  affiliates      Affiliate[]
-  auditLogs       AuditLog[]
+  affiliates          Affiliate[]
+  auditLogs           AuditLog[]
+  passwordResetTokens PasswordResetToken[]
+  quotesCreated       Quote[]              @relation("QuotesCreated")
+  quotesAssigned      Quote[]              @relation("QuotesAssigned")
+  presence            UserPresence?
+  eventsCreated       Event[]
+
+  // Time Off and Shift Swap relations
+  timeOffRequests     TimeOffRequest[]
+  timeOffReviewed     TimeOffRequest[]     @relation("TimeOffReviewer")
+  swapRequestsMade    ShiftSwapRequest[]   @relation("SwapRequester")
+  swapRequestsReceived ShiftSwapRequest[]  @relation("SwapTarget")
+  swapRequestsReviewed ShiftSwapRequest[]  @relation("SwapReviewer")
 }
 
 model Shift {
@@ -191,6 +203,10 @@ model Schedule {
   requests     SchedulingRequest[]
   swapRequests SchedulingRequest[] @relation("SwapTargetSchedule")
 
+  // Shift Swap relations
+  swapRequestsAsRequester ShiftSwapRequest[] @relation("RequesterShift")
+  swapRequestsAsTarget    ShiftSwapRequest[] @relation("TargetShift")
+
   @@index([weekStart])
   @@index([userId, weekStart])
 }
@@ -279,4 +295,171 @@ model AuditLog {
   @@index([userId, createdAt])
   @@index([entity, entityId])
   @@index([action, createdAt])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([userId])
+}
+
+model Quote {
+  id           String      @id @default(cuid())
+  clientName   String
+  clientEmail  String?
+  clientPhone  String?
+  serviceType  String      // e.g., "Airport Transfer", "Hourly", "City Tour"
+  pickupDate   DateTime?
+  pickupLocation String?
+  dropoffLocation String?
+  estimatedAmount Float?
+  notes        String?     @db.Text
+  status       QuoteStatus @default(PENDING)
+
+  // Follow-up tracking
+  followUpCount Int       @default(0)
+  lastFollowUp  DateTime?
+  nextFollowUp  DateTime?
+  followUpNotes String?   @db.Text
+
+  // Conversion tracking
+  convertedAt   DateTime?
+  reservationId String?   // Link to reservation if converted
+
+  // Creator
+  createdById   String
+  createdBy     User      @relation("QuotesCreated", fields: [createdById], references: [id])
+
+  // Assigned follower (could be different from creator)
+  assignedToId  String?
+  assignedTo    User?     @relation("QuotesAssigned", fields: [assignedToId], references: [id])
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([assignedToId])
+  @@index([nextFollowUp])
+}
+
+enum QuoteStatus {
+  PENDING       // New quote, needs follow-up
+  FOLLOWING_UP  // Active follow-up in progress
+  CONVERTED     // Successfully converted to booking
+  LOST          // Customer went elsewhere
+  EXPIRED       // No response after follow-ups
+}
+
+enum TimeOffStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ShiftSwapStatus {
+  PENDING_TARGET
+  PENDING_ADMIN
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum EventType {
+  GAME_DAY      // Sports events
+  CONCERT       // Concerts/shows
+  CONFERENCE    // Business conferences
+  HOLIDAY       // Holidays
+  PROMOTION     // Company promotions
+  GENERAL       // Other events
+}
+
+model Event {
+  id          String      @id @default(cuid())
+  title       String
+  description String?     @db.Text
+  eventDate   DateTime
+  endDate     DateTime?   // Optional for multi-day events
+  eventType   EventType   @default(GENERAL)
+  location    String?
+  notes       String?     @db.Text
+
+  // Operational metadata
+  expectedVolume    String?   // "HIGH", "MEDIUM", "LOW"
+  staffingNotes     String?   @db.Text
+
+  // Creator
+  createdById String
+  createdBy   User        @relation(fields: [createdById], references: [id])
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([eventDate])
+  @@index([createdById])
+}
+
+model UserPresence {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isOnline     Boolean  @default(false)
+  lastSeenAt   DateTime @default(now())
+  currentPage  String?  // Track which page user is on
+
+  @@index([isOnline])
+  @@index([lastSeenAt])
+}
+
+model TimeOffRequest {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startDate   DateTime
+  endDate     DateTime
+  reason      String        @db.Text
+  type        String        // VACATION, SICK, PERSONAL, OTHER
+  status      TimeOffStatus @default(PENDING)
+  reviewedById String?
+  reviewedBy   User?        @relation("TimeOffReviewer", fields: [reviewedById], references: [id])
+  reviewedAt   DateTime?
+  adminNotes   String?      @db.Text
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([userId, status])
+  @@index([startDate, endDate])
+  @@index([status])
+}
+
+model ShiftSwapRequest {
+  id              String          @id @default(cuid())
+  requesterId     String
+  requester       User            @relation("SwapRequester", fields: [requesterId], references: [id])
+  targetUserId    String
+  targetUser      User            @relation("SwapTarget", fields: [targetUserId], references: [id])
+  requesterShiftId String
+  requesterShift   Schedule       @relation("RequesterShift", fields: [requesterShiftId], references: [id])
+  targetShiftId    String
+  targetShift      Schedule       @relation("TargetShift", fields: [targetShiftId], references: [id])
+  status          ShiftSwapStatus @default(PENDING_TARGET)
+  reason          String?         @db.Text
+  targetResponse  String?         @db.Text
+  reviewedById    String?
+  reviewedBy      User?          @relation("SwapReviewer", fields: [reviewedById], references: [id])
+  reviewedAt      DateTime?
+  adminNotes      String?        @db.Text
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([requesterId, status])
+  @@index([targetUserId, status])
+  @@index([status])
 }

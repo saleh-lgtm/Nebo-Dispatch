@@ -24,6 +24,10 @@ import {
     Briefcase,
     History,
     UserCog,
+    CalendarOff,
+    ArrowLeftRight,
+    CalendarDays,
+    Inbox,
 } from "lucide-react";
 
 interface NavLinkProps {
@@ -55,15 +59,17 @@ interface DropdownProps {
     icon: React.ReactNode;
     children: React.ReactNode;
     badge?: string;
+    activePrefix?: string | string[];
 }
 
-function NavDropdown({ label, icon, children, badge }: DropdownProps) {
+function NavDropdown({ label, icon, children, badge, activePrefix = "/admin" }: DropdownProps) {
     const [open, setOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const pathname = usePathname();
 
     // Check if any child link is active
-    const isActive = pathname.startsWith("/admin");
+    const prefixes = Array.isArray(activePrefix) ? activePrefix : [activePrefix];
+    const isActive = prefixes.some(prefix => pathname.startsWith(prefix));
 
     // Close on click outside
     useEffect(() => {
@@ -166,11 +172,35 @@ export default function Navbar() {
                     <div className="nav-links desktop hide-mobile">
                         {/* Common Links */}
                         <NavLink href="/dashboard" icon={<LayoutDashboard size={18} />} label="Dashboard" />
-                        <NavLink href="/schedule" icon={<Calendar size={18} />} label="Schedule" />
 
-                        {/* Dispatcher-only: Shift Report */}
-                        {isDispatcher && (
-                            <NavLink href="/reports/shift" icon={<ClipboardList size={18} />} label="Shift Report" />
+                        {/* My Work Dropdown - For dispatchers */}
+                        {!isSuperAdmin && (
+                            <NavDropdown
+                                label="My Work"
+                                icon={<Briefcase size={18} />}
+                                activePrefix={["/schedule", "/reports/shift"]}
+                            >
+                                <div className="dropdown-section">
+                                    <NavLink href="/schedule" icon={<Calendar size={16} />} label="My Schedule" />
+                                    {isDispatcher && (
+                                        <NavLink href="/reports/shift" icon={<ClipboardList size={16} />} label="Submit Shift Report" />
+                                    )}
+                                </div>
+                            </NavDropdown>
+                        )}
+
+                        {/* Requests Dropdown - Time Off & Shift Swap */}
+                        {!isSuperAdmin && (
+                            <NavDropdown
+                                label="Requests"
+                                icon={<Inbox size={18} />}
+                                activePrefix={["/time-off", "/shift-swap"]}
+                            >
+                                <div className="dropdown-section">
+                                    <NavLink href="/time-off" icon={<CalendarOff size={16} />} label="Time Off" />
+                                    <NavLink href="/shift-swap" icon={<ArrowLeftRight size={16} />} label="Shift Swap" />
+                                </div>
+                            </NavDropdown>
                         )}
 
                         <NavLink href="/affiliates" icon={<Users size={18} />} label="Affiliates" />
@@ -185,13 +215,13 @@ export default function Navbar() {
                                     badge={isSuperAdmin ? "SA" : undefined}
                                 >
                                     <div className="dropdown-section">
-                                        <span className="dropdown-section-label">Management</span>
-                                        <NavLink href="/admin/scheduler" icon={<CalendarClock size={16} />} label="Scheduler" />
-                                        <NavLink href="/admin/requests" icon={<FileEdit size={16} />} label="Requests" />
-                                        <NavLink href="/admin/notes" icon={<StickyNote size={16} />} label="Notes" />
+                                        <span className="dropdown-section-label">Scheduling</span>
+                                        <NavLink href="/admin/scheduler" icon={<CalendarClock size={16} />} label="Dispatcher Scheduler" />
+                                        <NavLink href="/admin/requests" icon={<FileEdit size={16} />} label="Pending Requests" />
                                     </div>
                                     <div className="dropdown-section">
-                                        <span className="dropdown-section-label">Reports</span>
+                                        <span className="dropdown-section-label">Team</span>
+                                        <NavLink href="/admin/notes" icon={<StickyNote size={16} />} label="Global Notes" />
                                         <NavLink href="/admin/reports" icon={<FileText size={16} />} label="Shift Reports" />
                                         <NavLink href="/admin/analytics" icon={<BarChart3 size={16} />} label="Analytics" />
                                     </div>

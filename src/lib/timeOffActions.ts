@@ -5,31 +5,39 @@ import { revalidatePath } from "next/cache";
 import { requireAuth, requireAdmin } from "./auth-helpers";
 import { createAuditLog } from "./auditActions";
 
-// Time off types
-export type TimeOffType = "vacation" | "sick" | "personal" | "other";
+export type TimeOffType = "VACATION" | "SICK" | "PERSONAL" | "OTHER";
 
-// Submit a time off request (any authenticated user)
-export async function submitTimeOffRequest(data: {
-    startDate: Date;
-    endDate: Date;
-    timeOffType: TimeOffType;
-    reason: string;
-}) {
+// Request time off
+export async function requestTimeOff(
+    startDate: Date,
+    endDate: Date,
+    reason: string,
+    type: TimeOffType
+) {
     const session = await requireAuth();
 
     // Validate dates
-    if (data.endDate < data.startDate) {
-        throw new Error("End date must be after start date");
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (start > end) {
+        throw new Error("Start date must be before end date");
     }
 
-    const request = await prisma.schedulingRequest.create({
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (start < today) {
+        throw new Error("Cannot request time off in the past");
+    }
+
+    const timeOffRequest = await prisma.timeOffRequest.create({
         data: {
             userId: session.user.id,
-            type: "TIME_OFF",
-            requestedStart: data.startDate,
-            requestedEnd: data.endDate,
-            timeOffType: data.timeOffType,
-            reason: data.reason,
+            startDate: start,
+            endDate: end,
+            reason,
+            type,
             status: "PENDING",
         },
     });
@@ -37,272 +45,177 @@ export async function submitTimeOffRequest(data: {
     await createAuditLog(
         session.user.id,
         "CREATE",
-        "SchedulingRequest",
-        request.id,
-        { type: "TIME_OFF", timeOffType: data.timeOffType }
-    );
-
-    revalidatePath("/schedule");
-    revalidatePath("/admin/requests");
-    return request;
-}
-
-// Get user's time off requests
-export async function getMyTimeOffRequests() {
-    const session = await requireAuth();
-
-    return await prisma.schedulingRequest.findMany({
-        where: {
-            userId: session.user.id,
-            type: "TIME_OFF",
-        },
-        orderBy: { createdAt: "desc" },
-    });
-}
-
-// Submit a shift swap request
-export async function submitShiftSwapRequest(data: {
-    scheduleId: string;
-    targetUserId: string;
-    targetScheduleId: string;
-    reason: string;
-}) {
-    const session = await requireAuth();
-
-    // Verify both schedules exist
-    const [mySchedule, targetSchedule] = await Promise.all([
-        prisma.schedule.findUnique({ where: { id: data.scheduleId } }),
-        prisma.schedule.findUnique({ where: { id: data.targetScheduleId } }),
-    ]);
-
-    if (!mySchedule || !targetSchedule) {
-        throw new Error("One or both schedules not found");
-    }
-
-    // Verify ownership
-    if (mySchedule.userId !== session.user.id) {
-        throw new Error("You can only swap your own shifts");
-    }
-
-    if (targetSchedule.userId !== data.targetUserId) {
-        throw new Error("Target schedule doesn't belong to the target user");
-    }
-
-    const request = await prisma.schedulingRequest.create({
-        data: {
-            userId: session.user.id,
-            type: "SHIFT_SWAP",
-            scheduleId: data.scheduleId,
-            targetUserId: data.targetUserId,
-            targetScheduleId: data.targetScheduleId,
-            reason: data.reason,
-            status: "PENDING",
-            targetAccepted: null,
-        },
-    });
-
-    await createAuditLog(
-        session.user.id,
-        "CREATE",
-        "SchedulingRequest",
-        request.id,
-        { type: "SHIFT_SWAP", targetUserId: data.targetUserId }
-    );
-
-    revalidatePath("/schedule");
-    revalidatePath("/admin/requests");
-    return request;
-}
-
-// Get incoming swap requests for current user
-export async function getIncomingSwapRequests() {
-    const session = await requireAuth();
-
-    return await prisma.schedulingRequest.findMany({
-        where: {
-            type: "SHIFT_SWAP",
-            targetUserId: session.user.id,
-            status: "PENDING",
-            targetAccepted: null,
-        },
-        include: {
-            user: { select: { id: true, name: true, email: true } },
-            schedule: true,
-            targetSchedule: true,
-        },
-        orderBy: { createdAt: "desc" },
-    });
-}
-
-// Get outgoing swap requests for current user
-export async function getOutgoingSwapRequests() {
-    const session = await requireAuth();
-
-    return await prisma.schedulingRequest.findMany({
-        where: {
-            type: "SHIFT_SWAP",
-            userId: session.user.id,
-        },
-        include: {
-            targetUser: { select: { id: true, name: true, email: true } },
-            schedule: true,
-            targetSchedule: true,
-        },
-        orderBy: { createdAt: "desc" },
-    });
-}
-
-// Target user accepts or rejects a swap request
-export async function respondToSwapRequest(requestId: string, accept: boolean) {
-    const session = await requireAuth();
-
-    const request = await prisma.schedulingRequest.findUnique({
-        where: { id: requestId },
-    });
-
-    if (!request) {
-        throw new Error("Request not found");
-    }
-
-    if (request.targetUserId !== session.user.id) {
-        throw new Error("You are not the target of this swap request");
-    }
-
-    if (request.targetAccepted !== null) {
-        throw new Error("You have already responded to this request");
-    }
-
-    const updated = await prisma.schedulingRequest.update({
-        where: { id: requestId },
-        data: {
-            targetAccepted: accept,
-            // If rejected by target, auto-reject the whole request
-            status: accept ? "PENDING" : "REJECTED",
-            adminNotes: accept ? null : "Rejected by target user",
-        },
-    });
-
-    await createAuditLog(
-        session.user.id,
-        accept ? "APPROVE" : "REJECT",
-        "SchedulingRequest",
-        requestId,
-        { type: "SHIFT_SWAP_RESPONSE", accepted: accept }
-    );
-
-    revalidatePath("/schedule");
-    revalidatePath("/admin/requests");
-    return updated;
-}
-
-// Admin approves a shift swap (performs the actual swap)
-export async function approveShiftSwap(requestId: string, adminNotes?: string) {
-    const session = await requireAdmin();
-
-    const request = await prisma.schedulingRequest.findUnique({
-        where: { id: requestId },
-        include: { schedule: true, targetSchedule: true },
-    });
-
-    if (!request) {
-        throw new Error("Request not found");
-    }
-
-    if (request.type !== "SHIFT_SWAP") {
-        throw new Error("This is not a shift swap request");
-    }
-
-    if (!request.targetAccepted) {
-        throw new Error("Target user has not accepted this swap yet");
-    }
-
-    // Perform the swap - exchange userIds on the schedules
-    await prisma.$transaction([
-        prisma.schedule.update({
-            where: { id: request.scheduleId! },
-            data: { userId: request.targetUserId! },
-        }),
-        prisma.schedule.update({
-            where: { id: request.targetScheduleId! },
-            data: { userId: request.userId },
-        }),
-        prisma.schedulingRequest.update({
-            where: { id: requestId },
-            data: {
-                status: "APPROVED",
-                adminNotes: adminNotes || "Shift swap completed",
-            },
-        }),
-    ]);
-
-    await createAuditLog(
-        session.user.id,
-        "APPROVE",
-        "SchedulingRequest",
-        requestId,
-        { type: "SHIFT_SWAP_COMPLETE", adminNotes }
+        "TimeOffRequest",
+        timeOffRequest.id,
+        { startDate: start.toISOString(), endDate: end.toISOString(), type, reason }
     );
 
     revalidatePath("/schedule");
     revalidatePath("/admin/scheduler");
-    revalidatePath("/admin/requests");
+
+    return timeOffRequest;
 }
 
-// Get time off and swap request statistics (admin)
-export async function getTimeOffStats() {
-    await requireAdmin();
+// Get my time off requests
+export async function getMyTimeOffRequests() {
+    const session = await requireAuth();
 
-    const [pendingTimeOff, pendingSwaps, approvedTimeOff, totalTimeOff] = await Promise.all([
-        prisma.schedulingRequest.count({
-            where: { type: "TIME_OFF", status: "PENDING" },
-        }),
-        prisma.schedulingRequest.count({
-            where: { type: "SHIFT_SWAP", status: "PENDING", targetAccepted: true },
-        }),
-        prisma.schedulingRequest.count({
-            where: { type: "TIME_OFF", status: "APPROVED" },
-        }),
-        prisma.schedulingRequest.count({
-            where: { type: "TIME_OFF" },
-        }),
-    ]);
-
-    return {
-        pendingTimeOff,
-        pendingSwaps,
-        approvedTimeOff,
-        totalTimeOff,
-    };
-}
-
-// Get all time off requests for a date range (admin)
-export async function getTimeOffCalendar(startDate: Date, endDate: Date) {
-    await requireAdmin();
-
-    return await prisma.schedulingRequest.findMany({
-        where: {
-            type: "TIME_OFF",
-            status: "APPROVED",
-            requestedStart: { lte: endDate },
-            requestedEnd: { gte: startDate },
-        },
+    return await prisma.timeOffRequest.findMany({
+        where: { userId: session.user.id },
         include: {
-            user: { select: { id: true, name: true, email: true } },
+            reviewedBy: { select: { id: true, name: true } },
         },
-        orderBy: { requestedStart: "asc" },
+        orderBy: { createdAt: "desc" },
     });
 }
 
-// Cancel a time off or swap request (user can cancel their own pending requests)
-export async function cancelMyRequest(requestId: string) {
-    const session = await requireAuth();
+// Get pending time off requests (admin only)
+export async function getPendingTimeOffRequests() {
+    await requireAdmin();
 
-    const request = await prisma.schedulingRequest.findUnique({
-        where: { id: requestId },
+    return await prisma.timeOffRequest.findMany({
+        where: { status: "PENDING" },
+        include: {
+            user: { select: { id: true, name: true, email: true } },
+            reviewedBy: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: "asc" },
+    });
+}
+
+// Get all time off requests with optional filters (admin only)
+export async function getAllTimeOffRequests(filters?: {
+    status?: string;
+    userId?: string;
+    startDate?: Date;
+    endDate?: Date;
+}) {
+    await requireAdmin();
+
+    const where: Record<string, unknown> = {};
+
+    if (filters?.status) {
+        where.status = filters.status;
+    }
+    if (filters?.userId) {
+        where.userId = filters.userId;
+    }
+    if (filters?.startDate || filters?.endDate) {
+        where.startDate = {};
+        if (filters?.startDate) {
+            (where.startDate as Record<string, Date>).gte = filters.startDate;
+        }
+        if (filters?.endDate) {
+            (where.startDate as Record<string, Date>).lte = filters.endDate;
+        }
+    }
+
+    return await prisma.timeOffRequest.findMany({
+        where,
+        include: {
+            user: { select: { id: true, name: true, email: true } },
+            reviewedBy: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+    });
+}
+
+// Approve time off request (admin only)
+export async function approveTimeOff(id: string, adminNotes?: string) {
+    const session = await requireAdmin();
+
+    const request = await prisma.timeOffRequest.findUnique({
+        where: { id },
     });
 
     if (!request) {
-        throw new Error("Request not found");
+        throw new Error("Time off request not found");
+    }
+
+    if (request.status !== "PENDING") {
+        throw new Error("Can only approve pending requests");
+    }
+
+    const updated = await prisma.timeOffRequest.update({
+        where: { id },
+        data: {
+            status: "APPROVED",
+            reviewedById: session.user.id,
+            reviewedAt: new Date(),
+            adminNotes: adminNotes || undefined,
+        },
+        include: {
+            user: { select: { id: true, name: true } },
+        },
+    });
+
+    await createAuditLog(
+        session.user.id,
+        "APPROVE",
+        "TimeOffRequest",
+        id,
+        { userId: request.userId, adminNotes }
+    );
+
+    revalidatePath("/schedule");
+    revalidatePath("/admin/scheduler");
+
+    return updated;
+}
+
+// Reject time off request (admin only)
+export async function rejectTimeOff(id: string, adminNotes?: string) {
+    const session = await requireAdmin();
+
+    const request = await prisma.timeOffRequest.findUnique({
+        where: { id },
+    });
+
+    if (!request) {
+        throw new Error("Time off request not found");
+    }
+
+    if (request.status !== "PENDING") {
+        throw new Error("Can only reject pending requests");
+    }
+
+    const updated = await prisma.timeOffRequest.update({
+        where: { id },
+        data: {
+            status: "REJECTED",
+            reviewedById: session.user.id,
+            reviewedAt: new Date(),
+            adminNotes: adminNotes || undefined,
+        },
+        include: {
+            user: { select: { id: true, name: true } },
+        },
+    });
+
+    await createAuditLog(
+        session.user.id,
+        "REJECT",
+        "TimeOffRequest",
+        id,
+        { userId: request.userId, adminNotes }
+    );
+
+    revalidatePath("/schedule");
+    revalidatePath("/admin/scheduler");
+
+    return updated;
+}
+
+// Cancel time off request (by the user who created it)
+export async function cancelTimeOff(id: string) {
+    const session = await requireAuth();
+
+    const request = await prisma.timeOffRequest.findUnique({
+        where: { id },
+    });
+
+    if (!request) {
+        throw new Error("Time off request not found");
     }
 
     if (request.userId !== session.user.id) {
@@ -313,18 +226,104 @@ export async function cancelMyRequest(requestId: string) {
         throw new Error("Can only cancel pending requests");
     }
 
-    await prisma.schedulingRequest.delete({
-        where: { id: requestId },
+    const updated = await prisma.timeOffRequest.update({
+        where: { id },
+        data: {
+            status: "CANCELLED",
+        },
     });
 
     await createAuditLog(
         session.user.id,
-        "DELETE",
-        "SchedulingRequest",
-        requestId,
-        { type: request.type, reason: "User cancelled" }
+        "CANCEL",
+        "TimeOffRequest",
+        id,
+        { originalStatus: "PENDING" }
     );
 
     revalidatePath("/schedule");
-    revalidatePath("/admin/requests");
+
+    return updated;
+}
+
+// Get time off calendar - see who's off in a date range
+export async function getTimeOffCalendar(startDate: Date, endDate: Date) {
+    await requireAuth();
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    // Get all approved time off that overlaps with the date range
+    const timeOffRequests = await prisma.timeOffRequest.findMany({
+        where: {
+            status: "APPROVED",
+            OR: [
+                {
+                    // Time off starts within the range
+                    startDate: {
+                        gte: start,
+                        lte: end,
+                    },
+                },
+                {
+                    // Time off ends within the range
+                    endDate: {
+                        gte: start,
+                        lte: end,
+                    },
+                },
+                {
+                    // Time off spans the entire range
+                    AND: [
+                        { startDate: { lte: start } },
+                        { endDate: { gte: end } },
+                    ],
+                },
+            ],
+        },
+        include: {
+            user: { select: { id: true, name: true } },
+        },
+        orderBy: { startDate: "asc" },
+    });
+
+    return timeOffRequests;
+}
+
+// Get time off statistics for a user
+export async function getTimeOffStats(userId?: string) {
+    const session = await requireAuth();
+    const targetUserId = userId || session.user.id;
+
+    // If requesting someone else's stats, require admin
+    if (userId && userId !== session.user.id) {
+        await requireAdmin();
+    }
+
+    const currentYear = new Date().getFullYear();
+    const yearStart = new Date(currentYear, 0, 1);
+    const yearEnd = new Date(currentYear, 11, 31, 23, 59, 59);
+
+    const requests = await prisma.timeOffRequest.findMany({
+        where: {
+            userId: targetUserId,
+            startDate: { gte: yearStart },
+            endDate: { lte: yearEnd },
+        },
+    });
+
+    const stats = {
+        pending: requests.filter(r => r.status === "PENDING").length,
+        approved: requests.filter(r => r.status === "APPROVED").length,
+        rejected: requests.filter(r => r.status === "REJECTED").length,
+        cancelled: requests.filter(r => r.status === "CANCELLED").length,
+        byType: {
+            VACATION: requests.filter(r => r.type === "VACATION" && r.status === "APPROVED").length,
+            SICK: requests.filter(r => r.type === "SICK" && r.status === "APPROVED").length,
+            PERSONAL: requests.filter(r => r.type === "PERSONAL" && r.status === "APPROVED").length,
+            OTHER: requests.filter(r => r.type === "OTHER" && r.status === "APPROVED").length,
+        },
+    };
+
+    return stats;
 }

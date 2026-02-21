@@ -24,12 +24,12 @@ import {
     getWeekSchedules,
 } from "@/lib/schedulerActions";
 
-// Helper to get start of week (Sunday 00:00:00)
+// Helper to get start of week (Sunday 00:00:00 UTC)
 function getWeekStart(date: Date): Date {
     const d = new Date(date);
-    const day = d.getDay();
-    d.setDate(d.getDate() - day);
-    d.setHours(0, 0, 0, 0);
+    const day = d.getUTCDay();
+    d.setUTCDate(d.getUTCDate() - day);
+    d.setUTCHours(0, 0, 0, 0);
     return d;
 }
 import "./scheduler.css";
@@ -119,8 +119,8 @@ function schedulesToBlocks(schedules: ScheduleData[], dispatchers: Dispatcher[],
         const shiftStart = new Date(schedule.shiftStart);
         const shiftEnd = new Date(schedule.shiftEnd);
 
-        const dayOfWeek = shiftStart.getDay();
-        const startHour = shiftStart.getHours();
+        const dayOfWeek = shiftStart.getUTCDay();
+        const startHour = shiftStart.getUTCHours();
         // Use ceil to preserve fractional hours
         const totalDuration = Math.ceil((shiftEnd.getTime() - shiftStart.getTime()) / (1000 * 60 * 60));
 
@@ -284,14 +284,14 @@ export default function SchedulerClient({ dispatchers, initialSchedules, initial
     // Navigate weeks
     const goToPrevWeek = async () => {
         const newWeek = new Date(weekStart);
-        newWeek.setDate(newWeek.getDate() - 7);
+        newWeek.setUTCDate(newWeek.getUTCDate() - 7);
         setWeekStart(newWeek);
         await loadWeekSchedules(newWeek);
     };
 
     const goToNextWeek = async () => {
         const newWeek = new Date(weekStart);
-        newWeek.setDate(newWeek.getDate() + 7);
+        newWeek.setUTCDate(newWeek.getUTCDate() + 7);
         setWeekStart(newWeek);
         await loadWeekSchedules(newWeek);
     };
@@ -306,15 +306,15 @@ export default function SchedulerClient({ dispatchers, initialSchedules, initial
     const formatWeekRange = () => {
         const start = new Date(weekStart);
         const end = new Date(weekStart);
-        end.setDate(end.getDate() + 6);
-        const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-        return `${start.toLocaleDateString(undefined, opts)} - ${end.toLocaleDateString(undefined, opts)}, ${start.getFullYear()}`;
+        end.setUTCDate(end.getUTCDate() + 6);
+        const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", timeZone: "UTC" };
+        return `${start.toLocaleDateString(undefined, opts)} - ${end.toLocaleDateString(undefined, opts)}, ${start.getUTCFullYear()}`;
     };
 
     // Get date for a day column
     const getDateForDay = (dayIndex: number): Date => {
         const date = new Date(weekStart);
-        date.setDate(date.getDate() + dayIndex);
+        date.setUTCDate(date.getUTCDate() + dayIndex);
         return date;
     };
 
@@ -358,10 +358,10 @@ export default function SchedulerClient({ dispatchers, initialSchedules, initial
 
         const date = getDateForDay(day);
         const shiftStart = new Date(date);
-        shiftStart.setHours(hour, 0, 0, 0);
+        shiftStart.setUTCHours(hour, 0, 0, 0);
 
         const shiftEnd = new Date(shiftStart);
-        shiftEnd.setHours(shiftEnd.getHours() + dragState.duration);
+        shiftEnd.setUTCHours(shiftEnd.getUTCHours() + dragState.duration);
 
         if (dragState.type === "new") {
             // Create new shift
@@ -611,7 +611,7 @@ export default function SchedulerClient({ dispatchers, initialSchedules, initial
                                 return (
                                     <div key={day} className="grid-day-header">
                                         <span className="day-name">{day}</span>
-                                        <span className="day-date">{date.getDate()}</span>
+                                        <span className="day-date">{date.getUTCDate()}</span>
                                     </div>
                                 );
                             })}
