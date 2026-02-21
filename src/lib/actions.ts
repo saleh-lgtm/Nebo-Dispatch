@@ -58,8 +58,8 @@ export async function createActiveShift(userId: string) {
         include: { items: true },
     });
 
-    const taskEntries = templates.flatMap(t =>
-        t.items.map(item => ({
+    const taskEntries = templates.flatMap((t: any) =>
+        t.items.map((item: any) => ({
             shiftId: shift.id,
             content: item.content,
         }))
