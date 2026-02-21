@@ -8,12 +8,12 @@
   --bg-elevated: #FFFFFF;
   --bg-muted: #E7E5E4;
 
-  /* Premium gold accent with warm undertones */
-  --accent: #B8860B;
-  --accent-hover: #9A7209;
-  --accent-light: #D4A726;
-  --accent-glow: rgba(184, 134, 11, 0.15);
-  --accent-soft: rgba(184, 134, 11, 0.08);
+  /* Brand taupe accent - warm and elegant */
+  --accent: #B7AFA3;
+  --accent-hover: #A59E92;
+  --accent-light: #C9C3B8;
+  --accent-glow: rgba(183, 175, 163, 0.25);
+  --accent-soft: rgba(183, 175, 163, 0.12);
 
   /* Rich dark text for contrast */
   --text-primary: #1C1917;
@@ -24,7 +24,7 @@
   /* Refined borders */
   --border: #E7E5E4;
   --border-hover: #D6D3D1;
-  --border-accent: rgba(184, 134, 11, 0.3);
+  --border-accent: rgba(183, 175, 163, 0.4);
 
   /* Premium glass effect for light mode */
   --glass: rgba(255, 255, 255, 0.85);
