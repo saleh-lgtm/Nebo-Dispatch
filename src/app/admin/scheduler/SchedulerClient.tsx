@@ -175,32 +175,63 @@ function schedulesToBlocks(schedules: ScheduleData[], dispatchers: Dispatcher[],
     return blocks;
 }
 
-// Detect overlapping shifts on the same day (same time slot, different dispatchers)
-function detectOverlaps(shifts: ShiftBlock[]): Set<string> {
-    const overlaps = new Set<string>();
+// Detect overlapping shifts and calculate their horizontal positions
+function calculateOverlapPositions(shifts: ShiftBlock[]): Map<string, { index: number; total: number }> {
+    const positions = new Map<string, { index: number; total: number }>();
 
-    for (let i = 0; i < shifts.length; i++) {
-        for (let j = i + 1; j < shifts.length; j++) {
-            const a = shifts[i];
-            const b = shifts[j];
+    // Group shifts by day
+    const shiftsByDay: Map<number, ShiftBlock[]> = new Map();
+    for (const shift of shifts) {
+        if (!shiftsByDay.has(shift.day)) {
+            shiftsByDay.set(shift.day, []);
+        }
+        shiftsByDay.get(shift.day)!.push(shift);
+    }
 
-            // Check same day
-            if (a.day === b.day) {
-                const aStart = a.startHour;
-                const aEnd = a.startHour + a.duration;
-                const bStart = b.startHour;
-                const bEnd = b.startHour + b.duration;
+    // For each day, find overlapping groups
+    for (const [_day, dayShifts] of shiftsByDay) {
+        // Sort by start hour
+        const sorted = [...dayShifts].sort((a, b) => a.startHour - b.startHour);
 
-                // Check for overlap
-                if (!(aEnd <= bStart || bEnd <= aStart)) {
-                    overlaps.add(a.id);
-                    overlaps.add(b.id);
+        // Find overlapping clusters
+        const clusters: ShiftBlock[][] = [];
+
+        for (const shift of sorted) {
+            const shiftStart = shift.startHour;
+            const shiftEnd = shift.startHour + shift.duration;
+
+            // Find a cluster this shift overlaps with
+            let addedToCluster = false;
+            for (const cluster of clusters) {
+                // Check if this shift overlaps with any shift in the cluster
+                const overlapsCluster = cluster.some(existing => {
+                    const existingStart = existing.startHour;
+                    const existingEnd = existing.startHour + existing.duration;
+                    return !(shiftEnd <= existingStart || existingEnd <= shiftStart);
+                });
+
+                if (overlapsCluster) {
+                    cluster.push(shift);
+                    addedToCluster = true;
+                    break;
                 }
             }
+
+            if (!addedToCluster) {
+                clusters.push([shift]);
+            }
+        }
+
+        // Assign positions within each cluster
+        for (const cluster of clusters) {
+            const total = cluster.length;
+            cluster.forEach((shift, index) => {
+                positions.set(shift.id, { index, total });
+            });
         }
     }
 
-    return overlaps;
+    return positions;
 }
 
 interface Props {
@@ -602,22 +633,29 @@ export default function SchedulerClient({ dispatchers, initialSchedules, initial
                         {/* Shift blocks overlay */}
                         <div className="shifts-overlay">
                             {(() => {
-                                const overlaps = detectOverlaps(shifts);
+                                const overlapPositions = calculateOverlapPositions(shifts);
                                 return shifts.map((shift) => {
                                     const rowIndex = HOUR_TO_ROW[shift.startHour];
                                     // Top position: rowIndex * 30px row height + 44px header height
                                     const top = rowIndex * 30 + 44;
-                                    // Left position: percentage within the 7-day grid (overlay starts after time column)
-                                    const left = shift.day * (100 / 7);
-                                    const width = 100 / 7;
+
+                                    // Get overlap info for this shift
+                                    const position = overlapPositions.get(shift.id) || { index: 0, total: 1 };
+                                    const { index: overlapIndex, total: overlapTotal } = position;
+
+                                    // Calculate width and left position based on overlapping shifts
+                                    const dayWidth = 100 / 7; // Width of one day column in percentage
+                                    const shiftWidth = dayWidth / overlapTotal; // Divide by number of overlapping shifts
+                                    const left = shift.day * dayWidth + (overlapIndex * shiftWidth);
+
                                     const height = shift.duration * 30;
-                                    const hasOverlap = overlaps.has(shift.id);
+                                    const hasOverlap = overlapTotal > 1;
 
                                     // Build class names
                                     const classNames = ["shift-block"];
                                     if (shift.isCrossMidnight) classNames.push("cross-midnight");
                                     if (shift.isContinuation) classNames.push("cross-midnight-continuation");
-                                    if (hasOverlap) classNames.push("overlap-warning");
+                                    if (hasOverlap) classNames.push("has-overlap");
 
                                     return (
                                         <div
@@ -626,7 +664,7 @@ export default function SchedulerClient({ dispatchers, initialSchedules, initial
                                             style={{
                                                 top: `${top}px`,
                                                 left: `calc(${left}% + 2px)`,
-                                                width: `calc(${width}% - 4px)`,
+                                                width: `calc(${shiftWidth}% - 4px)`,
                                                 height: `${height}px`,
                                                 background: shift.color,
                                                 color: getContrastColor(shift.color),
