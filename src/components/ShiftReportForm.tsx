@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, memo } from "react";
-import { Plus, Trash2, ClipboardCheck, Send, AlertCircle, Bookmark, Phone, Mail, FileText, TrendingUp, MessageSquare, Lightbulb } from "lucide-react";
+import { Plus, Trash2, ClipboardCheck, Send, AlertCircle, Bookmark, Phone, Mail, FileText, TrendingUp, MessageSquare, Lightbulb, Clock, CheckCircle, Minus } from "lucide-react";
 import { toggleTask, saveShiftReport } from "@/lib/actions";
 
 interface ReservationEntry {
@@ -79,21 +79,32 @@ export default function ShiftReportPage({ session, activeShift, initialTasks }: 
         window.location.href = "/dashboard";
     };
 
+    const completedTasks = tasks.filter((t: any) => t.isCompleted).length;
+    const taskProgress = tasks.length > 0 ? (completedTasks / tasks.length) * 100 : 0;
+
     return (
-        <div className="flex flex-col gap-6 animate-fade-in">
+        <div className="report-page">
             {/* Header */}
-            <header className="shift-report-header">
-                <div>
-                    <h1 className="font-display" style={{ fontSize: "2rem" }}>Current Shift Report</h1>
-                    <p style={{ color: "var(--text-secondary)" }}>Logging shift data for {new Date().toLocaleDateString()}</p>
+            <header className="report-header">
+                <div className="header-content">
+                    <div className="header-icon">
+                        <ClipboardCheck size={24} />
+                    </div>
+                    <div>
+                        <h1 className="header-title">Shift Report</h1>
+                        <p className="header-subtitle">
+                            <Clock size={14} />
+                            <span>{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+                        </p>
+                    </div>
                 </div>
                 <button
                     onClick={handleSubmit}
-                    className="btn btn-primary"
+                    className="submit-btn"
                     disabled={isSubmitting}
                 >
                     {isSubmitting ? (
-                        <span className="animate-spin" style={{ display: "inline-block", width: "18px", height: "18px", border: "2px solid currentColor", borderTopColor: "transparent", borderRadius: "50%" }} />
+                        <span className="spinner" />
                     ) : (
                         <Send size={18} />
                     )}
@@ -101,112 +112,179 @@ export default function ShiftReportPage({ session, activeShift, initialTasks }: 
                 </button>
             </header>
 
-            <div className="shift-report-layout">
-                <div className="flex flex-col gap-6">
+            <div className="report-layout">
+                <main className="report-main">
                     {/* Communication Metrics */}
-                    <section className="glass-card">
-                        <SectionHeader icon={<Phone className="text-accent" />} title="Communication Metrics" />
-                        <div className="metrics-grid">
-                            <MetricInput
+                    <section className="report-card">
+                        <div className="card-header">
+                            <div className="card-icon card-icon-blue">
+                                <Phone size={18} />
+                            </div>
+                            <h2 className="card-title">Communication</h2>
+                        </div>
+                        <div className="metrics-row">
+                            <MetricCard
                                 label="Calls Received"
                                 value={metrics.calls}
-                                onChange={(v: number) => setMetrics({ ...metrics, calls: v })}
-                                icon={<Phone size={16} />}
+                                onChange={(v) => setMetrics({ ...metrics, calls: v })}
+                                icon={<Phone size={20} />}
+                                color="blue"
                             />
-                            <MetricInput
+                            <MetricCard
                                 label="Emails Sent"
                                 value={metrics.emails}
-                                onChange={(v: number) => setMetrics({ ...metrics, emails: v })}
-                                icon={<Mail size={16} />}
+                                onChange={(v) => setMetrics({ ...metrics, emails: v })}
+                                icon={<Mail size={20} />}
+                                color="purple"
                             />
                         </div>
                     </section>
 
                     {/* Quotes */}
-                    <section className="glass-card">
-                        <SectionHeader icon={<FileText className="text-accent" />} title="Quotes" />
-                        <div className="metrics-grid">
-                            <MetricInput
+                    <section className="report-card">
+                        <div className="card-header">
+                            <div className="card-icon card-icon-green">
+                                <FileText size={18} />
+                            </div>
+                            <h2 className="card-title">Quotes</h2>
+                        </div>
+                        <div className="metrics-row">
+                            <MetricCard
                                 label="Quotes Given"
                                 value={metrics.quotes}
-                                onChange={(v: number) => setMetrics({ ...metrics, quotes: v })}
-                                icon={<FileText size={16} />}
+                                onChange={(v) => setMetrics({ ...metrics, quotes: v })}
+                                icon={<FileText size={20} />}
+                                color="green"
                             />
                         </div>
                     </section>
 
-                    {/* Reservation Metrics */}
-                    <section className="glass-card">
-                        <SectionHeader icon={<Bookmark className="text-accent" />} title="Reservation Handling" />
-                        <div className="metrics-grid" style={{ marginBottom: "1.5rem" }}>
-                            <MetricInput
-                                label="Total Reservations Handled"
+                    {/* Reservation Handling */}
+                    <section className="report-card">
+                        <div className="card-header">
+                            <div className="card-icon card-icon-amber">
+                                <Bookmark size={18} />
+                            </div>
+                            <h2 className="card-title">Reservations</h2>
+                        </div>
+                        <div className="metrics-row" style={{ marginBottom: "1.5rem" }}>
+                            <MetricCard
+                                label="Total Handled"
                                 value={metrics.totalReservationsHandled}
-                                onChange={(v: number) => setMetrics({ ...metrics, totalReservationsHandled: v })}
-                                icon={<TrendingUp size={16} />}
+                                onChange={(v) => setMetrics({ ...metrics, totalReservationsHandled: v })}
+                                icon={<TrendingUp size={20} />}
+                                color="amber"
                             />
                         </div>
-                        <div className="flex flex-col gap-6">
-                            <ReservationSection title="Accepted Reservations" data={accepted} setter={setAccepted} add={() => addReservation(setAccepted)} update={updateReservation} remove={removeReservation} />
-                            <ReservationSection title="Modified Reservations" data={modified} setter={setModified} add={() => addReservation(setModified)} update={updateReservation} remove={removeReservation} />
-                            <ReservationSection title="Cancelled Reservations" data={cancelled} setter={setCancelled} add={() => addReservation(setCancelled)} update={updateReservation} remove={removeReservation} />
+                        <div className="reservations-grid">
+                            <ReservationSection
+                                title="Accepted"
+                                data={accepted}
+                                setter={setAccepted}
+                                add={() => addReservation(setAccepted)}
+                                update={updateReservation}
+                                remove={removeReservation}
+                                color="green"
+                            />
+                            <ReservationSection
+                                title="Modified"
+                                data={modified}
+                                setter={setModified}
+                                add={() => addReservation(setModified)}
+                                update={updateReservation}
+                                remove={removeReservation}
+                                color="blue"
+                            />
+                            <ReservationSection
+                                title="Cancelled"
+                                data={cancelled}
+                                setter={setCancelled}
+                                add={() => addReservation(setCancelled)}
+                                update={updateReservation}
+                                remove={removeReservation}
+                                color="red"
+                            />
                         </div>
                     </section>
 
-                    {/* Incidents & Notes */}
-                    <section className="glass-card">
-                        <SectionHeader icon={<AlertCircle className="text-accent" />} title="Incidents & Notes" />
-                        <div className="flex flex-col gap-4">
-                            <div>
-                                <label className="input-label">
-                                    <AlertCircle size={14} style={{ color: "var(--danger)" }} />
+                    {/* Notes Section */}
+                    <section className="report-card">
+                        <div className="card-header">
+                            <div className="card-icon card-icon-red">
+                                <AlertCircle size={18} />
+                            </div>
+                            <h2 className="card-title">Notes & Feedback</h2>
+                        </div>
+                        <div className="notes-grid">
+                            <div className="note-field">
+                                <label className="note-label note-label-red">
+                                    <AlertCircle size={14} />
                                     <span>Incidents / Deviations</span>
                                 </label>
                                 <textarea
-                                    className="input"
-                                    style={{ height: "80px", resize: "vertical" }}
+                                    className="note-input"
                                     value={narrative.incidents}
                                     onChange={(e) => setNarrative({ ...narrative, incidents: e.target.value })}
-                                    placeholder="Any incidents, deviations from normal operations, or issues to report?"
+                                    placeholder="Report any incidents, deviations, or issues..."
                                 />
                             </div>
-                            <div>
-                                <label className="input-label">
+                            <div className="note-field">
+                                <label className="note-label">
                                     <MessageSquare size={14} />
                                     <span>General Comments</span>
                                 </label>
                                 <textarea
-                                    className="input"
-                                    style={{ height: "80px", resize: "vertical" }}
+                                    className="note-input"
                                     value={narrative.comments}
                                     onChange={(e) => setNarrative({ ...narrative, comments: e.target.value })}
-                                    placeholder="Any other comments about your shift?"
+                                    placeholder="Any other comments about your shift..."
                                 />
                             </div>
-                            <div>
-                                <label className="input-label">
-                                    <Lightbulb size={14} style={{ color: "var(--accent)" }} />
-                                    <span>New Ideas / Suggestions</span>
+                            <div className="note-field">
+                                <label className="note-label note-label-accent">
+                                    <Lightbulb size={14} />
+                                    <span>Ideas & Suggestions</span>
                                 </label>
                                 <textarea
-                                    className="input"
-                                    style={{ height: "80px", resize: "vertical" }}
+                                    className="note-input"
                                     value={narrative.ideas}
                                     onChange={(e) => setNarrative({ ...narrative, ideas: e.target.value })}
-                                    placeholder="Any ideas to improve processes or service?"
+                                    placeholder="Ideas to improve processes or service..."
                                 />
                             </div>
                         </div>
                     </section>
-                </div>
+                </main>
 
-                {/* Task Checklist Sidebar */}
-                <aside className="shift-report-sidebar">
-                    <section className="glass-card" style={{ position: "sticky", top: "100px" }}>
-                        <SectionHeader icon={<ClipboardCheck className="text-accent" />} title="Shift Tasks" />
-                        <div className="flex flex-col gap-2">
+                {/* Sidebar */}
+                <aside className="report-sidebar">
+                    <div className="sidebar-card">
+                        <div className="sidebar-header">
+                            <ClipboardCheck size={18} />
+                            <h3>Shift Tasks</h3>
+                        </div>
+
+                        {tasks.length > 0 && (
+                            <div className="progress-section">
+                                <div className="progress-header">
+                                    <span className="progress-label">Progress</span>
+                                    <span className="progress-value">{completedTasks}/{tasks.length}</span>
+                                </div>
+                                <div className="progress-track">
+                                    <div
+                                        className="progress-bar"
+                                        style={{ width: `${taskProgress}%` }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="tasks-list">
                             {tasks.length === 0 ? (
-                                <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", fontStyle: "italic", padding: "0.5rem" }}>No tasks assigned.</p>
+                                <div className="empty-tasks">
+                                    <CheckCircle size={24} />
+                                    <p>No tasks assigned</p>
+                                </div>
                             ) : (
                                 tasks.map((task: any) => (
                                     <label key={task.id} className="task-item">
@@ -216,42 +294,23 @@ export default function ShiftReportPage({ session, activeShift, initialTasks }: 
                                             onChange={() => handleToggleTask(task.id, task.isCompleted)}
                                             className="task-checkbox"
                                         />
-                                        <span className={`task-label ${task.isCompleted ? "completed" : ""}`}>
+                                        <span className={`task-text ${task.isCompleted ? "task-completed" : ""}`}>
                                             {task.content}
                                         </span>
                                     </label>
                                 ))
                             )}
                         </div>
-                        {tasks.length > 0 && (
-                            <div className="task-progress">
-                                <div className="progress-bar">
-                                    <div
-                                        className="progress-fill"
-                                        style={{
-                                            width: `${(tasks.filter((t: any) => t.isCompleted).length / tasks.length) * 100}%`
-                                        }}
-                                    />
-                                </div>
-                                <span className="progress-text">
-                                    {tasks.filter((t: any) => t.isCompleted).length} / {tasks.length} completed
-                                </span>
-                            </div>
-                        )}
-                    </section>
+                    </div>
 
-                    {/* Mobile Submit Button */}
-                    <div className="mobile-submit show-mobile">
+                    {/* Mobile Submit */}
+                    <div className="mobile-submit">
                         <button
                             onClick={handleSubmit}
-                            className="btn btn-primary w-full"
+                            className="submit-btn submit-btn-full"
                             disabled={isSubmitting}
                         >
-                            {isSubmitting ? (
-                                <span className="animate-spin" style={{ display: "inline-block", width: "18px", height: "18px", border: "2px solid currentColor", borderTopColor: "transparent", borderRadius: "50%" }} />
-                            ) : (
-                                <Send size={18} />
-                            )}
+                            {isSubmitting ? <span className="spinner" /> : <Send size={18} />}
                             <span>{isSubmitting ? "Submitting..." : "Finalize & Clock Out"}</span>
                         </button>
                     </div>
@@ -259,127 +318,381 @@ export default function ShiftReportPage({ session, activeShift, initialTasks }: 
             </div>
 
             <style jsx>{`
-                .shift-report-header {
+                .report-page {
+                    padding: 1.5rem;
+                    max-width: 1400px;
+                    margin: 0 auto;
+                }
+
+                .report-header {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
+                    margin-bottom: 2rem;
                     flex-wrap: wrap;
                     gap: 1rem;
                 }
 
-                .shift-report-layout {
-                    display: grid;
-                    grid-template-columns: 1fr 350px;
-                    gap: 2rem;
+                .header-content {
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
                 }
 
-                .shift-report-sidebar {
+                .header-icon {
+                    width: 48px;
+                    height: 48px;
+                    border-radius: 12px;
+                    background: linear-gradient(135deg, var(--accent) 0%, #d4a853 100%);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #1a1a2e;
+                }
+
+                .header-title {
+                    font-size: 1.75rem;
+                    font-weight: 700;
+                    color: var(--text-primary);
+                    margin-bottom: 0.25rem;
+                }
+
+                .header-subtitle {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    font-size: 0.875rem;
+                    color: var(--text-secondary);
+                }
+
+                .submit-btn {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.875rem 1.5rem;
+                    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+                    border: none;
+                    border-radius: 10px;
+                    color: white;
+                    font-weight: 600;
+                    font-size: 0.9rem;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+                }
+
+                .submit-btn:hover:not(:disabled) {
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 20px rgba(34, 197, 94, 0.4);
+                }
+
+                .submit-btn:disabled {
+                    opacity: 0.7;
+                    cursor: not-allowed;
+                }
+
+                .submit-btn-full {
+                    width: 100%;
+                    justify-content: center;
+                }
+
+                .spinner {
+                    width: 18px;
+                    height: 18px;
+                    border: 2px solid currentColor;
+                    border-top-color: transparent;
+                    border-radius: 50%;
+                    animation: spin 0.8s linear infinite;
+                }
+
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+
+                .report-layout {
+                    display: grid;
+                    grid-template-columns: 1fr 320px;
+                    gap: 1.5rem;
+                }
+
+                .report-main {
                     display: flex;
                     flex-direction: column;
                     gap: 1.5rem;
                 }
 
-                .metrics-grid {
+                .report-card {
+                    background: linear-gradient(135deg, rgba(30, 30, 50, 0.9) 0%, rgba(25, 25, 45, 0.95) 100%);
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 16px;
+                    padding: 1.5rem;
+                    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+                }
+
+                .card-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    margin-bottom: 1.25rem;
+                }
+
+                .card-icon {
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 10px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+
+                .card-icon-blue {
+                    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.1) 100%);
+                    color: #60a5fa;
+                }
+
+                .card-icon-green {
+                    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%);
+                    color: #4ade80;
+                }
+
+                .card-icon-amber {
+                    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.1) 100%);
+                    color: #fbbf24;
+                }
+
+                .card-icon-red {
+                    background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.1) 100%);
+                    color: #f87171;
+                }
+
+                .card-title {
+                    font-size: 1.1rem;
+                    font-weight: 600;
+                    color: var(--text-primary);
+                }
+
+                .metrics-row {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                    gap: 1rem;
+                }
+
+                .reservations-grid {
                     display: grid;
                     grid-template-columns: repeat(3, 1fr);
                     gap: 1rem;
                 }
 
-                .input-label {
-                    font-size: 0.875rem;
-                    color: var(--text-secondary);
-                    margin-bottom: 0.5rem;
+                .notes-grid {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1rem;
+                }
+
+                .note-field {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.5rem;
+                }
+
+                .note-label {
                     display: flex;
                     align-items: center;
                     gap: 0.5rem;
+                    font-size: 0.8rem;
+                    font-weight: 500;
+                    color: var(--text-secondary);
+                }
+
+                .note-label-red {
+                    color: #f87171;
+                }
+
+                .note-label-accent {
+                    color: var(--accent);
+                }
+
+                .note-input {
+                    width: 100%;
+                    padding: 0.875rem;
+                    background: rgba(255, 255, 255, 0.03);
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 10px;
+                    color: var(--text-primary);
+                    font-size: 0.9rem;
+                    resize: vertical;
+                    min-height: 80px;
+                    transition: all 0.2s;
+                }
+
+                .note-input:focus {
+                    outline: none;
+                    border-color: var(--accent);
+                    background: rgba(255, 255, 255, 0.05);
+                }
+
+                .note-input::placeholder {
+                    color: var(--text-secondary);
+                    opacity: 0.6;
+                }
+
+                /* Sidebar */
+                .report-sidebar {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1rem;
+                }
+
+                .sidebar-card {
+                    background: linear-gradient(135deg, rgba(30, 30, 50, 0.9) 0%, rgba(25, 25, 45, 0.95) 100%);
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 16px;
+                    padding: 1.25rem;
+                    position: sticky;
+                    top: 100px;
+                }
+
+                .sidebar-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    color: var(--accent);
+                    margin-bottom: 1rem;
+                }
+
+                .sidebar-header h3 {
+                    font-size: 1rem;
+                    font-weight: 600;
+                    color: var(--text-primary);
+                }
+
+                .progress-section {
+                    margin-bottom: 1rem;
+                    padding-bottom: 1rem;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+                }
+
+                .progress-header {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-bottom: 0.5rem;
+                }
+
+                .progress-label {
+                    font-size: 0.75rem;
+                    color: var(--text-secondary);
+                }
+
+                .progress-value {
+                    font-size: 0.75rem;
+                    font-weight: 600;
+                    color: var(--accent);
+                }
+
+                .progress-track {
+                    height: 6px;
+                    background: rgba(255, 255, 255, 0.06);
+                    border-radius: 3px;
+                    overflow: hidden;
+                }
+
+                .progress-bar {
+                    height: 100%;
+                    background: linear-gradient(90deg, var(--accent), #d4a853);
+                    border-radius: 3px;
+                    transition: width 0.3s ease;
+                }
+
+                .tasks-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.5rem;
+                }
+
+                .empty-tasks {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 1.5rem;
+                    color: var(--text-secondary);
+                    opacity: 0.5;
+                }
+
+                .empty-tasks p {
+                    font-size: 0.875rem;
                 }
 
                 .task-item {
                     display: flex;
                     align-items: center;
                     gap: 0.75rem;
-                    padding: 0.5rem;
-                    border-radius: 0.5rem;
+                    padding: 0.625rem 0.75rem;
+                    border-radius: 8px;
                     cursor: pointer;
-                    transition: background-color 0.2s;
+                    transition: background 0.2s;
                 }
 
                 .task-item:hover {
-                    background: rgba(255, 255, 255, 0.05);
+                    background: rgba(255, 255, 255, 0.04);
                 }
 
                 .task-checkbox {
                     width: 18px;
                     height: 18px;
                     accent-color: var(--accent);
+                    cursor: pointer;
                 }
 
-                .task-label {
+                .task-text {
                     font-size: 0.875rem;
                     color: var(--text-primary);
                     transition: all 0.2s;
                 }
 
-                .task-label.completed {
+                .task-completed {
                     color: var(--text-secondary);
                     text-decoration: line-through;
                 }
 
-                .task-progress {
-                    margin-top: 1rem;
-                    padding-top: 1rem;
-                    border-top: 1px solid var(--border);
-                }
-
-                .progress-bar {
-                    height: 6px;
-                    background: var(--bg-secondary);
-                    border-radius: 3px;
-                    overflow: hidden;
-                    margin-bottom: 0.5rem;
-                }
-
-                .progress-fill {
-                    height: 100%;
-                    background: var(--success);
-                    border-radius: 3px;
-                    transition: width 0.3s ease;
-                }
-
-                .progress-text {
-                    font-size: 0.75rem;
-                    color: var(--text-secondary);
-                }
-
                 .mobile-submit {
-                    margin-top: 1rem;
+                    display: none;
                 }
 
                 @media (max-width: 1024px) {
-                    .shift-report-layout {
+                    .report-layout {
                         grid-template-columns: 1fr;
                     }
 
-                    .shift-report-sidebar {
+                    .report-sidebar {
                         order: -1;
                     }
 
-                    .metrics-grid {
-                        grid-template-columns: repeat(2, 1fr);
+                    .reservations-grid {
+                        grid-template-columns: 1fr;
+                    }
+
+                    .sidebar-card {
+                        position: static;
                     }
                 }
 
                 @media (max-width: 640px) {
-                    .shift-report-header {
+                    .report-header {
                         flex-direction: column;
                         align-items: flex-start;
                     }
 
-                    .shift-report-header button {
+                    .report-header .submit-btn {
                         display: none;
                     }
 
-                    .metrics-grid {
+                    .mobile-submit {
+                        display: block;
+                        margin-top: 0.5rem;
+                    }
+
+                    .metrics-row {
                         grid-template-columns: 1fr;
                     }
                 }
@@ -388,126 +701,180 @@ export default function ShiftReportPage({ session, activeShift, initialTasks }: 
     );
 }
 
-function ReservationSection({ title, data, setter, add, update, remove }: any) {
-    return (
-        <div className="flex flex-col gap-2">
-            <div className="flex justify-between items-center">
-                <h3 style={{ fontSize: "1rem", fontWeight: 600 }}>{title}</h3>
-                <button onClick={add} className="btn-outline" style={{ padding: "0.25rem 0.5rem", borderRadius: "0.25rem", display: "flex", alignItems: "center", gap: "0.25rem", fontSize: "0.75rem", border: "1px solid var(--border)", cursor: "pointer", color: "var(--text-secondary)" }}>
-                    <Plus size={14} /> Add
-                </button>
-            </div>
-            <div className="flex flex-col gap-2">
-                {data.map((item: any, index: number) => (
-                    <div key={index} className="flex gap-2 items-start">
-                        <input className="input" placeholder="Res #" style={{ padding: "0.5rem", width: "120px" }} value={item.id} onChange={(e) => update(setter, index, "id", e.target.value)} />
-                        <input className="input" placeholder="Notes/Changes" style={{ padding: "0.5rem", flex: 1 }} value={item.notes} onChange={(e) => update(setter, index, "notes", e.target.value)} />
-                        <button onClick={() => remove(setter, index)} style={{ background: "none", border: "none", color: "var(--danger)", cursor: "pointer", padding: "0.5rem" }}>
-                            <Trash2 size={16} />
-                        </button>
-                    </div>
-                ))}
-                {data.length === 0 && <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", fontStyle: "italic", padding: "0.5rem" }}>No entries yet.</p>}
-            </div>
-        </div>
-    );
-}
-
-function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }) {
-    return (
-        <div className="flex items-center gap-2" style={{ marginBottom: "1.5rem" }}>
-            {icon}
-            <h2 className="font-display" style={{ fontSize: "1.25rem" }}>{title}</h2>
-        </div>
-    );
-}
-
-interface MetricInputProps {
+// Metric Card Component
+interface MetricCardProps {
     label: string;
     value: number;
     onChange: (v: number) => void;
-    icon?: React.ReactNode;
-    variant?: "default" | "success" | "warning" | "danger";
+    icon: React.ReactNode;
+    color: "blue" | "green" | "amber" | "purple" | "red";
 }
 
-const MetricInput = memo(function MetricInput({ label, value, onChange, icon, variant = "default" }: MetricInputProps) {
-    const variantColors: Record<string, string> = {
-        default: "var(--text-secondary)",
-        success: "var(--success)",
-        warning: "var(--warning)",
-        danger: "var(--danger)"
+const MetricCard = memo(function MetricCard({ label, value, onChange, icon, color }: MetricCardProps) {
+    const colors = {
+        blue: { bg: "rgba(59, 130, 246, 0.1)", border: "rgba(59, 130, 246, 0.2)", text: "#60a5fa" },
+        green: { bg: "rgba(34, 197, 94, 0.1)", border: "rgba(34, 197, 94, 0.2)", text: "#4ade80" },
+        amber: { bg: "rgba(245, 158, 11, 0.1)", border: "rgba(245, 158, 11, 0.2)", text: "#fbbf24" },
+        purple: { bg: "rgba(168, 85, 247, 0.1)", border: "rgba(168, 85, 247, 0.2)", text: "#c084fc" },
+        red: { bg: "rgba(239, 68, 68, 0.1)", border: "rgba(239, 68, 68, 0.2)", text: "#f87171" },
     };
 
-    const labelColor = variantColors[variant];
+    const c = colors[color];
 
     return (
-        <div className="flex flex-col gap-1">
-            <label style={{
-                fontSize: "0.75rem",
-                color: labelColor,
-                fontWeight: 500,
-                display: "flex",
-                alignItems: "center",
-                gap: "0.375rem"
-            }}>
-                {icon}
-                {label}
-            </label>
-            <div className="flex items-center gap-2">
+        <div style={{
+            padding: "1rem",
+            background: c.bg,
+            border: `1px solid ${c.border}`,
+            borderRadius: "12px",
+        }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+                <span style={{ color: c.text }}>{icon}</span>
+                <span style={{ fontSize: "0.8rem", fontWeight: 500, color: "var(--text-secondary)" }}>{label}</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
                 <button
                     type="button"
                     onClick={() => onChange(Math.max(0, value - 1))}
-                    className="btn-outline"
                     style={{
                         width: "32px",
                         height: "32px",
-                        border: "1px solid var(--border)",
+                        border: `1px solid ${c.border}`,
+                        background: "rgba(0, 0, 0, 0.2)",
+                        borderRadius: "8px",
+                        color: c.text,
                         cursor: "pointer",
-                        background: "none",
-                        color: "white",
-                        borderRadius: "0.375rem",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: "1.25rem",
-                        lineHeight: 1
+                        transition: "all 0.2s",
                     }}
                     aria-label={`Decrease ${label}`}
                 >
-                    -
+                    <Minus size={16} />
                 </button>
                 <span style={{
-                    minWidth: "40px",
+                    flex: 1,
                     textAlign: "center",
+                    fontSize: "1.75rem",
                     fontWeight: 700,
-                    fontSize: "1.125rem",
-                    color: value > 0 ? "var(--text-primary)" : "var(--text-secondary)"
+                    color: value > 0 ? c.text : "var(--text-secondary)",
                 }}>
                     {value}
                 </span>
                 <button
                     type="button"
                     onClick={() => onChange(value + 1)}
-                    className="btn-outline"
                     style={{
                         width: "32px",
                         height: "32px",
-                        border: "1px solid var(--border)",
+                        border: `1px solid ${c.border}`,
+                        background: "rgba(0, 0, 0, 0.2)",
+                        borderRadius: "8px",
+                        color: c.text,
                         cursor: "pointer",
-                        background: "none",
-                        color: "white",
-                        borderRadius: "0.375rem",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: "1.25rem",
-                        lineHeight: 1
+                        transition: "all 0.2s",
                     }}
                     aria-label={`Increase ${label}`}
                 >
-                    +
+                    <Plus size={16} />
                 </button>
             </div>
         </div>
     );
 });
+
+// Reservation Section Component
+function ReservationSection({ title, data, setter, add, update, remove, color }: any) {
+    const colors: Record<string, { bg: string; border: string; text: string }> = {
+        green: { bg: "rgba(34, 197, 94, 0.05)", border: "rgba(34, 197, 94, 0.15)", text: "#4ade80" },
+        blue: { bg: "rgba(59, 130, 246, 0.05)", border: "rgba(59, 130, 246, 0.15)", text: "#60a5fa" },
+        red: { bg: "rgba(239, 68, 68, 0.05)", border: "rgba(239, 68, 68, 0.15)", text: "#f87171" },
+    };
+    const c = colors[color] || colors.blue;
+
+    return (
+        <div style={{
+            padding: "1rem",
+            background: c.bg,
+            border: `1px solid ${c.border}`,
+            borderRadius: "12px",
+        }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+                <h3 style={{ fontSize: "0.85rem", fontWeight: 600, color: c.text }}>{title}</h3>
+                <button
+                    onClick={add}
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.25rem",
+                        padding: "0.25rem 0.5rem",
+                        background: "rgba(0, 0, 0, 0.2)",
+                        border: `1px solid ${c.border}`,
+                        borderRadius: "6px",
+                        color: c.text,
+                        fontSize: "0.7rem",
+                        fontWeight: 500,
+                        cursor: "pointer",
+                    }}
+                >
+                    <Plus size={12} /> Add
+                </button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                {data.map((item: any, index: number) => (
+                    <div key={index} style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                        <input
+                            placeholder="Res #"
+                            value={item.id}
+                            onChange={(e) => update(setter, index, "id", e.target.value)}
+                            style={{
+                                width: "80px",
+                                padding: "0.5rem",
+                                background: "rgba(0, 0, 0, 0.2)",
+                                border: "1px solid rgba(255, 255, 255, 0.1)",
+                                borderRadius: "6px",
+                                color: "var(--text-primary)",
+                                fontSize: "0.8rem",
+                            }}
+                        />
+                        <input
+                            placeholder="Notes"
+                            value={item.notes}
+                            onChange={(e) => update(setter, index, "notes", e.target.value)}
+                            style={{
+                                flex: 1,
+                                padding: "0.5rem",
+                                background: "rgba(0, 0, 0, 0.2)",
+                                border: "1px solid rgba(255, 255, 255, 0.1)",
+                                borderRadius: "6px",
+                                color: "var(--text-primary)",
+                                fontSize: "0.8rem",
+                            }}
+                        />
+                        <button
+                            onClick={() => remove(setter, index)}
+                            style={{
+                                padding: "0.375rem",
+                                background: "none",
+                                border: "none",
+                                color: "#f87171",
+                                cursor: "pointer",
+                            }}
+                        >
+                            <Trash2 size={14} />
+                        </button>
+                    </div>
+                ))}
+                {data.length === 0 && (
+                    <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", fontStyle: "italic", textAlign: "center", padding: "0.5rem" }}>
+                        No entries
+                    </p>
+                )}
+            </div>
+        </div>
+    );
+}
