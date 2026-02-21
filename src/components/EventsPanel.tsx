@@ -133,7 +133,7 @@ function AddEventModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
                                 Event Date *
                             </label>
                             <input
-                                type="datetime-local"
+                                type="date"
                                 className="input"
                                 value={form.eventDate}
                                 onChange={(e) => setForm({ ...form, eventDate: e.target.value })}
@@ -145,7 +145,7 @@ function AddEventModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
                                 End Date (Optional)
                             </label>
                             <input
-                                type="datetime-local"
+                                type="date"
                                 className="input"
                                 value={form.endDate}
                                 onChange={(e) => setForm({ ...form, endDate: e.target.value })}
@@ -269,8 +269,6 @@ export default function EventsPanel({ events: initialEvents, isAdmin }: Props) {
             weekday: "short",
             month: "short",
             day: "numeric",
-            hour: "numeric",
-            minute: "2-digit",
         });
     };
 
