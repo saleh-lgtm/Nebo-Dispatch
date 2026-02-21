@@ -119,6 +119,13 @@ export default function ShiftReportPage({ session, activeShift, initialTasks }: 
                                 onChange={(v: number) => setMetrics({ ...metrics, emails: v })}
                                 icon={<Mail size={16} />}
                             />
+                        </div>
+                    </section>
+
+                    {/* Quotes */}
+                    <section className="glass-card">
+                        <SectionHeader icon={<FileText className="text-accent" />} title="Quotes" />
+                        <div className="metrics-grid">
                             <MetricInput
                                 label="Quotes Given"
                                 value={metrics.quotes}
@@ -143,39 +150,6 @@ export default function ShiftReportPage({ session, activeShift, initialTasks }: 
                             <ReservationSection title="Accepted Reservations" data={accepted} setter={setAccepted} add={() => addReservation(setAccepted)} update={updateReservation} remove={removeReservation} />
                             <ReservationSection title="Modified Reservations" data={modified} setter={setModified} add={() => addReservation(setModified)} update={updateReservation} remove={removeReservation} />
                             <ReservationSection title="Cancelled Reservations" data={cancelled} setter={setCancelled} add={() => addReservation(setCancelled)} update={updateReservation} remove={removeReservation} />
-                        </div>
-                    </section>
-
-                    {/* Achievements & Challenges */}
-                    <section className="glass-card">
-                        <SectionHeader icon={<Award className="text-accent" />} title="Achievements & Challenges" />
-                        <div className="flex flex-col gap-4">
-                            <div>
-                                <label className="input-label">
-                                    <Award size={14} style={{ color: "var(--success)" }} />
-                                    <span>Achievements / Notable Accomplishments</span>
-                                </label>
-                                <textarea
-                                    className="input"
-                                    style={{ height: "100px", resize: "vertical" }}
-                                    value={narrative.achievements}
-                                    onChange={(e) => setNarrative({ ...narrative, achievements: e.target.value })}
-                                    placeholder="What went well during your shift? Any wins to celebrate?"
-                                />
-                            </div>
-                            <div>
-                                <label className="input-label">
-                                    <AlertTriangle size={14} style={{ color: "var(--warning)" }} />
-                                    <span>Challenges / Difficulties Faced</span>
-                                </label>
-                                <textarea
-                                    className="input"
-                                    style={{ height: "100px", resize: "vertical" }}
-                                    value={narrative.challenges}
-                                    onChange={(e) => setNarrative({ ...narrative, challenges: e.target.value })}
-                                    placeholder="What obstacles did you encounter? Any areas needing support?"
-                                />
-                            </div>
                         </div>
                     </section>
 
