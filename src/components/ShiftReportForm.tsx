@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2, ClipboardCheck, Send, AlertCircle, Bookmark } from "lucide-react";
+import { Plus, Trash2, ClipboardCheck, Send, AlertCircle, Bookmark, Star, Phone, Mail, FileText, Users, Car, Clock, TrendingUp, MessageSquare, Lightbulb, Award, AlertTriangle } from "lucide-react";
 import { toggleTask, saveShiftReport } from "@/lib/actions";
 
 interface ReservationEntry {
@@ -9,13 +9,53 @@ interface ReservationEntry {
     notes: string;
 }
 
+interface Metrics {
+    calls: number;
+    emails: number;
+    quotes: number;
+    totalReservationsHandled: number;
+    complaintsReceived: number;
+    complaintsResolved: number;
+    escalations: number;
+    driversDispatched: number;
+    noShowsHandled: number;
+    latePickups: number;
+}
+
+interface Narrative {
+    comments: string;
+    incidents: string;
+    ideas: string;
+    achievements: string;
+    challenges: string;
+}
+
 export default function ShiftReportPage({ session, activeShift, initialTasks }: any) {
     const [accepted, setAccepted] = useState<ReservationEntry[]>([]);
     const [modified, setModified] = useState<ReservationEntry[]>([]);
     const [cancelled, setCancelled] = useState<ReservationEntry[]>([]);
-    const [metrics, setMetrics] = useState({ calls: 0, emails: 0, quotes: 0 });
-    const [narrative, setNarrative] = useState({ comments: "", incidents: "", ideas: "" });
+    const [metrics, setMetrics] = useState<Metrics>({
+        calls: 0,
+        emails: 0,
+        quotes: 0,
+        totalReservationsHandled: 0,
+        complaintsReceived: 0,
+        complaintsResolved: 0,
+        escalations: 0,
+        driversDispatched: 0,
+        noShowsHandled: 0,
+        latePickups: 0
+    });
+    const [narrative, setNarrative] = useState<Narrative>({
+        comments: "",
+        incidents: "",
+        ideas: "",
+        achievements: "",
+        challenges: ""
+    });
+    const [shiftRating, setShiftRating] = useState<number>(0);
     const [tasks, setTasks] = useState(initialTasks || []);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const addReservation = (setter: any) => {
         setter((prev: any) => [...prev, { id: "", notes: "" }]);
@@ -35,19 +75,30 @@ export default function ShiftReportPage({ session, activeShift, initialTasks }: 
     };
 
     const handleSubmit = async () => {
+        setIsSubmitting(true);
         const data = {
             shiftId: activeShift.id,
             userId: session.user.id,
             callsReceived: metrics.calls,
             emailsSent: metrics.emails,
             quotesGiven: metrics.quotes,
+            totalReservationsHandled: metrics.totalReservationsHandled,
+            complaintsReceived: metrics.complaintsReceived,
+            complaintsResolved: metrics.complaintsResolved,
+            escalations: metrics.escalations,
+            driversDispatched: metrics.driversDispatched,
+            noShowsHandled: metrics.noShowsHandled,
+            latePickups: metrics.latePickups,
             generalComments: narrative.comments,
             incidents: narrative.incidents,
             newIdeas: narrative.ideas,
+            achievements: narrative.achievements,
+            challenges: narrative.challenges,
+            shiftRating: shiftRating > 0 ? shiftRating : undefined,
             acceptedReservations: accepted,
             modifiedReservations: modified,
             cancelledReservations: cancelled,
-            clockOut: true // Finish shift on report submit
+            clockOut: true
         };
 
         await saveShiftReport(data);
@@ -56,26 +107,81 @@ export default function ShiftReportPage({ session, activeShift, initialTasks }: 
 
     return (
         <div className="flex flex-col gap-6 animate-fade-in">
-            <header className="flex justify-between items-center">
+            {/* Header */}
+            <header className="shift-report-header">
                 <div>
                     <h1 className="font-display" style={{ fontSize: "2rem" }}>Current Shift Report</h1>
                     <p style={{ color: "var(--text-secondary)" }}>Logging shift data for {new Date().toLocaleDateString()}</p>
                 </div>
-                <button onClick={handleSubmit} className="btn btn-primary">
-                    <Send size={18} />
-                    <span>Finalize & Clock Out</span>
+                <button
+                    onClick={handleSubmit}
+                    className="btn btn-primary"
+                    disabled={isSubmitting}
+                >
+                    {isSubmitting ? (
+                        <span className="animate-spin" style={{ display: "inline-block", width: "18px", height: "18px", border: "2px solid currentColor", borderTopColor: "transparent", borderRadius: "50%" }} />
+                    ) : (
+                        <Send size={18} />
+                    )}
+                    <span>{isSubmitting ? "Submitting..." : "Finalize & Clock Out"}</span>
                 </button>
             </header>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 350px", gap: "2rem" }}>
+            <div className="shift-report-layout">
                 <div className="flex flex-col gap-6">
-                    {/* Reservation Logs */}
+                    {/* Shift Self-Assessment */}
                     <section className="glass-card">
-                        <div className="flex items-center gap-2" style={{ marginBottom: "1.5rem" }}>
-                            <Bookmark className="text-accent" />
-                            <h2 className="font-display" style={{ fontSize: "1.25rem" }}>Reservation Logs</h2>
+                        <SectionHeader icon={<Star className="text-accent" />} title="Shift Self-Assessment" />
+                        <div className="flex flex-col gap-4 items-center" style={{ padding: "1rem 0" }}>
+                            <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>How would you rate your shift overall?</p>
+                            <StarRating value={shiftRating} onChange={setShiftRating} />
+                            <p style={{ color: "var(--text-secondary)", fontSize: "0.75rem", fontStyle: "italic" }}>
+                                {shiftRating === 0 && "Click to rate"}
+                                {shiftRating === 1 && "Difficult shift"}
+                                {shiftRating === 2 && "Below average"}
+                                {shiftRating === 3 && "Average shift"}
+                                {shiftRating === 4 && "Good shift"}
+                                {shiftRating === 5 && "Excellent shift!"}
+                            </p>
                         </div>
+                    </section>
 
+                    {/* Communication Metrics */}
+                    <section className="glass-card">
+                        <SectionHeader icon={<Phone className="text-accent" />} title="Communication Metrics" />
+                        <div className="metrics-grid">
+                            <MetricInput
+                                label="Calls Received"
+                                value={metrics.calls}
+                                onChange={(v: number) => setMetrics({ ...metrics, calls: v })}
+                                icon={<Phone size={16} />}
+                            />
+                            <MetricInput
+                                label="Emails Sent"
+                                value={metrics.emails}
+                                onChange={(v: number) => setMetrics({ ...metrics, emails: v })}
+                                icon={<Mail size={16} />}
+                            />
+                            <MetricInput
+                                label="Quotes Given"
+                                value={metrics.quotes}
+                                onChange={(v: number) => setMetrics({ ...metrics, quotes: v })}
+                                icon={<FileText size={16} />}
+                            />
+                        </div>
+                    </section>
+
+                    {/* Reservation Metrics */}
+                    <section className="glass-card">
+                        <SectionHeader icon={<Bookmark className="text-accent" />} title="Reservation Handling" />
+                        <div className="metrics-grid" style={{ marginBottom: "1.5rem" }}>
+                            <MetricInput
+                                label="Total Reservations Handled"
+                                value={metrics.totalReservationsHandled}
+                                onChange={(v: number) => setMetrics({ ...metrics, totalReservationsHandled: v })}
+                                icon={<TrendingUp size={16} />}
+                            />
+                        </div>
                         <div className="flex flex-col gap-6">
                             <ReservationSection title="Accepted Reservations" data={accepted} setter={setAccepted} add={() => addReservation(setAccepted)} update={updateReservation} remove={removeReservation} />
                             <ReservationSection title="Modified Reservations" data={modified} setter={setModified} add={() => addReservation(setModified)} update={updateReservation} remove={removeReservation} />
@@ -83,52 +189,325 @@ export default function ShiftReportPage({ session, activeShift, initialTasks }: 
                         </div>
                     </section>
 
-                    {/* Metrics & Narrative */}
+                    {/* Customer Interaction Metrics */}
                     <section className="glass-card">
-                        <h2 className="font-display" style={{ fontSize: "1.25rem", marginBottom: "1.5rem" }}>Performance & Notes</h2>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem", marginBottom: "2rem" }}>
-                            <MetricInput label="Calls Received" value={metrics.calls} onChange={(v: number) => setMetrics({ ...metrics, calls: v })} />
-                            <MetricInput label="Emails Sent" value={metrics.emails} onChange={(v: number) => setMetrics({ ...metrics, emails: v })} />
-                            <MetricInput label="Quotes Given" value={metrics.quotes} onChange={(v: number) => setMetrics({ ...metrics, quotes: v })} />
+                        <SectionHeader icon={<Users className="text-accent" />} title="Customer Interactions" />
+                        <div className="metrics-grid">
+                            <MetricInput
+                                label="Complaints Received"
+                                value={metrics.complaintsReceived}
+                                onChange={(v: number) => setMetrics({ ...metrics, complaintsReceived: v })}
+                                icon={<MessageSquare size={16} />}
+                                variant="warning"
+                            />
+                            <MetricInput
+                                label="Complaints Resolved"
+                                value={metrics.complaintsResolved}
+                                onChange={(v: number) => setMetrics({ ...metrics, complaintsResolved: v })}
+                                icon={<MessageSquare size={16} />}
+                                variant="success"
+                            />
+                            <MetricInput
+                                label="Escalations"
+                                value={metrics.escalations}
+                                onChange={(v: number) => setMetrics({ ...metrics, escalations: v })}
+                                icon={<AlertTriangle size={16} />}
+                                variant="danger"
+                            />
                         </div>
+                    </section>
+
+                    {/* Driver Coordination Metrics */}
+                    <section className="glass-card">
+                        <SectionHeader icon={<Car className="text-accent" />} title="Driver Coordination" />
+                        <div className="metrics-grid">
+                            <MetricInput
+                                label="Drivers Dispatched"
+                                value={metrics.driversDispatched}
+                                onChange={(v: number) => setMetrics({ ...metrics, driversDispatched: v })}
+                                icon={<Car size={16} />}
+                            />
+                            <MetricInput
+                                label="No-Shows Handled"
+                                value={metrics.noShowsHandled}
+                                onChange={(v: number) => setMetrics({ ...metrics, noShowsHandled: v })}
+                                icon={<Users size={16} />}
+                                variant="warning"
+                            />
+                            <MetricInput
+                                label="Late Pickups"
+                                value={metrics.latePickups}
+                                onChange={(v: number) => setMetrics({ ...metrics, latePickups: v })}
+                                icon={<Clock size={16} />}
+                                variant="warning"
+                            />
+                        </div>
+                    </section>
+
+                    {/* Achievements & Challenges */}
+                    <section className="glass-card">
+                        <SectionHeader icon={<Award className="text-accent" />} title="Achievements & Challenges" />
                         <div className="flex flex-col gap-4">
                             <div>
-                                <label style={{ fontSize: "0.875rem", color: "var(--text-secondary)", marginBottom: "0.5rem", display: "block" }}>Incidents / Deviations</label>
-                                <textarea className="input" style={{ height: "80px", resize: "none" }} value={narrative.incidents} onChange={(e) => setNarrative({ ...narrative, incidents: e.target.value })} />
+                                <label className="input-label">
+                                    <Award size={14} style={{ color: "var(--success)" }} />
+                                    <span>Achievements / Notable Accomplishments</span>
+                                </label>
+                                <textarea
+                                    className="input"
+                                    style={{ height: "100px", resize: "vertical" }}
+                                    value={narrative.achievements}
+                                    onChange={(e) => setNarrative({ ...narrative, achievements: e.target.value })}
+                                    placeholder="What went well during your shift? Any wins to celebrate?"
+                                />
                             </div>
                             <div>
-                                <label style={{ fontSize: "0.875rem", color: "var(--text-secondary)", marginBottom: "0.5rem", display: "block" }}>General Comments</label>
-                                <textarea className="input" style={{ height: "80px", resize: "none" }} value={narrative.comments} onChange={(e) => setNarrative({ ...narrative, comments: e.target.value })} />
+                                <label className="input-label">
+                                    <AlertTriangle size={14} style={{ color: "var(--warning)" }} />
+                                    <span>Challenges / Difficulties Faced</span>
+                                </label>
+                                <textarea
+                                    className="input"
+                                    style={{ height: "100px", resize: "vertical" }}
+                                    value={narrative.challenges}
+                                    onChange={(e) => setNarrative({ ...narrative, challenges: e.target.value })}
+                                    placeholder="What obstacles did you encounter? Any areas needing support?"
+                                />
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Incidents & Notes */}
+                    <section className="glass-card">
+                        <SectionHeader icon={<AlertCircle className="text-accent" />} title="Incidents & Notes" />
+                        <div className="flex flex-col gap-4">
+                            <div>
+                                <label className="input-label">
+                                    <AlertCircle size={14} style={{ color: "var(--danger)" }} />
+                                    <span>Incidents / Deviations</span>
+                                </label>
+                                <textarea
+                                    className="input"
+                                    style={{ height: "80px", resize: "vertical" }}
+                                    value={narrative.incidents}
+                                    onChange={(e) => setNarrative({ ...narrative, incidents: e.target.value })}
+                                    placeholder="Any incidents, deviations from normal operations, or issues to report?"
+                                />
+                            </div>
+                            <div>
+                                <label className="input-label">
+                                    <MessageSquare size={14} />
+                                    <span>General Comments</span>
+                                </label>
+                                <textarea
+                                    className="input"
+                                    style={{ height: "80px", resize: "vertical" }}
+                                    value={narrative.comments}
+                                    onChange={(e) => setNarrative({ ...narrative, comments: e.target.value })}
+                                    placeholder="Any other comments about your shift?"
+                                />
+                            </div>
+                            <div>
+                                <label className="input-label">
+                                    <Lightbulb size={14} style={{ color: "var(--accent)" }} />
+                                    <span>New Ideas / Suggestions</span>
+                                </label>
+                                <textarea
+                                    className="input"
+                                    style={{ height: "80px", resize: "vertical" }}
+                                    value={narrative.ideas}
+                                    onChange={(e) => setNarrative({ ...narrative, ideas: e.target.value })}
+                                    placeholder="Any ideas to improve processes or service?"
+                                />
                             </div>
                         </div>
                     </section>
                 </div>
 
                 {/* Task Checklist Sidebar */}
-                <aside className="flex flex-col gap-6">
+                <aside className="shift-report-sidebar">
                     <section className="glass-card" style={{ position: "sticky", top: "100px" }}>
-                        <div className="flex items-center gap-2" style={{ marginBottom: "1.5rem" }}>
-                            <ClipboardCheck className="text-accent" />
-                            <h2 className="font-display" style={{ fontSize: "1.25rem" }}>Shift Tasks</h2>
-                        </div>
+                        <SectionHeader icon={<ClipboardCheck className="text-accent" />} title="Shift Tasks" />
                         <div className="flex flex-col gap-2">
-                            {tasks.map((task: any) => (
-                                <label key={task.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer transition-colors">
-                                    <input
-                                        type="checkbox"
-                                        checked={task.isCompleted}
-                                        onChange={() => handleToggleTask(task.id, task.isCompleted)}
-                                        style={{ width: "18px", height: "18px" }}
-                                    />
-                                    <span style={{ fontSize: "0.875rem", color: task.isCompleted ? "var(--text-secondary)" : "var(--text-primary)", textDecoration: task.isCompleted ? "line-through" : "none" }}>
-                                        {task.content}
-                                    </span>
-                                </label>
-                            ))}
+                            {tasks.length === 0 ? (
+                                <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", fontStyle: "italic", padding: "0.5rem" }}>No tasks assigned.</p>
+                            ) : (
+                                tasks.map((task: any) => (
+                                    <label key={task.id} className="task-item">
+                                        <input
+                                            type="checkbox"
+                                            checked={task.isCompleted}
+                                            onChange={() => handleToggleTask(task.id, task.isCompleted)}
+                                            className="task-checkbox"
+                                        />
+                                        <span className={`task-label ${task.isCompleted ? "completed" : ""}`}>
+                                            {task.content}
+                                        </span>
+                                    </label>
+                                ))
+                            )}
                         </div>
+                        {tasks.length > 0 && (
+                            <div className="task-progress">
+                                <div className="progress-bar">
+                                    <div
+                                        className="progress-fill"
+                                        style={{
+                                            width: `${(tasks.filter((t: any) => t.isCompleted).length / tasks.length) * 100}%`
+                                        }}
+                                    />
+                                </div>
+                                <span className="progress-text">
+                                    {tasks.filter((t: any) => t.isCompleted).length} / {tasks.length} completed
+                                </span>
+                            </div>
+                        )}
                     </section>
+
+                    {/* Mobile Submit Button */}
+                    <div className="mobile-submit show-mobile">
+                        <button
+                            onClick={handleSubmit}
+                            className="btn btn-primary w-full"
+                            disabled={isSubmitting}
+                        >
+                            {isSubmitting ? (
+                                <span className="animate-spin" style={{ display: "inline-block", width: "18px", height: "18px", border: "2px solid currentColor", borderTopColor: "transparent", borderRadius: "50%" }} />
+                            ) : (
+                                <Send size={18} />
+                            )}
+                            <span>{isSubmitting ? "Submitting..." : "Finalize & Clock Out"}</span>
+                        </button>
+                    </div>
                 </aside>
             </div>
+
+            <style jsx>{`
+                .shift-report-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    flex-wrap: wrap;
+                    gap: 1rem;
+                }
+
+                .shift-report-layout {
+                    display: grid;
+                    grid-template-columns: 1fr 350px;
+                    gap: 2rem;
+                }
+
+                .shift-report-sidebar {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1.5rem;
+                }
+
+                .metrics-grid {
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 1rem;
+                }
+
+                .input-label {
+                    font-size: 0.875rem;
+                    color: var(--text-secondary);
+                    margin-bottom: 0.5rem;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+
+                .task-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    padding: 0.5rem;
+                    border-radius: 0.5rem;
+                    cursor: pointer;
+                    transition: background-color 0.2s;
+                }
+
+                .task-item:hover {
+                    background: rgba(255, 255, 255, 0.05);
+                }
+
+                .task-checkbox {
+                    width: 18px;
+                    height: 18px;
+                    accent-color: var(--accent);
+                }
+
+                .task-label {
+                    font-size: 0.875rem;
+                    color: var(--text-primary);
+                    transition: all 0.2s;
+                }
+
+                .task-label.completed {
+                    color: var(--text-secondary);
+                    text-decoration: line-through;
+                }
+
+                .task-progress {
+                    margin-top: 1rem;
+                    padding-top: 1rem;
+                    border-top: 1px solid var(--border);
+                }
+
+                .progress-bar {
+                    height: 6px;
+                    background: var(--bg-secondary);
+                    border-radius: 3px;
+                    overflow: hidden;
+                    margin-bottom: 0.5rem;
+                }
+
+                .progress-fill {
+                    height: 100%;
+                    background: var(--success);
+                    border-radius: 3px;
+                    transition: width 0.3s ease;
+                }
+
+                .progress-text {
+                    font-size: 0.75rem;
+                    color: var(--text-secondary);
+                }
+
+                .mobile-submit {
+                    margin-top: 1rem;
+                }
+
+                @media (max-width: 1024px) {
+                    .shift-report-layout {
+                        grid-template-columns: 1fr;
+                    }
+
+                    .shift-report-sidebar {
+                        order: -1;
+                    }
+
+                    .metrics-grid {
+                        grid-template-columns: repeat(2, 1fr);
+                    }
+                }
+
+                @media (max-width: 640px) {
+                    .shift-report-header {
+                        flex-direction: column;
+                        align-items: flex-start;
+                    }
+
+                    .shift-report-header button {
+                        display: none;
+                    }
+
+                    .metrics-grid {
+                        grid-template-columns: 1fr;
+                    }
+                }
+            `}</style>
         </div>
     );
 }
@@ -158,14 +537,138 @@ function ReservationSection({ title, data, setter, add, update, remove }: any) {
     );
 }
 
-function MetricInput({ label, value, onChange }: any) {
+function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }) {
+    return (
+        <div className="flex items-center gap-2" style={{ marginBottom: "1.5rem" }}>
+            {icon}
+            <h2 className="font-display" style={{ fontSize: "1.25rem" }}>{title}</h2>
+        </div>
+    );
+}
+
+function StarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+    const [hovered, setHovered] = useState<number>(0);
+
+    return (
+        <div className="flex gap-1" style={{ padding: "0.5rem 0" }}>
+            {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                    key={star}
+                    type="button"
+                    onClick={() => onChange(star)}
+                    onMouseEnter={() => setHovered(star)}
+                    onMouseLeave={() => setHovered(0)}
+                    style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: "0.25rem",
+                        transition: "transform 0.15s ease"
+                    }}
+                    onFocus={() => setHovered(star)}
+                    onBlur={() => setHovered(0)}
+                    aria-label={`Rate ${star} star${star > 1 ? "s" : ""}`}
+                >
+                    <Star
+                        size={32}
+                        fill={(hovered || value) >= star ? "var(--warning)" : "transparent"}
+                        color={(hovered || value) >= star ? "var(--warning)" : "var(--border)"}
+                        style={{
+                            transition: "all 0.15s ease",
+                            transform: (hovered || value) >= star ? "scale(1.1)" : "scale(1)"
+                        }}
+                    />
+                </button>
+            ))}
+        </div>
+    );
+}
+
+interface MetricInputProps {
+    label: string;
+    value: number;
+    onChange: (v: number) => void;
+    icon?: React.ReactNode;
+    variant?: "default" | "success" | "warning" | "danger";
+}
+
+function MetricInput({ label, value, onChange, icon, variant = "default" }: MetricInputProps) {
+    const variantColors: Record<string, string> = {
+        default: "var(--text-secondary)",
+        success: "var(--success)",
+        warning: "var(--warning)",
+        danger: "var(--danger)"
+    };
+
+    const labelColor = variantColors[variant];
+
     return (
         <div className="flex flex-col gap-1">
-            <label style={{ fontSize: "0.75rem", color: "var(--text-secondary)", fontWeight: 500 }}>{label}</label>
+            <label style={{
+                fontSize: "0.75rem",
+                color: labelColor,
+                fontWeight: 500,
+                display: "flex",
+                alignItems: "center",
+                gap: "0.375rem"
+            }}>
+                {icon}
+                {label}
+            </label>
             <div className="flex items-center gap-2">
-                <button onClick={() => onChange(Math.max(0, value - 1))} className="btn-outline" style={{ width: "32px", height: "32px", border: "1px solid var(--border)", cursor: "pointer", background: "none", color: "white" }}>-</button>
-                <span style={{ minWidth: "30px", textAlign: "center", fontWeight: 700 }}>{value}</span>
-                <button onClick={() => onChange(value + 1)} className="btn-outline" style={{ width: "32px", height: "32px", border: "1px solid var(--border)", cursor: "pointer", background: "none", color: "white" }}>+</button>
+                <button
+                    type="button"
+                    onClick={() => onChange(Math.max(0, value - 1))}
+                    className="btn-outline"
+                    style={{
+                        width: "32px",
+                        height: "32px",
+                        border: "1px solid var(--border)",
+                        cursor: "pointer",
+                        background: "none",
+                        color: "white",
+                        borderRadius: "0.375rem",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "1.25rem",
+                        lineHeight: 1
+                    }}
+                    aria-label={`Decrease ${label}`}
+                >
+                    -
+                </button>
+                <span style={{
+                    minWidth: "40px",
+                    textAlign: "center",
+                    fontWeight: 700,
+                    fontSize: "1.125rem",
+                    color: value > 0 ? "var(--text-primary)" : "var(--text-secondary)"
+                }}>
+                    {value}
+                </span>
+                <button
+                    type="button"
+                    onClick={() => onChange(value + 1)}
+                    className="btn-outline"
+                    style={{
+                        width: "32px",
+                        height: "32px",
+                        border: "1px solid var(--border)",
+                        cursor: "pointer",
+                        background: "none",
+                        color: "white",
+                        borderRadius: "0.375rem",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "1.25rem",
+                        lineHeight: 1
+                    }}
+                    aria-label={`Increase ${label}`}
+                >
+                    +
+                </button>
             </div>
         </div>
     );

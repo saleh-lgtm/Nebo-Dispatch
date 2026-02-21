@@ -11,6 +11,7 @@ export type AuditAction =
     | "LOGOUT"
     | "APPROVE"
     | "REJECT"
+    | "REVIEW"
     | "CLOCK_IN"
     | "CLOCK_OUT"
     | "PASSWORD_CHANGE"

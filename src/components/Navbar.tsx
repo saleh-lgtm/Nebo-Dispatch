@@ -93,6 +93,7 @@ export default function Navbar() {
             <NavLink href="/admin/notes" icon={<StickyNote size={18} />} label="Notes" onClick={closeMobileMenu} />
             <NavLink href="/admin/requests" icon={<FileEdit size={18} />} label="Requests" onClick={closeMobileMenu} />
             <NavLink href="/admin/analytics" icon={<BarChart3 size={18} />} label="Analytics" onClick={closeMobileMenu} />
+            <NavLink href="/admin/reports" icon={<FileText size={18} />} label="Reports" onClick={closeMobileMenu} />
             {isSuperAdmin && (
                 <>
                     <NavLink href="/admin/users" icon={<UserIcon size={18} />} label="Users" onClick={closeMobileMenu} />

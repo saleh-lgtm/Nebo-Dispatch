@@ -35,6 +35,13 @@ enum RequestStatus {
   REJECTED
 }
 
+enum ReportStatus {
+  DRAFT
+  SUBMITTED
+  REVIEWED
+  FLAGGED
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -50,82 +57,117 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   // Self-referential relation for user creation tracking
-  createdById   String?
-  createdBy     User?     @relation("CreatedBy", fields: [createdById], references: [id])
-  createdUsers  User[]    @relation("CreatedBy")
+  createdById  String?
+  createdBy    User?   @relation("CreatedBy", fields: [createdById], references: [id])
+  createdUsers User[]  @relation("CreatedBy")
 
-  shifts        Shift[]
-  shiftReports  ShiftReport[]
-  courtReports  CourtReport[]
-  assignedTasks Task[]        @relation("AssignedDispatcher")
-  createdTasks  Task[]        @relation("AssigningAdmin")
-  notes         GlobalNote[]
-  schedules     Schedule[]
-  requests      SchedulingRequest[]
-  swapRequests  SchedulingRequest[] @relation("SwapTarget")
-  affiliates    Affiliate[]
-  auditLogs     AuditLog[]
+  shifts          Shift[]
+  shiftReports    ShiftReport[]
+  reviewedReports ShiftReport[]       @relation("ReviewedReports")
+  courtReports    CourtReport[]
+  assignedTasks   Task[]              @relation("AssignedDispatcher")
+  createdTasks    Task[]              @relation("AssigningAdmin")
+  notes           GlobalNote[]
+  schedules       Schedule[]
+  requests        SchedulingRequest[]
+  swapRequests    SchedulingRequest[] @relation("SwapTarget")
+  affiliates      Affiliate[]
+  auditLogs       AuditLog[]
 }
 
 model Shift {
-  id          String       @id @default(cuid())
-  userId      String
-  user        User         @relation(fields: [userId], references: [id])
-  clockIn     DateTime     @default(now())
-  clockOut    DateTime?
-  totalHours  Float?
-  reports     ShiftReport[]
-  tasks       ShiftTask[]
-  requests    SchedulingRequest[]
+  id         String              @id @default(cuid())
+  userId     String
+  user       User                @relation(fields: [userId], references: [id])
+  clockIn    DateTime            @default(now())
+  clockOut   DateTime?
+  totalHours Float?
+  reports    ShiftReport[]
+  tasks      ShiftTask[]
+  requests   SchedulingRequest[]
 }
 
 model ShiftReport {
-  id              String   @id @default(cuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id])
-  shiftId         String
-  shift           Shift    @relation(fields: [shiftId], references: [id])
-  
-  // Standard fields
-  callsReceived   Int      @default(0)
-  handoffNotes    String?  @db.Text
-  generalComments String?  @db.Text
-  newIdeas        String?  @db.Text
-  
-  // New detailed fields
-  acceptedReservations Json?   // [{id: string, notes: string}]
-  modifiedReservations Json?   // [{id: string, notes: string}]
-  cancelledReservations Json?  // [{id: string, reason: string}]
-  emailsSent      Int      @default(0)
-  quotesGiven     Int      @default(0)
-  incidents       String?  @db.Text
-  
-  createdAt       DateTime @default(now())
+  id      String @id @default(cuid())
+  userId  String
+  user    User   @relation(fields: [userId], references: [id])
+  shiftId String
+  shift   Shift  @relation(fields: [shiftId], references: [id])
+
+  // Status tracking
+  status ReportStatus @default(SUBMITTED)
+
+  // Core metrics
+  callsReceived Int @default(0)
+  emailsSent    Int @default(0)
+  quotesGiven   Int @default(0)
+
+  // Reservation tracking
+  acceptedReservations     Json? // [{id: string, notes: string}]
+  modifiedReservations     Json? // [{id: string, notes: string}]
+  cancelledReservations    Json? // [{id: string, reason: string}]
+  totalReservationsHandled Int   @default(0)
+
+  // Customer interaction metrics
+  complaintsReceived Int @default(0)
+  complaintsResolved Int @default(0)
+  escalations        Int @default(0)
+
+  // Driver coordination
+  driversDispatched Int @default(0)
+  noShowsHandled    Int @default(0)
+  latePickups       Int @default(0)
+
+  // Narrative fields
+  handoffNotes    String? @db.Text
+  generalComments String? @db.Text
+  newIdeas        String? @db.Text
+  incidents       String? @db.Text
+  achievements    String? @db.Text // Notable accomplishments
+  challenges      String? @db.Text // Difficulties faced
+
+  // Rating (self-assessment)
+  shiftRating Int? // 1-5 self-rating
+
+  // Admin review
+  reviewedById     String?
+  reviewedBy       User?     @relation("ReviewedReports", fields: [reviewedById], references: [id])
+  reviewedAt       DateTime?
+  adminFeedback    String?   @db.Text
+  performanceScore Int? // Admin-assigned 1-100 score
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model TaskTemplate {
-  id          String   @id @default(cuid())
+  id          String     @id @default(cuid())
   title       String
   description String?
-  category    String?  // e.g., "Morning", "Standard"
-  isActive    Boolean  @default(true)
+  category    String? // e.g., "Morning", "Standard"
+  isActive    Boolean    @default(true)
   items       TaskItem[]
 }
 
 model TaskItem {
-  id          String       @id @default(cuid())
-  templateId  String
-  template    TaskTemplate @relation(fields: [templateId], references: [id])
-  content     String
-  order       Int          @default(0)
+  id         String       @id @default(cuid())
+  templateId String
+  template   TaskTemplate @relation(fields: [templateId], references: [id])
+  content    String
+  order      Int          @default(0)
 }
 
 model ShiftTask {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   shiftId     String
-  shift       Shift    @relation(fields: [shiftId], references: [id])
+  shift       Shift     @relation(fields: [shiftId], references: [id])
   content     String
-  isCompleted Boolean  @default(false)
+  isCompleted Boolean   @default(false)
   completedAt DateTime?
 }
 
@@ -139,14 +181,14 @@ model CourtReport {
 }
 
 model Schedule {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  isPublished Boolean  @default(false)
-  shiftStart  DateTime
-  shiftEnd    DateTime
-  weekStart   DateTime? // Sunday 00:00:00 of the week for efficient queries
-  requests    SchedulingRequest[]
+  id           String              @id @default(cuid())
+  userId       String
+  user         User                @relation(fields: [userId], references: [id])
+  isPublished  Boolean             @default(false)
+  shiftStart   DateTime
+  shiftEnd     DateTime
+  weekStart    DateTime? // Sunday 00:00:00 of the week for efficient queries
+  requests     SchedulingRequest[]
   swapRequests SchedulingRequest[] @relation("SwapTargetSchedule")
 
   @@index([weekStart])
@@ -154,51 +196,51 @@ model Schedule {
 }
 
 model Affiliate {
-  id                String   @id @default(cuid())
-  name              String
-  email             String
-  market            String   // Region/Area
-  notes             String?  @db.Text
-  cityTransferRate  String?  // Pricing/Rate info
-  isApproved        Boolean  @default(false)
-  
-  submittedById     String
-  submittedBy       User     @relation(fields: [submittedById], references: [id])
-  
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id               String  @id @default(cuid())
+  name             String
+  email            String
+  market           String // Region/Area
+  notes            String? @db.Text
+  cityTransferRate String? // Pricing/Rate info
+  isApproved       Boolean @default(false)
+
+  submittedById String
+  submittedBy   User   @relation(fields: [submittedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model SchedulingRequest {
-  id              String        @id @default(cuid())
-  userId          String
-  user            User          @relation(fields: [userId], references: [id])
-  type            RequestType
-  status          RequestStatus @default(PENDING)
-  reason          String?       @db.Text
+  id     String        @id @default(cuid())
+  userId String
+  user   User          @relation(fields: [userId], references: [id])
+  type   RequestType
+  status RequestStatus @default(PENDING)
+  reason String?       @db.Text
 
-  requestedStart  DateTime?
-  requestedEnd    DateTime?
+  requestedStart DateTime?
+  requestedEnd   DateTime?
 
-  shiftId         String?
-  shift           Shift?        @relation(fields: [shiftId], references: [id])
+  shiftId String?
+  shift   Shift?  @relation(fields: [shiftId], references: [id])
 
-  scheduleId      String?
-  schedule        Schedule?     @relation(fields: [scheduleId], references: [id])
+  scheduleId String?
+  schedule   Schedule? @relation(fields: [scheduleId], references: [id])
 
   // For TIME_OFF requests
-  timeOffType     String?       // "vacation", "sick", "personal", "other"
+  timeOffType String? // "vacation", "sick", "personal", "other"
 
   // For SHIFT_SWAP requests
-  targetUserId    String?
-  targetUser      User?         @relation("SwapTarget", fields: [targetUserId], references: [id])
+  targetUserId     String?
+  targetUser       User?     @relation("SwapTarget", fields: [targetUserId], references: [id])
   targetScheduleId String?
-  targetSchedule  Schedule?     @relation("SwapTargetSchedule", fields: [targetScheduleId], references: [id])
-  targetAccepted  Boolean?      // null = pending, true = accepted, false = rejected
+  targetSchedule   Schedule? @relation("SwapTargetSchedule", fields: [targetScheduleId], references: [id])
+  targetAccepted   Boolean? // null = pending, true = accepted, false = rejected
 
-  adminNotes      String?       @db.Text
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  adminNotes String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model Task {
@@ -227,10 +269,10 @@ model AuditLog {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id])
-  action    String   // CREATE, UPDATE, DELETE, LOGIN, APPROVE, REJECT, etc.
-  entity    String   // User, Schedule, ShiftReport, Affiliate, etc.
+  action    String // CREATE, UPDATE, DELETE, LOGIN, APPROVE, REJECT, etc.
+  entity    String // User, Schedule, ShiftReport, Affiliate, etc.
   entityId  String?
-  details   Json?    // Additional context about the action
+  details   Json? // Additional context about the action
   ipAddress String?
   createdAt DateTime @default(now())
 

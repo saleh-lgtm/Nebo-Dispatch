@@ -35,16 +35,32 @@ export async function saveShiftReport(data: Record<string, unknown> & {
         data: {
             user: { connect: { id: userId } },
             shift: { connect: { id: shiftId } },
+            // Core communication metrics
             callsReceived: reportData.callsReceived as number | undefined,
             emailsSent: reportData.emailsSent as number | undefined,
             quotesGiven: reportData.quotesGiven as number | undefined,
+            // Reservation tracking
+            totalReservationsHandled: reportData.totalReservationsHandled as number | undefined,
+            acceptedReservations: reportData.acceptedReservations as object | undefined,
+            modifiedReservations: reportData.modifiedReservations as object | undefined,
+            cancelledReservations: reportData.cancelledReservations as object | undefined,
+            // Customer interaction metrics
+            complaintsReceived: reportData.complaintsReceived as number | undefined,
+            complaintsResolved: reportData.complaintsResolved as number | undefined,
+            escalations: reportData.escalations as number | undefined,
+            // Driver coordination metrics
+            driversDispatched: reportData.driversDispatched as number | undefined,
+            noShowsHandled: reportData.noShowsHandled as number | undefined,
+            latePickups: reportData.latePickups as number | undefined,
+            // Narrative fields
             handoffNotes: reportData.handoffNotes as string | undefined,
             generalComments: reportData.generalComments as string | undefined,
             newIdeas: reportData.newIdeas as string | undefined,
             incidents: reportData.incidents as string | undefined,
-            acceptedReservations: reportData.acceptedReservations as object | undefined,
-            modifiedReservations: reportData.modifiedReservations as object | undefined,
-            cancelledReservations: reportData.cancelledReservations as object | undefined,
+            achievements: reportData.achievements as string | undefined,
+            challenges: reportData.challenges as string | undefined,
+            // Self-assessment rating (1-5)
+            shiftRating: reportData.shiftRating as number | undefined,
         },
     });
 
