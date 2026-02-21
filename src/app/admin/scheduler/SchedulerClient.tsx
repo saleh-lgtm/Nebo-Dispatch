@@ -355,6 +355,7 @@ export default function SchedulerClient({ dispatchers, initialSchedules, initial
             color: getDispatcherColor(index),
             duration: defaultDuration,
         });
+        e.dataTransfer.setData("text/plain", dispatcher.id);
         e.dataTransfer.effectAllowed = "copy";
     };
 
@@ -368,6 +369,7 @@ export default function SchedulerClient({ dispatchers, initialSchedules, initial
             shiftId: shift.id,
             duration: shift.duration,
         });
+        e.dataTransfer.setData("text/plain", shift.id);
         e.dataTransfer.effectAllowed = "move";
     };
 

@@ -2,7 +2,7 @@
 
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "./auth-helpers";
+import { requireAdmin, requireAuth } from "./auth-helpers";
 import { createAuditLog } from "./auditActions";
 
 // Helper to get start of week (Sunday 00:00:00 UTC) - internal use only
@@ -200,4 +200,25 @@ export async function isWeekPublished(weekStart: Date): Promise<boolean> {
     });
 
     return count > 0;
+}
+
+// Get user's next scheduled shift (for any authenticated user)
+export async function getUserNextShift(userId: string) {
+    await requireAuth();
+
+    const now = new Date();
+
+    return prisma.schedule.findFirst({
+        where: {
+            userId,
+            isPublished: true,
+            shiftStart: { gte: now },
+        },
+        orderBy: { shiftStart: "asc" },
+        select: {
+            id: true,
+            shiftStart: true,
+            shiftEnd: true,
+        },
+    });
 }
