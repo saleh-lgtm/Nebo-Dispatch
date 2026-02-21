@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useMemo, memo } from "react";
 import {
     ChevronLeft,
     ChevronRight,
@@ -262,6 +262,17 @@ export default function SchedulerClient({ dispatchers, initialSchedules, initial
 
     const gridRef = useRef<HTMLDivElement>(null);
 
+    // Memoize expensive calculations - CRITICAL PERFORMANCE OPTIMIZATION
+    const overlapPositions = useMemo(() => calculateOverlapPositions(shifts), [shifts]);
+
+    const dispatcherHoursMap = useMemo(() => {
+        const hours = new Map<string, number>();
+        shifts.forEach(s => {
+            hours.set(s.dispatcherId, (hours.get(s.dispatcherId) || 0) + s.duration);
+        });
+        return hours;
+    }, [shifts]);
+
     // Load schedules when week changes
     const loadWeekSchedules = useCallback(async (newWeekStart: Date) => {
         const schedules = await getWeekSchedules(newWeekStart);
@@ -441,12 +452,10 @@ export default function SchedulerClient({ dispatchers, initialSchedules, initial
         URL.revokeObjectURL(url);
     };
 
-    // Calculate shift hours per dispatcher
-    const getDispatcherHours = (dispatcherId: string): number => {
-        return shifts
-            .filter((s) => s.dispatcherId === dispatcherId)
-            .reduce((sum, s) => sum + s.duration, 0);
-    };
+    // Calculate shift hours per dispatcher - uses memoized map
+    const getDispatcherHours = useCallback((dispatcherId: string): number => {
+        return dispatcherHoursMap.get(dispatcherId) || 0;
+    }, [dispatcherHoursMap]);
 
     // Total hours scheduled
     const totalHours = shifts.reduce((sum, s) => sum + s.duration, 0);
@@ -632,9 +641,7 @@ export default function SchedulerClient({ dispatchers, initialSchedules, initial
 
                         {/* Shift blocks overlay */}
                         <div className="shifts-overlay">
-                            {(() => {
-                                const overlapPositions = calculateOverlapPositions(shifts);
-                                return shifts.map((shift) => {
+                            {shifts.map((shift) => {
                                     const rowIndex = HOUR_TO_ROW[shift.startHour];
                                     // Top position: rowIndex * 30px row height + 44px header height
                                     const top = rowIndex * 30 + 44;
@@ -690,8 +697,7 @@ export default function SchedulerClient({ dispatchers, initialSchedules, initial
                                             )}
                                         </div>
                                     );
-                                });
-                            })()}
+                                })}
                         </div>
                     </div>
                 </main>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, memo } from "react";
 import { Plus, Trash2, ClipboardCheck, Send, AlertCircle, Bookmark, Star, Phone, Mail, FileText, Users, Car, Clock, TrendingUp, MessageSquare, Lightbulb, Award, AlertTriangle } from "lucide-react";
 import { toggleTask, saveShiftReport } from "@/lib/actions";
 
@@ -546,7 +546,7 @@ function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }
     );
 }
 
-function StarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+const StarRating = memo(function StarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
     const [hovered, setHovered] = useState<number>(0);
 
     return (
@@ -582,7 +582,7 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
             ))}
         </div>
     );
-}
+});
 
 interface MetricInputProps {
     label: string;
@@ -592,7 +592,7 @@ interface MetricInputProps {
     variant?: "default" | "success" | "warning" | "danger";
 }
 
-function MetricInput({ label, value, onChange, icon, variant = "default" }: MetricInputProps) {
+const MetricInput = memo(function MetricInput({ label, value, onChange, icon, variant = "default" }: MetricInputProps) {
     const variantColors: Record<string, string> = {
         default: "var(--text-secondary)",
         success: "var(--success)",
@@ -672,4 +672,4 @@ function MetricInput({ label, value, onChange, icon, variant = "default" }: Metr
             </div>
         </div>
     );
-}
+});
