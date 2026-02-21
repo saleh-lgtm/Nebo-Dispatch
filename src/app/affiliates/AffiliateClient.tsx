@@ -7,6 +7,7 @@ import {
     Search,
     Globe,
     Mail,
+    Phone,
     MapPin,
     DollarSign,
     Info,
@@ -26,6 +27,7 @@ interface Affiliate {
     id: string;
     name: string;
     email: string;
+    phone: string | null;
     market: string;
     notes: string | null;
     cityTransferRate: string | null;
@@ -56,6 +58,7 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
     const [formData, setFormData] = useState({
         name: "",
         email: "",
+        phone: "",
         market: "",
         cityTransferRate: "",
         notes: ""
@@ -81,7 +84,7 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
                 submittedById: session.user.id
             });
             setShowForm(false);
-            setFormData({ name: "", email: "", market: "", cityTransferRate: "", notes: "" });
+            setFormData({ name: "", email: "", phone: "", market: "", cityTransferRate: "", notes: "" });
             addToast("Affiliate submitted for admin approval!", "success");
             router.refresh();
         } catch {
@@ -280,6 +283,12 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
                                 <Mail size={14} className="text-accent" />
                                 <span>{affiliate.email}</span>
                             </div>
+                            {affiliate.phone && (
+                                <div className="flex items-center gap-2" style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+                                    <Phone size={14} className="text-accent" />
+                                    <span>{affiliate.phone}</span>
+                                </div>
+                            )}
                             <div className="flex items-center gap-2" style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
                                 <DollarSign size={14} className="text-accent" />
                                 <span>Rate: {affiliate.cityTransferRate || "Not specified"}</span>
@@ -325,17 +334,31 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         />
                     </div>
-                    <div className="flex flex-col gap-1">
-                        <label style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
-                            Email Address *
-                        </label>
-                        <input
-                            required
-                            type="email"
-                            className="input"
-                            value={formData.email}
-                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        />
+                    <div className="flex gap-4 flex-wrap">
+                        <div className="flex flex-col gap-1 flex-1" style={{ minWidth: "150px" }}>
+                            <label style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+                                Email Address *
+                            </label>
+                            <input
+                                required
+                                type="email"
+                                className="input"
+                                value={formData.email}
+                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                            />
+                        </div>
+                        <div className="flex flex-col gap-1 flex-1" style={{ minWidth: "150px" }}>
+                            <label style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+                                Phone Number
+                            </label>
+                            <input
+                                type="tel"
+                                className="input"
+                                placeholder="(555) 123-4567"
+                                value={formData.phone}
+                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                            />
+                        </div>
                     </div>
                     <div className="flex gap-4 flex-wrap">
                         <div className="flex flex-col gap-1 flex-1" style={{ minWidth: "150px" }}>

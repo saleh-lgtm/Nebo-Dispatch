@@ -198,6 +198,7 @@ export async function createActiveShift(userId: string) {
 export async function submitAffiliate(data: {
     name: string;
     email: string;
+    phone?: string;
     market: string;
     notes?: string;
     cityTransferRate?: string;
