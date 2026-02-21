@@ -20,7 +20,7 @@ export default async function SchedulerPage() {
         redirect("/login");
     }
 
-    if (session.user.role !== "ADMIN") {
+    if (session.user.role !== "ADMIN" && session.user.role !== "SUPER_ADMIN") {
         redirect("/dashboard");
     }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import {
     ChevronLeft,
     ChevronRight,
@@ -59,6 +59,8 @@ interface ShiftBlock {
     duration: number;
     isPublished: boolean;
     color: string;
+    isCrossMidnight?: boolean;
+    isContinuation?: boolean;
 }
 
 // Constants
@@ -109,29 +111,96 @@ function getDispatcherColor(index: number): string {
     return COLORS[index % COLORS.length];
 }
 
-// Convert schedule data to shift blocks
+// Convert schedule data to shift blocks (handles cross-midnight shifts by splitting)
 function schedulesToBlocks(schedules: ScheduleData[], dispatchers: Dispatcher[], weekStart: Date): ShiftBlock[] {
-    return schedules.map((schedule) => {
+    const blocks: ShiftBlock[] = [];
+
+    for (const schedule of schedules) {
         const shiftStart = new Date(schedule.shiftStart);
         const shiftEnd = new Date(schedule.shiftEnd);
 
         const dayOfWeek = shiftStart.getDay();
         const startHour = shiftStart.getHours();
-        const duration = Math.round((shiftEnd.getTime() - shiftStart.getTime()) / (1000 * 60 * 60));
+        // Use ceil to preserve fractional hours
+        const totalDuration = Math.ceil((shiftEnd.getTime() - shiftStart.getTime()) / (1000 * 60 * 60));
 
         const dispatcherIndex = dispatchers.findIndex((d) => d.id === schedule.userId);
+        const color = dispatcherIndex >= 0 ? getDispatcherColor(dispatcherIndex) : COLORS[0];
 
-        return {
-            id: schedule.id,
-            dispatcherId: schedule.userId,
-            dispatcherName: schedule.user.name || "Unknown",
-            day: dayOfWeek,
-            startHour,
-            duration,
-            isPublished: schedule.isPublished,
-            color: getDispatcherColor(dispatcherIndex),
-        };
-    });
+        // Check if shift crosses midnight
+        const hoursUntilMidnight = 24 - startHour;
+
+        if (totalDuration > hoursUntilMidnight && startHour !== 0) {
+            // Split into two blocks: before midnight and after midnight
+            blocks.push({
+                id: schedule.id,
+                dispatcherId: schedule.userId,
+                dispatcherName: schedule.user.name || "Unknown",
+                day: dayOfWeek,
+                startHour,
+                duration: hoursUntilMidnight,
+                isPublished: schedule.isPublished,
+                color,
+                isCrossMidnight: true,
+            });
+
+            // Second part: from midnight onwards (next day)
+            const nextDay = (dayOfWeek + 1) % 7;
+            const remainingHours = totalDuration - hoursUntilMidnight;
+            blocks.push({
+                id: `${schedule.id}-cont`,
+                dispatcherId: schedule.userId,
+                dispatcherName: schedule.user.name || "Unknown",
+                day: nextDay,
+                startHour: 0,
+                duration: remainingHours,
+                isPublished: schedule.isPublished,
+                color,
+                isContinuation: true,
+            });
+        } else {
+            blocks.push({
+                id: schedule.id,
+                dispatcherId: schedule.userId,
+                dispatcherName: schedule.user.name || "Unknown",
+                day: dayOfWeek,
+                startHour,
+                duration: totalDuration,
+                isPublished: schedule.isPublished,
+                color,
+            });
+        }
+    }
+
+    return blocks;
+}
+
+// Detect overlapping shifts on the same day (same time slot, different dispatchers)
+function detectOverlaps(shifts: ShiftBlock[]): Set<string> {
+    const overlaps = new Set<string>();
+
+    for (let i = 0; i < shifts.length; i++) {
+        for (let j = i + 1; j < shifts.length; j++) {
+            const a = shifts[i];
+            const b = shifts[j];
+
+            // Check same day
+            if (a.day === b.day) {
+                const aStart = a.startHour;
+                const aEnd = a.startHour + a.duration;
+                const bStart = b.startHour;
+                const bEnd = b.startHour + b.duration;
+
+                // Check for overlap
+                if (!(aEnd <= bStart || bEnd <= aStart)) {
+                    overlaps.add(a.id);
+                    overlaps.add(b.id);
+                }
+            }
+        }
+    }
+
+    return overlaps;
 }
 
 interface Props {
@@ -508,11 +577,10 @@ export default function SchedulerClient({ dispatchers, initialSchedules, initial
                             })}
 
                             {/* Time labels and cells */}
-                            {GRID_HOURS.map((hour, rowIndex) => (
-                                <>
+                            {GRID_HOURS.map((hour) => (
+                                <React.Fragment key={`row-${hour}`}>
                                     {/* Time label */}
                                     <div
-                                        key={`time-${hour}`}
                                         className={`grid-time-label ${hour === 23 || hour === 7 || hour === 15 ? "shift-boundary" : ""}`}
                                     >
                                         {formatHour(hour)}
@@ -527,50 +595,65 @@ export default function SchedulerClient({ dispatchers, initialSchedules, initial
                                             onDrop={() => handleCellDrop(dayIndex, hour)}
                                         />
                                     ))}
-                                </>
+                                </React.Fragment>
                             ))}
                         </div>
 
                         {/* Shift blocks overlay */}
                         <div className="shifts-overlay">
-                            {shifts.map((shift) => {
-                                const rowIndex = HOUR_TO_ROW[shift.startHour];
-                                const top = (rowIndex + 1) * 30 + 44; // +1 for header, 30px per row, 44px header
-                                const left = (shift.day + 1) * (100 / 8); // +1 for time column
-                                const height = shift.duration * 30;
+                            {(() => {
+                                const overlaps = detectOverlaps(shifts);
+                                return shifts.map((shift) => {
+                                    const rowIndex = HOUR_TO_ROW[shift.startHour];
+                                    // Top position: rowIndex * 30px row height + 44px header height
+                                    const top = rowIndex * 30 + 44;
+                                    // Left position: percentage within the 7-day grid (overlay starts after time column)
+                                    const left = shift.day * (100 / 7);
+                                    const width = 100 / 7;
+                                    const height = shift.duration * 30;
+                                    const hasOverlap = overlaps.has(shift.id);
 
-                                return (
-                                    <div
-                                        key={shift.id}
-                                        className="shift-block"
-                                        style={{
-                                            top: `${top}px`,
-                                            left: `calc(${left}% + 2px)`,
-                                            width: `calc(${100 / 8}% - 4px)`,
-                                            height: `${height}px`,
-                                            background: shift.color,
-                                            color: getContrastColor(shift.color),
-                                        }}
-                                        draggable
-                                        onDragStart={(e) => handleShiftDragStart(shift, e)}
-                                        onDragEnd={handleDragEnd}
-                                    >
-                                        <span className="shift-name">{shift.dispatcherName}</span>
-                                        <span className="shift-time">
-                                            {formatHourFull(shift.startHour)} - {formatHourFull(shift.startHour + shift.duration)}
-                                        </span>
-                                        <button
-                                            className="shift-delete"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeleteShift(shift.id);
+                                    // Build class names
+                                    const classNames = ["shift-block"];
+                                    if (shift.isCrossMidnight) classNames.push("cross-midnight");
+                                    if (shift.isContinuation) classNames.push("cross-midnight-continuation");
+                                    if (hasOverlap) classNames.push("overlap-warning");
+
+                                    return (
+                                        <div
+                                            key={shift.id}
+                                            className={classNames.join(" ")}
+                                            style={{
+                                                top: `${top}px`,
+                                                left: `calc(${left}% + 2px)`,
+                                                width: `calc(${width}% - 4px)`,
+                                                height: `${height}px`,
+                                                background: shift.color,
+                                                color: getContrastColor(shift.color),
                                             }}
+                                            draggable={!shift.isContinuation}
+                                            onDragStart={(e) => !shift.isContinuation && handleShiftDragStart(shift, e)}
+                                            onDragEnd={handleDragEnd}
                                         >
-                                            <X size={12} />
-                                        </button>
-                                    </div>
-                                );
-                            })}
+                                            <span className="shift-name">{shift.dispatcherName}</span>
+                                            <span className="shift-time">
+                                                {formatHourFull(shift.startHour)} - {formatHourFull(shift.startHour + shift.duration)}
+                                            </span>
+                                            {!shift.isContinuation && (
+                                                <button
+                                                    className="shift-delete"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteShift(shift.id);
+                                                    }}
+                                                >
+                                                    <X size={12} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                });
+                            })()}
                         </div>
                     </div>
                 </main>

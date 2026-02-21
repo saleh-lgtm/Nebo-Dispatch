@@ -10,6 +10,7 @@ datasource db {
 }
 
 enum Role {
+  SUPER_ADMIN
   ADMIN
   DISPATCHER
 }
@@ -24,6 +25,8 @@ enum RequestType {
   HOURS_MODIFICATION
   SCHEDULE_CHANGE
   REVIEW
+  TIME_OFF
+  SHIFT_SWAP
 }
 
 enum RequestStatus {
@@ -39,8 +42,17 @@ model User {
   emailVerified DateTime?
   password      String?
   role          Role      @default(DISPATCHER)
+  isActive      Boolean   @default(true)
+  lastLogin     DateTime?
+  loginAttempts Int       @default(0)
+  lockedUntil   DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+
+  // Self-referential relation for user creation tracking
+  createdById   String?
+  createdBy     User?     @relation("CreatedBy", fields: [createdById], references: [id])
+  createdUsers  User[]    @relation("CreatedBy")
 
   shifts        Shift[]
   shiftReports  ShiftReport[]
@@ -50,7 +62,9 @@ model User {
   notes         GlobalNote[]
   schedules     Schedule[]
   requests      SchedulingRequest[]
+  swapRequests  SchedulingRequest[] @relation("SwapTarget")
   affiliates    Affiliate[]
+  auditLogs     AuditLog[]
 }
 
 model Shift {
@@ -133,6 +147,7 @@ model Schedule {
   shiftEnd    DateTime
   weekStart   DateTime? // Sunday 00:00:00 of the week for efficient queries
   requests    SchedulingRequest[]
+  swapRequests SchedulingRequest[] @relation("SwapTargetSchedule")
 
   @@index([weekStart])
   @@index([userId, weekStart])
@@ -161,16 +176,26 @@ model SchedulingRequest {
   type            RequestType
   status          RequestStatus @default(PENDING)
   reason          String?       @db.Text
-  
+
   requestedStart  DateTime?
   requestedEnd    DateTime?
-  
+
   shiftId         String?
   shift           Shift?        @relation(fields: [shiftId], references: [id])
-  
+
   scheduleId      String?
   schedule        Schedule?     @relation(fields: [scheduleId], references: [id])
-  
+
+  // For TIME_OFF requests
+  timeOffType     String?       // "vacation", "sick", "personal", "other"
+
+  // For SHIFT_SWAP requests
+  targetUserId    String?
+  targetUser      User?         @relation("SwapTarget", fields: [targetUserId], references: [id])
+  targetScheduleId String?
+  targetSchedule  Schedule?     @relation("SwapTargetSchedule", fields: [targetScheduleId], references: [id])
+  targetAccepted  Boolean?      // null = pending, true = accepted, false = rejected
+
   adminNotes      String?       @db.Text
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -196,4 +221,20 @@ model GlobalNote {
   title     String
   content   String   @db.Text
   createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String   // CREATE, UPDATE, DELETE, LOGIN, APPROVE, REJECT, etc.
+  entity    String   // User, Schedule, ShiftReport, Affiliate, etc.
+  entityId  String?
+  details   Json?    // Additional context about the action
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([entity, entityId])
+  @@index([action, createdAt])
 }
