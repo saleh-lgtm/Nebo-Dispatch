@@ -483,6 +483,20 @@
     opacity: 0.85;
 }
 
+/* Overlapping shifts - side by side */
+.shift-block.has-overlap {
+    border-left: 2px solid rgba(255, 255, 255, 0.4);
+    border-right: 2px solid rgba(255, 255, 255, 0.4);
+}
+
+.shift-block.has-overlap .shift-name {
+    font-size: 0.68rem;
+}
+
+.shift-block.has-overlap .shift-time {
+    font-size: 0.58rem;
+}
+
 /* Overlap warning */
 .shift-block.overlap-warning {
     border: 2px solid var(--warning, #f59e0b);

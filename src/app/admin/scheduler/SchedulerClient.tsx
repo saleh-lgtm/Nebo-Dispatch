@@ -188,37 +188,64 @@ function calculateOverlapPositions(shifts: ShiftBlock[]): Map<string, { index: n
         shiftsByDay.get(shift.day)!.push(shift);
     }
 
-    // For each day, find overlapping groups
-    for (const [_day, dayShifts] of shiftsByDay) {
-        // Sort by start hour
-        const sorted = [...dayShifts].sort((a, b) => a.startHour - b.startHour);
+    // Helper to check if two shifts overlap
+    const shiftsOverlap = (a: ShiftBlock, b: ShiftBlock): boolean => {
+        const aStart = a.startHour;
+        const aEnd = a.startHour + a.duration;
+        const bStart = b.startHour;
+        const bEnd = b.startHour + b.duration;
+        return !(aEnd <= bStart || bEnd <= aStart);
+    };
 
-        // Find overlapping clusters
+    // For each day, find overlapping groups using union-find approach
+    for (const [_day, dayShifts] of shiftsByDay) {
+        if (dayShifts.length === 0) continue;
+
+        // Build adjacency: which shifts overlap with which
+        const overlaps: Map<string, Set<string>> = new Map();
+        for (const shift of dayShifts) {
+            overlaps.set(shift.id, new Set());
+        }
+
+        for (let i = 0; i < dayShifts.length; i++) {
+            for (let j = i + 1; j < dayShifts.length; j++) {
+                if (shiftsOverlap(dayShifts[i], dayShifts[j])) {
+                    overlaps.get(dayShifts[i].id)!.add(dayShifts[j].id);
+                    overlaps.get(dayShifts[j].id)!.add(dayShifts[i].id);
+                }
+            }
+        }
+
+        // Find connected components (clusters of overlapping shifts)
+        const visited = new Set<string>();
         const clusters: ShiftBlock[][] = [];
 
-        for (const shift of sorted) {
-            const shiftStart = shift.startHour;
-            const shiftEnd = shift.startHour + shift.duration;
+        for (const shift of dayShifts) {
+            if (visited.has(shift.id)) continue;
 
-            // Find a cluster this shift overlaps with
-            let addedToCluster = false;
-            for (const cluster of clusters) {
-                // Check if this shift overlaps with any shift in the cluster
-                const overlapsCluster = cluster.some(existing => {
-                    const existingStart = existing.startHour;
-                    const existingEnd = existing.startHour + existing.duration;
-                    return !(shiftEnd <= existingStart || existingEnd <= shiftStart);
-                });
+            // BFS to find all shifts in this cluster
+            const cluster: ShiftBlock[] = [];
+            const queue = [shift];
 
-                if (overlapsCluster) {
-                    cluster.push(shift);
-                    addedToCluster = true;
-                    break;
+            while (queue.length > 0) {
+                const current = queue.shift()!;
+                if (visited.has(current.id)) continue;
+                visited.add(current.id);
+                cluster.push(current);
+
+                // Add all overlapping shifts to queue
+                for (const neighborId of overlaps.get(current.id) || []) {
+                    if (!visited.has(neighborId)) {
+                        const neighbor = dayShifts.find(s => s.id === neighborId);
+                        if (neighbor) queue.push(neighbor);
+                    }
                 }
             }
 
-            if (!addedToCluster) {
-                clusters.push([shift]);
+            if (cluster.length > 0) {
+                // Sort cluster by start hour for consistent positioning
+                cluster.sort((a, b) => a.startHour - b.startHour || a.dispatcherName.localeCompare(b.dispatcherName));
+                clusters.push(cluster);
             }
         }
 
