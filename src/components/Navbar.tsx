@@ -24,6 +24,7 @@ import {
     Briefcase,
     History,
     UserCog,
+    CheckSquare,
 } from "lucide-react";
 
 interface NavLinkProps {
@@ -197,6 +198,7 @@ export default function Navbar() {
                                     </div>
                                     <div className="dropdown-section">
                                         <span className="dropdown-section-label">Team</span>
+                                        <NavLink href="/admin/tasks" icon={<CheckSquare size={16} />} label="Admin Tasks" />
                                         <NavLink href="/admin/notes" icon={<StickyNote size={16} />} label="Global Notes" />
                                         <NavLink href="/admin/reports" icon={<FileText size={16} />} label="Shift Reports" />
                                         <NavLink href="/admin/analytics" icon={<BarChart3 size={16} />} label="Analytics" />
@@ -311,6 +313,7 @@ export default function Navbar() {
                                 <Shield size={12} />
                                 Admin - Team
                             </span>
+                            <NavLink href="/admin/tasks" icon={<CheckSquare size={18} />} label="Admin Tasks" onClick={closeMobileMenu} />
                             <NavLink href="/admin/notes" icon={<StickyNote size={18} />} label="Global Notes" onClick={closeMobileMenu} />
                             <NavLink href="/admin/reports" icon={<FileText size={18} />} label="Shift Reports" onClick={closeMobileMenu} />
                             <NavLink href="/admin/analytics" icon={<BarChart3 size={18} />} label="Analytics" onClick={closeMobileMenu} />

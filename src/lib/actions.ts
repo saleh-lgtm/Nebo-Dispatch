@@ -8,12 +8,29 @@ import { createAuditLog } from "./auditActions";
 export async function toggleTask(entryId: string, isCompleted: boolean) {
     await requireAuth();
 
+    // Get current task to check if startedAt needs to be set
+    const currentTask = await prisma.shiftTask.findUnique({
+        where: { id: entryId },
+    });
+
+    const now = new Date();
+    const updateData: {
+        isCompleted: boolean;
+        completedAt: Date | null;
+        startedAt?: Date;
+    } = {
+        isCompleted,
+        completedAt: isCompleted ? now : null,
+    };
+
+    // Set startedAt on first completion (when task is first worked on)
+    if (isCompleted && !currentTask?.startedAt) {
+        updateData.startedAt = now;
+    }
+
     await prisma.shiftTask.update({
         where: { id: entryId },
-        data: {
-            isCompleted,
-            completedAt: isCompleted ? new Date() : null,
-        },
+        data: updateData,
     });
     revalidatePath("/reports/shift");
 }
@@ -44,14 +61,6 @@ export async function saveShiftReport(data: Record<string, unknown> & {
             acceptedReservations: reportData.acceptedReservations as object | undefined,
             modifiedReservations: reportData.modifiedReservations as object | undefined,
             cancelledReservations: reportData.cancelledReservations as object | undefined,
-            // Customer interaction metrics
-            complaintsReceived: reportData.complaintsReceived as number | undefined,
-            complaintsResolved: reportData.complaintsResolved as number | undefined,
-            escalations: reportData.escalations as number | undefined,
-            // Driver coordination metrics
-            driversDispatched: reportData.driversDispatched as number | undefined,
-            noShowsHandled: reportData.noShowsHandled as number | undefined,
-            latePickups: reportData.latePickups as number | undefined,
             // Narrative fields
             handoffNotes: reportData.handoffNotes as string | undefined,
             generalComments: reportData.generalComments as string | undefined,
@@ -59,8 +68,6 @@ export async function saveShiftReport(data: Record<string, unknown> & {
             incidents: reportData.incidents as string | undefined,
             achievements: reportData.achievements as string | undefined,
             challenges: reportData.challenges as string | undefined,
-            // Self-assessment rating (1-5)
-            shiftRating: reportData.shiftRating as number | undefined,
         },
     });
 
@@ -153,6 +160,33 @@ export async function createActiveShift(userId: string) {
         ];
         await prisma.shiftTask.createMany({
             data: defaultTasks.map(content => ({ shiftId: shift.id, content })),
+        });
+    }
+
+    // Add admin-assigned tasks to the shift
+    const adminTasks = await prisma.adminTask.findMany({
+        where: {
+            isActive: true,
+            OR: [
+                { assignToAll: true },
+                { assignedToId: userId },
+            ],
+        },
+        orderBy: [
+            { priority: "desc" },
+            { createdAt: "desc" },
+        ],
+    });
+
+    if (adminTasks.length > 0) {
+        await prisma.shiftTask.createMany({
+            data: adminTasks.map((task) => ({
+                shiftId: shift.id,
+                content: task.title,
+                isAdminTask: true,
+                assignedById: task.createdById,
+                priority: task.priority,
+            })),
         });
     }
 

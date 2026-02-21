@@ -41,7 +41,23 @@ export async function getAllShiftReports(options?: {
             where,
             include: {
                 user: { select: { id: true, name: true, email: true } },
-                shift: { select: { id: true, clockIn: true, clockOut: true, totalHours: true } },
+                shift: {
+                    select: {
+                        id: true,
+                        clockIn: true,
+                        clockOut: true,
+                        totalHours: true,
+                        quotes: {
+                            select: {
+                                id: true,
+                                clientName: true,
+                                serviceType: true,
+                                status: true,
+                                estimatedAmount: true,
+                            },
+                        },
+                    },
+                },
                 reviewedBy: { select: { id: true, name: true } },
             },
             orderBy: { createdAt: "desc" },
@@ -69,6 +85,15 @@ export async function getShiftReportById(id: string) {
                     clockOut: true,
                     totalHours: true,
                     tasks: true,
+                    quotes: {
+                        select: {
+                            id: true,
+                            clientName: true,
+                            serviceType: true,
+                            status: true,
+                            estimatedAmount: true,
+                        },
+                    },
                 },
             },
             reviewedBy: { select: { id: true, name: true } },

@@ -23,11 +23,20 @@ import {
 } from "lucide-react";
 import { getAllShiftReports, reviewShiftReport, getDispatcherPerformance } from "@/lib/shiftReportActions";
 
+interface QuoteData {
+    id: string;
+    clientName: string;
+    serviceType: string;
+    status: string;
+    estimatedAmount: number | null;
+}
+
 interface ShiftData {
     id: string;
     clockIn: Date;
     clockOut: Date | null;
     totalHours: number | null;
+    quotes?: QuoteData[];
 }
 
 interface UserData {
@@ -704,12 +713,65 @@ export default function ReportsClient({
 
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
                             <MetricBox label="Reservations" value={selectedReport.totalReservationsHandled} />
-                            <MetricBox label="Complaints" value={`${selectedReport.complaintsResolved}/${selectedReport.complaintsReceived}`} />
-                            <MetricBox label="Escalations" value={selectedReport.escalations} />
-                            <MetricBox label="Drivers Dispatched" value={selectedReport.driversDispatched} />
-                            <MetricBox label="No Shows" value={selectedReport.noShowsHandled} />
-                            <MetricBox label="Late Pickups" value={selectedReport.latePickups} />
                         </div>
+
+                        {/* Linked Quotes Section */}
+                        {selectedReport.shift.quotes && selectedReport.shift.quotes.length > 0 && (
+                            <div style={{ marginBottom: "1.5rem", padding: "1rem", background: "rgba(255, 255, 255, 0.03)", borderRadius: "0.5rem" }}>
+                                <div style={{ fontSize: "0.875rem", fontWeight: 600, marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                    <FileText size={16} style={{ color: "var(--accent)" }} />
+                                    Quotes Created During Shift ({selectedReport.shift.quotes.length})
+                                </div>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                                    {selectedReport.shift.quotes.map((quote) => (
+                                        <div
+                                            key={quote.id}
+                                            style={{
+                                                display: "flex",
+                                                justifyContent: "space-between",
+                                                alignItems: "center",
+                                                padding: "0.5rem 0.75rem",
+                                                background: "rgba(255, 255, 255, 0.02)",
+                                                borderRadius: "0.375rem",
+                                                fontSize: "0.875rem",
+                                            }}
+                                        >
+                                            <div>
+                                                <span style={{ fontWeight: 500 }}>{quote.clientName}</span>
+                                                <span style={{ color: "var(--text-secondary)", marginLeft: "0.5rem" }}>
+                                                    ({quote.serviceType})
+                                                </span>
+                                            </div>
+                                            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                                                {quote.estimatedAmount && (
+                                                    <span style={{ color: "var(--success)" }}>
+                                                        ${quote.estimatedAmount.toFixed(2)}
+                                                    </span>
+                                                )}
+                                                <span
+                                                    style={{
+                                                        padding: "0.125rem 0.5rem",
+                                                        borderRadius: "9999px",
+                                                        fontSize: "0.75rem",
+                                                        fontWeight: 500,
+                                                        background: quote.status === "CONVERTED"
+                                                            ? "var(--success)"
+                                                            : quote.status === "FOLLOWING_UP"
+                                                            ? "var(--warning)"
+                                                            : "var(--bg-secondary)",
+                                                        color: quote.status === "CONVERTED" || quote.status === "FOLLOWING_UP"
+                                                            ? "black"
+                                                            : "var(--text-primary)",
+                                                    }}
+                                                >
+                                                    {quote.status}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Narrative Sections */}
                         {selectedReport.incidents && (

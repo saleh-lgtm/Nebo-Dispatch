@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, memo } from "react";
-import { Plus, Trash2, ClipboardCheck, Send, AlertCircle, Bookmark, Star, Phone, Mail, FileText, Users, Car, Clock, TrendingUp, MessageSquare, Lightbulb, Award, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, ClipboardCheck, Send, AlertCircle, Bookmark, Phone, Mail, FileText, TrendingUp, MessageSquare, Lightbulb, Award, AlertTriangle } from "lucide-react";
 import { toggleTask, saveShiftReport } from "@/lib/actions";
 
 interface ReservationEntry {
@@ -14,12 +14,6 @@ interface Metrics {
     emails: number;
     quotes: number;
     totalReservationsHandled: number;
-    complaintsReceived: number;
-    complaintsResolved: number;
-    escalations: number;
-    driversDispatched: number;
-    noShowsHandled: number;
-    latePickups: number;
 }
 
 interface Narrative {
@@ -38,13 +32,7 @@ export default function ShiftReportPage({ session, activeShift, initialTasks }: 
         calls: 0,
         emails: 0,
         quotes: 0,
-        totalReservationsHandled: 0,
-        complaintsReceived: 0,
-        complaintsResolved: 0,
-        escalations: 0,
-        driversDispatched: 0,
-        noShowsHandled: 0,
-        latePickups: 0
+        totalReservationsHandled: 0
     });
     const [narrative, setNarrative] = useState<Narrative>({
         comments: "",
@@ -53,7 +41,6 @@ export default function ShiftReportPage({ session, activeShift, initialTasks }: 
         achievements: "",
         challenges: ""
     });
-    const [shiftRating, setShiftRating] = useState<number>(0);
     const [tasks, setTasks] = useState(initialTasks || []);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -83,18 +70,11 @@ export default function ShiftReportPage({ session, activeShift, initialTasks }: 
             emailsSent: metrics.emails,
             quotesGiven: metrics.quotes,
             totalReservationsHandled: metrics.totalReservationsHandled,
-            complaintsReceived: metrics.complaintsReceived,
-            complaintsResolved: metrics.complaintsResolved,
-            escalations: metrics.escalations,
-            driversDispatched: metrics.driversDispatched,
-            noShowsHandled: metrics.noShowsHandled,
-            latePickups: metrics.latePickups,
             generalComments: narrative.comments,
             incidents: narrative.incidents,
             newIdeas: narrative.ideas,
             achievements: narrative.achievements,
             challenges: narrative.challenges,
-            shiftRating: shiftRating > 0 ? shiftRating : undefined,
             acceptedReservations: accepted,
             modifiedReservations: modified,
             cancelledReservations: cancelled,
@@ -129,23 +109,6 @@ export default function ShiftReportPage({ session, activeShift, initialTasks }: 
 
             <div className="shift-report-layout">
                 <div className="flex flex-col gap-6">
-                    {/* Shift Self-Assessment */}
-                    <section className="glass-card">
-                        <SectionHeader icon={<Star className="text-accent" />} title="Shift Self-Assessment" />
-                        <div className="flex flex-col gap-4 items-center" style={{ padding: "1rem 0" }}>
-                            <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>How would you rate your shift overall?</p>
-                            <StarRating value={shiftRating} onChange={setShiftRating} />
-                            <p style={{ color: "var(--text-secondary)", fontSize: "0.75rem", fontStyle: "italic" }}>
-                                {shiftRating === 0 && "Click to rate"}
-                                {shiftRating === 1 && "Difficult shift"}
-                                {shiftRating === 2 && "Below average"}
-                                {shiftRating === 3 && "Average shift"}
-                                {shiftRating === 4 && "Good shift"}
-                                {shiftRating === 5 && "Excellent shift!"}
-                            </p>
-                        </div>
-                    </section>
-
                     {/* Communication Metrics */}
                     <section className="glass-card">
                         <SectionHeader icon={<Phone className="text-accent" />} title="Communication Metrics" />
@@ -186,61 +149,6 @@ export default function ShiftReportPage({ session, activeShift, initialTasks }: 
                             <ReservationSection title="Accepted Reservations" data={accepted} setter={setAccepted} add={() => addReservation(setAccepted)} update={updateReservation} remove={removeReservation} />
                             <ReservationSection title="Modified Reservations" data={modified} setter={setModified} add={() => addReservation(setModified)} update={updateReservation} remove={removeReservation} />
                             <ReservationSection title="Cancelled Reservations" data={cancelled} setter={setCancelled} add={() => addReservation(setCancelled)} update={updateReservation} remove={removeReservation} />
-                        </div>
-                    </section>
-
-                    {/* Customer Interaction Metrics */}
-                    <section className="glass-card">
-                        <SectionHeader icon={<Users className="text-accent" />} title="Customer Interactions" />
-                        <div className="metrics-grid">
-                            <MetricInput
-                                label="Complaints Received"
-                                value={metrics.complaintsReceived}
-                                onChange={(v: number) => setMetrics({ ...metrics, complaintsReceived: v })}
-                                icon={<MessageSquare size={16} />}
-                                variant="warning"
-                            />
-                            <MetricInput
-                                label="Complaints Resolved"
-                                value={metrics.complaintsResolved}
-                                onChange={(v: number) => setMetrics({ ...metrics, complaintsResolved: v })}
-                                icon={<MessageSquare size={16} />}
-                                variant="success"
-                            />
-                            <MetricInput
-                                label="Escalations"
-                                value={metrics.escalations}
-                                onChange={(v: number) => setMetrics({ ...metrics, escalations: v })}
-                                icon={<AlertTriangle size={16} />}
-                                variant="danger"
-                            />
-                        </div>
-                    </section>
-
-                    {/* Driver Coordination Metrics */}
-                    <section className="glass-card">
-                        <SectionHeader icon={<Car className="text-accent" />} title="Driver Coordination" />
-                        <div className="metrics-grid">
-                            <MetricInput
-                                label="Drivers Dispatched"
-                                value={metrics.driversDispatched}
-                                onChange={(v: number) => setMetrics({ ...metrics, driversDispatched: v })}
-                                icon={<Car size={16} />}
-                            />
-                            <MetricInput
-                                label="No-Shows Handled"
-                                value={metrics.noShowsHandled}
-                                onChange={(v: number) => setMetrics({ ...metrics, noShowsHandled: v })}
-                                icon={<Users size={16} />}
-                                variant="warning"
-                            />
-                            <MetricInput
-                                label="Late Pickups"
-                                value={metrics.latePickups}
-                                onChange={(v: number) => setMetrics({ ...metrics, latePickups: v })}
-                                icon={<Clock size={16} />}
-                                variant="warning"
-                            />
                         </div>
                     </section>
 
@@ -545,44 +453,6 @@ function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }
         </div>
     );
 }
-
-const StarRating = memo(function StarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-    const [hovered, setHovered] = useState<number>(0);
-
-    return (
-        <div className="flex gap-1" style={{ padding: "0.5rem 0" }}>
-            {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                    key={star}
-                    type="button"
-                    onClick={() => onChange(star)}
-                    onMouseEnter={() => setHovered(star)}
-                    onMouseLeave={() => setHovered(0)}
-                    style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        padding: "0.25rem",
-                        transition: "transform 0.15s ease"
-                    }}
-                    onFocus={() => setHovered(star)}
-                    onBlur={() => setHovered(0)}
-                    aria-label={`Rate ${star} star${star > 1 ? "s" : ""}`}
-                >
-                    <Star
-                        size={32}
-                        fill={(hovered || value) >= star ? "var(--warning)" : "transparent"}
-                        color={(hovered || value) >= star ? "var(--warning)" : "var(--border)"}
-                        style={{
-                            transition: "all 0.15s ease",
-                            transform: (hovered || value) >= star ? "scale(1.1)" : "scale(1)"
-                        }}
-                    />
-                </button>
-            ))}
-        </div>
-    );
-});
 
 interface MetricInputProps {
     label: string;

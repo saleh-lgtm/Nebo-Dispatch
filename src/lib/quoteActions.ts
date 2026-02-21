@@ -16,17 +16,33 @@ export interface CreateQuoteData {
     dropoffLocation?: string;
     estimatedAmount?: number;
     notes?: string;
+    shiftId?: string; // Optional - will auto-detect active shift if not provided
 }
 
 export async function createQuote(data: CreateQuoteData) {
     const session = await requireAuth();
 
+    // Auto-detect active shift if not provided
+    let shiftId = data.shiftId;
+    if (!shiftId) {
+        const activeShift = await prisma.shift.findFirst({
+            where: {
+                userId: session.user.id,
+                clockOut: null,
+            },
+        });
+        shiftId = activeShift?.id;
+    }
+
+    const { shiftId: _, ...quoteData } = data;
+
     const quote = await prisma.quote.create({
         data: {
-            ...data,
+            ...quoteData,
             createdById: session.user.id,
             assignedToId: session.user.id, // Initially assigned to creator
             nextFollowUp: new Date(Date.now() + 24 * 60 * 60 * 1000), // Default: follow up in 24h
+            shiftId, // Link to active shift
         },
     });
 
@@ -35,11 +51,24 @@ export async function createQuote(data: CreateQuoteData) {
         "CREATE",
         "Quote",
         quote.id,
-        { clientName: data.clientName, serviceType: data.serviceType }
+        { clientName: data.clientName, serviceType: data.serviceType, shiftId }
     );
 
     revalidatePath("/dashboard");
     return quote;
+}
+
+// Get quotes created during a specific shift
+export async function getShiftQuotes(shiftId: string) {
+    await requireAuth();
+
+    return prisma.quote.findMany({
+        where: { shiftId },
+        include: {
+            createdBy: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: "asc" },
+    });
 }
 
 export async function getQuotes(options?: {
