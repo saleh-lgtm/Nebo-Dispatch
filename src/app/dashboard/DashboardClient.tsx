@@ -334,25 +334,6 @@ export default function DashboardClient({
             {/* Main Content */}
             <div className="content-grid">
                 <div className="content-col">
-                    <QuotesPanel quotes={pendingQuotes} />
-                    <RecentReportsPanel
-                        reports={recentReports}
-                        isAdmin={isSuperAdmin}
-                        currentUserId={userId}
-                    />
-                </div>
-
-                <div className="content-col">
-                    <EventsPanel events={upcomingEvents} isAdmin={isAdmin} />
-
-                    {isAdmin && (
-                        <ActiveUsersPanel
-                            initialOnlineUsers={onlineUsers}
-                            initialActiveShiftUsers={activeShiftUsers}
-                            currentUserId={userId}
-                        />
-                    )}
-
                     {/* Global Notes */}
                     <div className="card notes-card">
                         <div className="card-header">
@@ -383,6 +364,25 @@ export default function DashboardClient({
                             )}
                         </div>
                     </div>
+
+                    <QuotesPanel quotes={pendingQuotes} />
+                    <RecentReportsPanel
+                        reports={recentReports}
+                        isAdmin={isSuperAdmin}
+                        currentUserId={userId}
+                    />
+                </div>
+
+                <div className="content-col">
+                    <EventsPanel events={upcomingEvents} isAdmin={isAdmin} />
+
+                    {isAdmin && (
+                        <ActiveUsersPanel
+                            initialOnlineUsers={onlineUsers}
+                            initialActiveShiftUsers={activeShiftUsers}
+                            currentUserId={userId}
+                        />
+                    )}
                 </div>
             </div>
 
