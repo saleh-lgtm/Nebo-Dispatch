@@ -24,10 +24,6 @@ import {
     Briefcase,
     History,
     UserCog,
-    CalendarOff,
-    ArrowLeftRight,
-    CalendarDays,
-    Inbox,
 } from "lucide-react";
 
 interface NavLinkProps {
@@ -173,34 +169,14 @@ export default function Navbar() {
                         {/* Common Links */}
                         <NavLink href="/dashboard" icon={<LayoutDashboard size={18} />} label="Dashboard" />
 
-                        {/* My Work Dropdown - For dispatchers */}
+                        {/* Schedule & Work - For non-super-admin */}
                         {!isSuperAdmin && (
-                            <NavDropdown
-                                label="My Work"
-                                icon={<Briefcase size={18} />}
-                                activePrefix={["/schedule", "/reports/shift"]}
-                            >
-                                <div className="dropdown-section">
-                                    <NavLink href="/schedule" icon={<Calendar size={16} />} label="My Schedule" />
-                                    {isDispatcher && (
-                                        <NavLink href="/reports/shift" icon={<ClipboardList size={16} />} label="Submit Shift Report" />
-                                    )}
-                                </div>
-                            </NavDropdown>
-                        )}
-
-                        {/* Requests Dropdown - Time Off & Shift Swap */}
-                        {!isSuperAdmin && (
-                            <NavDropdown
-                                label="Requests"
-                                icon={<Inbox size={18} />}
-                                activePrefix={["/time-off", "/shift-swap"]}
-                            >
-                                <div className="dropdown-section">
-                                    <NavLink href="/time-off" icon={<CalendarOff size={16} />} label="Time Off" />
-                                    <NavLink href="/shift-swap" icon={<ArrowLeftRight size={16} />} label="Shift Swap" />
-                                </div>
-                            </NavDropdown>
+                            <>
+                                <NavLink href="/schedule" icon={<Calendar size={18} />} label="Schedule" />
+                                {isDispatcher && (
+                                    <NavLink href="/reports/shift" icon={<ClipboardList size={18} />} label="Shift Report" />
+                                )}
+                            </>
                         )}
 
                         <NavLink href="/affiliates" icon={<Users size={18} />} label="Affiliates" />
@@ -307,23 +283,35 @@ export default function Navbar() {
                     <div className="mobile-nav-section">
                         <span className="nav-section-label">Main</span>
                         <NavLink href="/dashboard" icon={<LayoutDashboard size={18} />} label="Dashboard" onClick={closeMobileMenu} />
-                        <NavLink href="/schedule" icon={<Calendar size={18} />} label="My Schedule" onClick={closeMobileMenu} />
+                        {!isSuperAdmin && (
+                            <NavLink href="/schedule" icon={<Calendar size={18} />} label="My Schedule" onClick={closeMobileMenu} />
+                        )}
                         {isDispatcher && (
                             <NavLink href="/reports/shift" icon={<ClipboardList size={18} />} label="Shift Report" onClick={closeMobileMenu} />
                         )}
                         <NavLink href="/affiliates" icon={<Users size={18} />} label="Affiliates" onClick={closeMobileMenu} />
                     </div>
 
-                    {/* Admin Section */}
+                    {/* Admin Section - Scheduling */}
                     {isAdmin && (
                         <div className="mobile-nav-section">
                             <span className="nav-section-label">
                                 <Shield size={12} />
-                                Admin Tools
+                                Admin - Scheduling
                             </span>
-                            <NavLink href="/admin/scheduler" icon={<CalendarClock size={18} />} label="Scheduler" onClick={closeMobileMenu} />
-                            <NavLink href="/admin/requests" icon={<FileEdit size={18} />} label="Requests" onClick={closeMobileMenu} />
-                            <NavLink href="/admin/notes" icon={<StickyNote size={18} />} label="Notes" onClick={closeMobileMenu} />
+                            <NavLink href="/admin/scheduler" icon={<CalendarClock size={18} />} label="Dispatcher Scheduler" onClick={closeMobileMenu} />
+                            <NavLink href="/admin/requests" icon={<FileEdit size={18} />} label="Pending Requests" onClick={closeMobileMenu} />
+                        </div>
+                    )}
+
+                    {/* Admin Section - Team */}
+                    {isAdmin && (
+                        <div className="mobile-nav-section">
+                            <span className="nav-section-label">
+                                <Shield size={12} />
+                                Admin - Team
+                            </span>
+                            <NavLink href="/admin/notes" icon={<StickyNote size={18} />} label="Global Notes" onClick={closeMobileMenu} />
                             <NavLink href="/admin/reports" icon={<FileText size={18} />} label="Shift Reports" onClick={closeMobileMenu} />
                             <NavLink href="/admin/analytics" icon={<BarChart3 size={18} />} label="Analytics" onClick={closeMobileMenu} />
                         </div>
