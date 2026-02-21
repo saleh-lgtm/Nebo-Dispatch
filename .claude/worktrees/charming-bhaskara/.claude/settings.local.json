@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /Users/salehzahran/Desktop/Nebo-dispatch-app/.claude/worktrees/charming-bhaskara log --oneline)"
+    ]
+  }
+}
