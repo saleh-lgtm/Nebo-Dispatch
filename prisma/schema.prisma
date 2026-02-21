@@ -85,6 +85,11 @@ model User {
   swapRequestsMade    ShiftSwapRequest[]   @relation("SwapRequester")
   swapRequestsReceived ShiftSwapRequest[]  @relation("SwapTarget")
   swapRequestsReviewed ShiftSwapRequest[]  @relation("SwapReviewer")
+
+  // Admin task assignment
+  assignedShiftTasks  ShiftTask[]          @relation("TaskAssigner")
+  adminTasksCreated   AdminTask[]          @relation("AdminTaskCreator")
+  adminTasksAssigned  AdminTask[]          @relation("AdminTaskAssignee")
 }
 
 model Shift {
@@ -97,6 +102,7 @@ model Shift {
   reports    ShiftReport[]
   tasks      ShiftTask[]
   requests   SchedulingRequest[]
+  quotes     Quote[]
 }
 
 model ShiftReport {
@@ -180,7 +186,14 @@ model ShiftTask {
   shift       Shift     @relation(fields: [shiftId], references: [id])
   content     String
   isCompleted Boolean   @default(false)
+  startedAt   DateTime? // When task was started
   completedAt DateTime?
+
+  // Admin assignment fields
+  assignedById  String?
+  assignedBy    User?    @relation("TaskAssigner", fields: [assignedById], references: [id])
+  isAdminTask   Boolean  @default(false)
+  priority      Int      @default(0)
 }
 
 model CourtReport {
@@ -341,12 +354,17 @@ model Quote {
   assignedToId  String?
   assignedTo    User?     @relation("QuotesAssigned", fields: [assignedToId], references: [id])
 
+  // Link to shift when quote was created
+  shiftId       String?
+  shift         Shift?    @relation(fields: [shiftId], references: [id])
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   @@index([status, createdAt])
   @@index([assignedToId])
   @@index([nextFollowUp])
+  @@index([shiftId])
 }
 
 enum QuoteStatus {
@@ -462,4 +480,23 @@ model ShiftSwapRequest {
   @@index([requesterId, status])
   @@index([targetUserId, status])
   @@index([status])
+}
+
+// Admin-assigned tasks for dispatchers
+model AdminTask {
+  id           String    @id @default(cuid())
+  title        String
+  description  String?   @db.Text
+  assignToAll  Boolean   @default(false)  // If true, assign to all dispatchers
+  assignedToId String?                    // null if assignToAll=true
+  assignedTo   User?     @relation("AdminTaskAssignee", fields: [assignedToId], references: [id])
+  createdById  String
+  createdBy    User      @relation("AdminTaskCreator", fields: [createdById], references: [id])
+  isActive     Boolean   @default(true)
+  priority     Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([isActive, createdAt])
+  @@index([assignedToId])
 }

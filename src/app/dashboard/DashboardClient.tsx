@@ -18,8 +18,6 @@ import QuotesPanel from "@/components/QuotesPanel";
 import ActiveUsersPanel from "@/components/ActiveUsersPanel";
 import RecentReportsPanel from "@/components/RecentReportsPanel";
 import EventsPanel from "@/components/EventsPanel";
-import TimeOffPanel from "@/components/TimeOffPanel";
-import ShiftSwapPanel from "@/components/ShiftSwapPanel";
 
 interface GlobalNote {
     id: string;
@@ -109,49 +107,6 @@ interface Event {
     createdAt: Date;
 }
 
-interface TimeOffRequest {
-    id: string;
-    userId: string;
-    startDate: Date;
-    endDate: Date;
-    reason: string;
-    type: string;
-    status: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
-    reviewedById: string | null;
-    reviewedBy: { id: string; name: string | null } | null;
-    reviewedAt: Date | null;
-    adminNotes: string | null;
-    createdAt: Date;
-    user?: { id: string; name: string | null; email: string | null };
-}
-
-interface Schedule {
-    id: string;
-    userId: string;
-    shiftStart: Date;
-    shiftEnd: Date;
-    isPublished: boolean;
-    user?: { id: string; name: string | null };
-}
-
-interface SwapRequest {
-    id: string;
-    requesterId: string;
-    targetUserId: string;
-    requesterShiftId: string;
-    targetShiftId: string;
-    status: "PENDING_TARGET" | "PENDING_ADMIN" | "APPROVED" | "REJECTED" | "CANCELLED";
-    reason: string | null;
-    targetResponse: string | null;
-    adminNotes: string | null;
-    createdAt: Date;
-    requester?: { id: string; name: string | null };
-    targetUser?: { id: string; name: string | null };
-    requesterShift: Schedule;
-    targetShift: Schedule;
-    reviewedBy?: { id: string; name: string | null } | null;
-}
-
 interface Props {
     initialStats: {
         userCount: number;
@@ -164,11 +119,6 @@ interface Props {
     activeShiftUsers: OnlineUser[];
     recentReports: ShiftReport[];
     upcomingEvents: Event[];
-    myTimeOffRequests: TimeOffRequest[];
-    pendingTimeOffRequests: TimeOffRequest[];
-    swapRequestsData: { madeRequests: SwapRequest[]; receivedRequests: SwapRequest[] };
-    pendingSwapRequests: { pendingTargetRequests: SwapRequest[]; pendingAdminRequests: SwapRequest[] };
-    mySchedules: Schedule[];
     userId: string;
     isAdmin: boolean;
     isSuperAdmin: boolean;
@@ -182,11 +132,6 @@ export default function DashboardClient({
     activeShiftUsers,
     recentReports,
     upcomingEvents,
-    myTimeOffRequests,
-    pendingTimeOffRequests,
-    swapRequestsData,
-    pendingSwapRequests,
-    mySchedules,
     userId,
     isAdmin,
     isSuperAdmin,
@@ -424,23 +369,6 @@ export default function DashboardClient({
                         currentUserId={userId}
                     />
 
-                    {/* Time Off Requests Panel */}
-                    <TimeOffPanel
-                        myRequests={myTimeOffRequests}
-                        pendingRequests={pendingTimeOffRequests}
-                        isAdmin={isAdmin}
-                    />
-
-                    {/* Shift Swap Requests Panel */}
-                    <ShiftSwapPanel
-                        madeRequests={swapRequestsData.madeRequests}
-                        receivedRequests={swapRequestsData.receivedRequests}
-                        pendingTargetRequests={pendingSwapRequests.pendingTargetRequests}
-                        pendingAdminRequests={pendingSwapRequests.pendingAdminRequests}
-                        myShifts={mySchedules}
-                        isAdmin={isAdmin}
-                        userId={userId}
-                    />
                 </div>
 
                 {/* Right Column */}

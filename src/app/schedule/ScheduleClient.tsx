@@ -12,14 +12,20 @@ import {
     FileEdit,
     X,
     MessageSquare,
+    Palmtree,
+    ArrowLeftRight,
 } from "lucide-react";
 import { createDetailedRequest } from "@/lib/requestActions";
+import TimeOffPanel from "@/components/TimeOffPanel";
+import ShiftSwapPanel from "@/components/ShiftSwapPanel";
 
 interface Schedule {
     id: string;
     shiftStart: Date;
     shiftEnd: Date;
     isPublished: boolean;
+    userId: string;
+    user?: { id: string; name: string | null };
 }
 
 interface Request {
@@ -34,12 +40,53 @@ interface Request {
     schedule: Schedule | null;
 }
 
+interface TimeOffRequest {
+    id: string;
+    userId: string;
+    startDate: Date;
+    endDate: Date;
+    reason: string;
+    type: string;
+    status: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
+    reviewedById: string | null;
+    reviewedBy: { id: string; name: string | null } | null;
+    reviewedAt: Date | null;
+    adminNotes: string | null;
+    createdAt: Date;
+    user?: { id: string; name: string | null; email: string | null };
+}
+
+interface SwapRequest {
+    id: string;
+    requesterId: string;
+    targetUserId: string;
+    requesterShiftId: string;
+    targetShiftId: string;
+    status: "PENDING_TARGET" | "PENDING_ADMIN" | "APPROVED" | "REJECTED" | "CANCELLED";
+    reason: string | null;
+    targetResponse: string | null;
+    adminNotes: string | null;
+    createdAt: Date;
+    requester?: { id: string; name: string | null };
+    targetUser?: { id: string; name: string | null };
+    requesterShift: Schedule;
+    targetShift: Schedule;
+    reviewedBy?: { id: string; name: string | null } | null;
+}
+
 interface Props {
     initialSchedule: Schedule[];
     requests: Request[];
     upcomingShifts: Schedule[];
     pastShifts: Schedule[];
+    myTimeOffRequests: TimeOffRequest[];
+    pendingTimeOffRequests: TimeOffRequest[];
+    swapRequestsData: { madeRequests: SwapRequest[]; receivedRequests: SwapRequest[] };
+    pendingSwapRequests: { pendingTargetRequests: SwapRequest[]; pendingAdminRequests: SwapRequest[] };
+    mySchedules: Schedule[];
     session: any;
+    isAdmin: boolean;
+    userId: string;
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -50,14 +97,23 @@ const TYPE_LABELS: Record<string, string> = {
     SHIFT_SWAP: "Shift Swap",
 };
 
+type TabType = "upcoming" | "history" | "requests" | "timeoff" | "swap";
+
 export default function ScheduleClient({
     initialSchedule,
     requests: initialRequests,
     upcomingShifts,
     pastShifts,
+    myTimeOffRequests,
+    pendingTimeOffRequests,
+    swapRequestsData,
+    pendingSwapRequests,
+    mySchedules,
     session,
+    isAdmin,
+    userId,
 }: Props) {
-    const [activeTab, setActiveTab] = useState<"upcoming" | "history" | "requests">("upcoming");
+    const [activeTab, setActiveTab] = useState<TabType>("upcoming");
     const [showRequestForm, setShowRequestForm] = useState(false);
     const [requests, setRequests] = useState<Request[]>(initialRequests);
 
@@ -152,6 +208,11 @@ export default function ScheduleClient({
         (shift, index, self) => index === self.findIndex((s) => s.id === shift.id)
     );
 
+    // Count pending items for badges
+    const pendingTimeOff = myTimeOffRequests.filter(r => r.status === "PENDING").length;
+    const pendingSwaps = swapRequestsData.madeRequests.filter(r => r.status === "PENDING_TARGET" || r.status === "PENDING_ADMIN").length +
+        pendingSwapRequests.pendingTargetRequests.length;
+
     return (
         <div className="flex flex-col gap-6 animate-fade-in" style={{ padding: "1.5rem" }}>
             <header className="flex justify-between items-center">
@@ -171,36 +232,87 @@ export default function ScheduleClient({
 
             <div className="glass-card overflow-hidden" style={{ padding: 0 }}>
                 {/* Tabs */}
-                <div className="flex border-b border-white/10">
+                <div className="flex border-b border-white/10" style={{ overflowX: "auto" }}>
                     <button
                         onClick={() => setActiveTab("upcoming")}
-                        className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-all ${
+                        className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-all whitespace-nowrap px-4 ${
                             activeTab === "upcoming"
                                 ? "text-accent border-b-2 border-accent"
                                 : "text-secondary hover:text-white"
                         }`}
                     >
-                        Upcoming Shifts
+                        <CalendarIcon size={14} style={{ display: "inline", marginRight: "0.5rem" }} />
+                        Upcoming
                     </button>
                     <button
                         onClick={() => setActiveTab("history")}
-                        className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-all ${
+                        className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-all whitespace-nowrap px-4 ${
                             activeTab === "history"
                                 ? "text-accent border-b-2 border-accent"
                                 : "text-secondary hover:text-white"
                         }`}
                     >
-                        Shift History
+                        <Clock size={14} style={{ display: "inline", marginRight: "0.5rem" }} />
+                        History
                     </button>
                     <button
                         onClick={() => setActiveTab("requests")}
-                        className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-all ${
+                        className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-all whitespace-nowrap px-4 ${
                             activeTab === "requests"
                                 ? "text-accent border-b-2 border-accent"
                                 : "text-secondary hover:text-white"
                         }`}
                     >
-                        My Requests ({requests.length})
+                        <FileEdit size={14} style={{ display: "inline", marginRight: "0.5rem" }} />
+                        Requests
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("timeoff")}
+                        className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-all whitespace-nowrap px-4 ${
+                            activeTab === "timeoff"
+                                ? "text-accent border-b-2 border-accent"
+                                : "text-secondary hover:text-white"
+                        }`}
+                    >
+                        <Palmtree size={14} style={{ display: "inline", marginRight: "0.5rem" }} />
+                        Time Off
+                        {pendingTimeOff > 0 && (
+                            <span style={{
+                                marginLeft: "0.5rem",
+                                background: "var(--warning)",
+                                color: "#000",
+                                padding: "0.125rem 0.375rem",
+                                borderRadius: "9999px",
+                                fontSize: "0.65rem",
+                                fontWeight: 700,
+                            }}>
+                                {pendingTimeOff}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("swap")}
+                        className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-all whitespace-nowrap px-4 ${
+                            activeTab === "swap"
+                                ? "text-accent border-b-2 border-accent"
+                                : "text-secondary hover:text-white"
+                        }`}
+                    >
+                        <ArrowLeftRight size={14} style={{ display: "inline", marginRight: "0.5rem" }} />
+                        Shift Swap
+                        {pendingSwaps > 0 && (
+                            <span style={{
+                                marginLeft: "0.5rem",
+                                background: "var(--warning)",
+                                color: "#000",
+                                padding: "0.125rem 0.375rem",
+                                borderRadius: "9999px",
+                                fontSize: "0.65rem",
+                                fontWeight: 700,
+                            }}>
+                                {pendingSwaps}
+                            </span>
+                        )}
                     </button>
                 </div>
 
@@ -404,11 +516,33 @@ export default function ScheduleClient({
                                 <div className="text-center py-12 flex flex-col items-center gap-3">
                                     <FileEdit size={48} className="text-accent opacity-20" />
                                     <p className="text-secondary italic">
-                                        No requests submitted yet. Click "New Request" to get started.
+                                        No requests submitted yet. Click &quot;New Request&quot; to get started.
                                     </p>
                                 </div>
                             )}
                         </div>
+                    )}
+
+                    {/* Time Off Tab */}
+                    {activeTab === "timeoff" && (
+                        <TimeOffPanel
+                            myRequests={myTimeOffRequests}
+                            pendingRequests={pendingTimeOffRequests}
+                            isAdmin={isAdmin}
+                        />
+                    )}
+
+                    {/* Shift Swap Tab */}
+                    {activeTab === "swap" && (
+                        <ShiftSwapPanel
+                            madeRequests={swapRequestsData.madeRequests}
+                            receivedRequests={swapRequestsData.receivedRequests}
+                            pendingTargetRequests={pendingSwapRequests.pendingTargetRequests}
+                            pendingAdminRequests={pendingSwapRequests.pendingAdminRequests}
+                            myShifts={mySchedules}
+                            isAdmin={isAdmin}
+                            userId={userId}
+                        />
                     )}
                 </div>
             </div>
@@ -520,7 +654,7 @@ export default function ScheduleClient({
                                 <AlertCircle size={14} className="text-accent mt-0.5" />
                                 <p className="text-xs text-secondary leading-normal">
                                     Your request will be reviewed by an administrator. You can track its
-                                    status in the "My Requests" tab.
+                                    status in the &quot;My Requests&quot; tab.
                                 </p>
                             </div>
 

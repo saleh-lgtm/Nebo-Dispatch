@@ -6,8 +6,6 @@ import { getGlobalNotes } from "@/lib/notesActions";
 import { getPendingQuotes } from "@/lib/quoteActions";
 import { getOnlineUsers, getActiveShiftUsers } from "@/lib/presenceActions";
 import { getUpcomingEvents } from "@/lib/eventActions";
-import { getMyTimeOffRequests, getPendingTimeOffRequests } from "@/lib/timeOffActions";
-import { getMySwapRequests, getPendingSwapRequests } from "@/lib/shiftSwapActions";
 import DashboardClient from "./DashboardClient";
 
 export default async function DashboardPage() {
@@ -30,11 +28,6 @@ export default async function DashboardPage() {
         activeShiftUsers,
         recentReports,
         upcomingEvents,
-        myTimeOffRequests,
-        pendingTimeOffRequests,
-        swapRequestsData,
-        pendingSwapRequests,
-        mySchedules,
     ] = await Promise.all([
         // User count for admins
         isAdmin ? prisma.user.count({ where: { isActive: true } }) : Promise.resolve(0),
@@ -71,29 +64,6 @@ export default async function DashboardPage() {
 
         // Upcoming events
         getUpcomingEvents(10),
-
-        // Time off requests
-        getMyTimeOffRequests(),
-
-        // Pending time off requests (for admins)
-        isAdmin ? getPendingTimeOffRequests() : Promise.resolve([]),
-
-        // Shift swap requests
-        getMySwapRequests(),
-
-        // Pending swap requests for admin approval
-        getPendingSwapRequests(),
-
-        // My upcoming schedules for shift swap
-        prisma.schedule.findMany({
-            where: {
-                userId: session.user.id,
-                shiftStart: { gte: new Date() },
-                isPublished: true,
-            },
-            orderBy: { shiftStart: "asc" },
-            take: 20,
-        }),
     ]);
 
     const stats = {
@@ -111,11 +81,6 @@ export default async function DashboardPage() {
             activeShiftUsers={activeShiftUsers}
             recentReports={recentReports}
             upcomingEvents={upcomingEvents}
-            myTimeOffRequests={myTimeOffRequests}
-            pendingTimeOffRequests={pendingTimeOffRequests}
-            swapRequestsData={swapRequestsData}
-            pendingSwapRequests={pendingSwapRequests}
-            mySchedules={mySchedules}
             userId={session.user.id}
             isAdmin={isAdmin}
             isSuperAdmin={isSuperAdmin}
