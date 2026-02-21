@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import ShiftReportForm from "@/components/ShiftReportForm";
+import { getShiftQuotes } from "@/lib/quoteActions";
 
 export default async function ShiftReportPage() {
     const session = await getServerSession(authOptions);
@@ -11,22 +12,30 @@ export default async function ShiftReportPage() {
         redirect("/login");
     }
 
-    // Find or create active shift
-    let activeShift = await prisma.shift.findFirst({
+    // Find active shift with tasks
+    const activeShift = await prisma.shift.findFirst({
         where: { userId: session.user.id, clockOut: null },
-        include: { tasks: { orderBy: { id: "asc" } } },
     });
 
     if (!activeShift) {
-        // If no active shift, redirect to dashboard to clock in
         redirect("/dashboard?error=no-active-shift");
     }
+
+    // Fetch tasks for the shift
+    const tasks = await prisma.shiftTask.findMany({
+        where: { shiftId: activeShift.id },
+        orderBy: { id: "asc" },
+    });
+
+    // Fetch quotes created during this shift
+    const shiftQuotes = await getShiftQuotes(activeShift.id);
 
     return (
         <ShiftReportForm
             session={session}
             activeShift={activeShift}
-            initialTasks={activeShift.tasks}
+            initialTasks={tasks}
+            initialQuotes={shiftQuotes}
         />
     );
 }

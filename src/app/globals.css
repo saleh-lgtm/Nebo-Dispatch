@@ -1,59 +1,59 @@
 @import url('https://fonts.googleapis.com/css2?family=Cormorant:wght@400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap');
 
 :root {
-  /* ===== LUXURY LIGHT PALETTE ===== */
-  /* Warm stone backgrounds for elegance */
-  --bg-primary: #FAFAF9;
-  --bg-secondary: #F5F5F4;
-  --bg-elevated: #FFFFFF;
-  --bg-muted: #E7E5E4;
+  /* ===== DARK ELEGANT PALETTE ===== */
+  /* Deep dark backgrounds */
+  --bg-primary: #0F0F14;
+  --bg-secondary: #16161D;
+  --bg-elevated: #1C1C26;
+  --bg-muted: #252530;
 
   /* Brand taupe accent - warm and elegant */
   --accent: #B7AFA3;
-  --accent-hover: #A59E92;
-  --accent-light: #C9C3B8;
-  --accent-glow: rgba(183, 175, 163, 0.25);
-  --accent-soft: rgba(183, 175, 163, 0.12);
+  --accent-hover: #C9C3B8;
+  --accent-light: #D4CFC6;
+  --accent-glow: rgba(183, 175, 163, 0.3);
+  --accent-soft: rgba(183, 175, 163, 0.15);
 
-  /* Rich dark text for contrast */
-  --text-primary: #1C1917;
-  --text-secondary: #57534E;
-  --text-muted: #A8A29E;
-  --text-inverse: #FFFFFF;
+  /* Light text for dark backgrounds */
+  --text-primary: #F5F5F4;
+  --text-secondary: #A8A29E;
+  --text-muted: #6B6B6B;
+  --text-inverse: #0F0F14;
 
-  /* Refined borders */
-  --border: #E7E5E4;
-  --border-hover: #D6D3D1;
-  --border-accent: rgba(183, 175, 163, 0.4);
+  /* Refined borders for dark mode */
+  --border: #2A2A35;
+  --border-hover: #3A3A48;
+  --border-accent: rgba(183, 175, 163, 0.3);
 
-  /* Premium glass effect for light mode */
-  --glass: rgba(255, 255, 255, 0.85);
-  --glass-border: rgba(0, 0, 0, 0.06);
-  --glass-hover: rgba(255, 255, 255, 0.95);
-  --glass-subtle: rgba(255, 255, 255, 0.6);
+  /* Premium glass effect for dark mode */
+  --glass: rgba(28, 28, 38, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-hover: rgba(35, 35, 48, 0.95);
+  --glass-subtle: rgba(28, 28, 38, 0.6);
 
-  /* Status colors - refined */
-  --success: #16A34A;
-  --success-bg: rgba(22, 163, 74, 0.08);
-  --success-border: rgba(22, 163, 74, 0.2);
-  --danger: #DC2626;
-  --danger-bg: rgba(220, 38, 38, 0.08);
-  --danger-border: rgba(220, 38, 38, 0.2);
-  --warning: #D97706;
-  --warning-bg: rgba(217, 119, 6, 0.08);
-  --warning-border: rgba(217, 119, 6, 0.2);
-  --info: #0284C7;
-  --info-bg: rgba(2, 132, 199, 0.08);
-  --info-border: rgba(2, 132, 199, 0.2);
+  /* Status colors - vibrant on dark */
+  --success: #22C55E;
+  --success-bg: rgba(34, 197, 94, 0.12);
+  --success-border: rgba(34, 197, 94, 0.25);
+  --danger: #EF4444;
+  --danger-bg: rgba(239, 68, 68, 0.12);
+  --danger-border: rgba(239, 68, 68, 0.25);
+  --warning: #F59E0B;
+  --warning-bg: rgba(245, 158, 11, 0.12);
+  --warning-border: rgba(245, 158, 11, 0.25);
+  --info: #38BDF8;
+  --info-bg: rgba(56, 189, 248, 0.12);
+  --info-border: rgba(56, 189, 248, 0.25);
 
-  /* Luxury shadows - soft and layered */
-  --shadow-xs: 0 1px 2px rgba(28, 25, 23, 0.04);
-  --shadow-sm: 0 2px 4px rgba(28, 25, 23, 0.06), 0 1px 2px rgba(28, 25, 23, 0.04);
-  --shadow-md: 0 4px 12px rgba(28, 25, 23, 0.08), 0 2px 4px rgba(28, 25, 23, 0.04);
-  --shadow-lg: 0 12px 32px rgba(28, 25, 23, 0.12), 0 4px 8px rgba(28, 25, 23, 0.06);
-  --shadow-xl: 0 24px 48px rgba(28, 25, 23, 0.16), 0 8px 16px rgba(28, 25, 23, 0.08);
+  /* Shadows for dark mode */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6), 0 4px 8px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.7), 0 8px 16px rgba(0, 0, 0, 0.5);
   --shadow-glow: 0 0 24px var(--accent-glow);
-  --shadow-inner: inset 0 2px 4px rgba(28, 25, 23, 0.04);
+  --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.3);
 
   /* Smooth transitions */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -67,6 +67,12 @@
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
   --radius-2xl: 1.5rem;
+
+  /* Navbar specific - keep light */
+  --navbar-bg: #FAFAF9;
+  --navbar-text: #1C1917;
+  --navbar-text-secondary: #57534E;
+  --navbar-border: #E7E5E4;
 }
 
 /* ===== BASE STYLES ===== */
@@ -992,7 +998,7 @@ select.input {
   display: none;
   background: none;
   border: none;
-  color: var(--text-primary);
+  color: var(--navbar-text);
   cursor: pointer;
   padding: 0.5rem;
 }
@@ -1018,12 +1024,26 @@ select.input {
   right: -320px;
   width: 320px;
   height: 100vh;
-  background: var(--bg-elevated);
+  background: var(--navbar-bg);
   z-index: 201;
   transition: right 0.4s var(--transition-luxury);
   padding: 2rem;
   overflow-y: auto;
   box-shadow: var(--shadow-xl);
+}
+
+.mobile-nav-drawer .nav-link {
+  color: var(--navbar-text-secondary);
+}
+
+.mobile-nav-drawer .nav-link:hover {
+  color: var(--navbar-text);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.mobile-nav-drawer .nav-link-active {
+  color: #8B7355;
+  background: rgba(139, 115, 85, 0.1);
 }
 
 .mobile-nav-drawer.open { right: 0; }

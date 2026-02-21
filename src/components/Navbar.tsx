@@ -155,8 +155,7 @@ export default function Navbar() {
     return (
         <>
             <nav
-                className="glass sticky-top"
-                style={{ borderBottom: "1px solid var(--glass-border)", padding: "0.75rem 0", zIndex: 100 }}
+                className="navbar-light sticky-top"
                 role="navigation"
                 aria-label="Main navigation"
             >
@@ -351,6 +350,32 @@ export default function Navbar() {
             </div>
 
             <style jsx>{`
+                /* Light Navbar Styles */
+                .navbar-light {
+                    background: var(--navbar-bg);
+                    border-bottom: 1px solid var(--navbar-border);
+                    padding: 0.75rem 0;
+                    z-index: 100;
+                }
+
+                .navbar-light :global(.nav-link) {
+                    color: var(--navbar-text-secondary);
+                }
+
+                .navbar-light :global(.nav-link:hover) {
+                    color: var(--navbar-text);
+                    background: rgba(0, 0, 0, 0.04);
+                }
+
+                .navbar-light :global(.nav-link-active) {
+                    color: #8B7355;
+                    background: rgba(139, 115, 85, 0.1);
+                }
+
+                .navbar-light :global(.nav-link-active:hover) {
+                    background: rgba(139, 115, 85, 0.15);
+                }
+
                 .nav-links {
                     display: flex;
                     align-items: center;
@@ -360,14 +385,14 @@ export default function Navbar() {
                 .nav-divider {
                     width: 1px;
                     height: 24px;
-                    background: var(--border);
+                    background: var(--navbar-border);
                     margin: 0 0.5rem;
                 }
 
                 .nav-section-label {
                     font-size: 0.7rem;
                     font-weight: 600;
-                    color: var(--text-muted);
+                    color: #A8A29E;
                     text-transform: uppercase;
                     letter-spacing: 0.08em;
                     padding: 0.5rem 0.75rem;
@@ -411,11 +436,11 @@ export default function Navbar() {
                     top: calc(100% + 0.5rem);
                     right: 0;
                     min-width: 220px;
-                    background: var(--bg-secondary);
-                    border: 1px solid var(--border);
+                    background: #FFFFFF;
+                    border: 1px solid var(--navbar-border);
                     border-radius: 0.75rem;
                     padding: 0.5rem;
-                    box-shadow: var(--shadow-lg);
+                    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06);
                     animation: dropdownFadeIn 0.15s ease;
                     z-index: 50;
                 }
@@ -436,13 +461,13 @@ export default function Navbar() {
                 }
 
                 .dropdown-section:not(:last-child) {
-                    border-bottom: 1px solid var(--border);
+                    border-bottom: 1px solid var(--navbar-border);
                 }
 
                 .dropdown-section-label {
                     font-size: 0.65rem;
                     font-weight: 600;
-                    color: var(--text-muted);
+                    color: #A8A29E;
                     text-transform: uppercase;
                     letter-spacing: 0.08em;
                     padding: 0.25rem 0.75rem 0.5rem;
@@ -525,7 +550,7 @@ export default function Navbar() {
                     display: none;
                     background: none;
                     border: none;
-                    color: var(--text-primary);
+                    color: var(--navbar-text);
                     cursor: pointer;
                     padding: 0.5rem;
                     border-radius: 0.5rem;
@@ -533,7 +558,7 @@ export default function Navbar() {
                 }
 
                 .mobile-menu-btn:hover {
-                    background: rgba(255, 255, 255, 0.08);
+                    background: rgba(0, 0, 0, 0.04);
                 }
 
                 .mobile-menu-btn:active {
@@ -545,7 +570,7 @@ export default function Navbar() {
                     justify-content: space-between;
                     align-items: center;
                     padding-bottom: 1rem;
-                    border-bottom: 1px solid var(--border);
+                    border-bottom: 1px solid var(--navbar-border);
                     margin-bottom: 1rem;
                 }
 
@@ -563,7 +588,7 @@ export default function Navbar() {
                 }
 
                 .mobile-nav-section:not(:last-child) {
-                    border-bottom: 1px solid var(--border);
+                    border-bottom: 1px solid var(--navbar-border);
                     margin-bottom: 0.5rem;
                 }
 
