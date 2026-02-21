@@ -240,22 +240,33 @@ export default function Navbar() {
                     color: var(--text-secondary);
                     font-weight: 500;
                     font-size: 0.875rem;
-                    transition: all 0.2s;
+                    transition: all var(--transition-fast);
                     text-decoration: none;
                     background: none;
                     border: none;
                     cursor: pointer;
                     font-family: inherit;
+                    position: relative;
                 }
 
                 :global(.nav-link:hover) {
                     color: var(--text-primary);
-                    background: rgba(255, 255, 255, 0.05);
+                    background: rgba(255, 255, 255, 0.08);
+                    transform: translateY(-1px);
+                }
+
+                :global(.nav-link:active) {
+                    transform: translateY(0);
                 }
 
                 :global(.nav-link-active) {
                     color: var(--accent);
-                    background: rgba(183, 175, 163, 0.1);
+                    background: rgba(183, 175, 163, 0.12);
+                    box-shadow: inset 0 -2px 0 var(--accent);
+                }
+
+                :global(.nav-link-active:hover) {
+                    background: rgba(183, 175, 163, 0.18);
                 }
 
                 .mobile-menu-btn {
@@ -266,10 +277,16 @@ export default function Navbar() {
                     cursor: pointer;
                     padding: 0.5rem;
                     border-radius: 0.5rem;
+                    transition: all var(--transition-fast);
                 }
 
                 .mobile-menu-btn:hover {
-                    background: rgba(255, 255, 255, 0.05);
+                    background: rgba(255, 255, 255, 0.08);
+                    transform: scale(1.05);
+                }
+
+                .mobile-menu-btn:active {
+                    transform: scale(0.95);
                 }
 
                 @media (max-width: 768px) {
