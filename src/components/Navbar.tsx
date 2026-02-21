@@ -25,6 +25,7 @@ import {
     History,
     UserCog,
     CheckSquare,
+    BookOpen,
 } from "lucide-react";
 
 interface NavLinkProps {
@@ -180,6 +181,7 @@ export default function Navbar() {
                         )}
 
                         <NavLink href="/affiliates" icon={<Users size={18} />} label="Affiliates" />
+                        <NavLink href="/sops" icon={<BookOpen size={18} />} label="SOPs" />
 
                         {/* Admin Dropdown */}
                         {isAdmin && (
@@ -199,6 +201,7 @@ export default function Navbar() {
                                         <span className="dropdown-section-label">Team</span>
                                         <NavLink href="/admin/tasks" icon={<CheckSquare size={16} />} label="Admin Tasks" />
                                         <NavLink href="/admin/notes" icon={<StickyNote size={16} />} label="Global Notes" />
+                                        <NavLink href="/admin/sops" icon={<BookOpen size={16} />} label="Manage SOPs" />
                                         <NavLink href="/admin/reports" icon={<FileText size={16} />} label="Shift Reports" />
                                         <NavLink href="/admin/analytics" icon={<BarChart3 size={16} />} label="Analytics" />
                                     </div>
@@ -291,6 +294,7 @@ export default function Navbar() {
                             <NavLink href="/reports/shift" icon={<ClipboardList size={18} />} label="Shift Report" onClick={closeMobileMenu} />
                         )}
                         <NavLink href="/affiliates" icon={<Users size={18} />} label="Affiliates" onClick={closeMobileMenu} />
+                        <NavLink href="/sops" icon={<BookOpen size={18} />} label="SOPs" onClick={closeMobileMenu} />
                     </div>
 
                     {/* Admin Section - Scheduling */}
@@ -314,6 +318,7 @@ export default function Navbar() {
                             </span>
                             <NavLink href="/admin/tasks" icon={<CheckSquare size={18} />} label="Admin Tasks" onClick={closeMobileMenu} />
                             <NavLink href="/admin/notes" icon={<StickyNote size={18} />} label="Global Notes" onClick={closeMobileMenu} />
+                            <NavLink href="/admin/sops" icon={<BookOpen size={18} />} label="Manage SOPs" onClick={closeMobileMenu} />
                             <NavLink href="/admin/reports" icon={<FileText size={18} />} label="Shift Reports" onClick={closeMobileMenu} />
                             <NavLink href="/admin/analytics" icon={<BarChart3 size={18} />} label="Analytics" onClick={closeMobileMenu} />
                         </div>
@@ -350,30 +355,34 @@ export default function Navbar() {
             </div>
 
             <style jsx>{`
-                /* Light Navbar Styles */
+                /* Light Navbar Styles - Refined */
                 .navbar-light {
                     background: var(--navbar-bg);
                     border-bottom: 1px solid var(--navbar-border);
-                    padding: 0.75rem 0;
+                    padding: 0.875rem 0;
                     z-index: 100;
+                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
                 }
 
                 .navbar-light :global(.nav-link) {
                     color: var(--navbar-text-secondary);
+                    font-size: 0.8125rem;
+                    letter-spacing: 0.01em;
                 }
 
                 .navbar-light :global(.nav-link:hover) {
                     color: var(--navbar-text);
-                    background: rgba(0, 0, 0, 0.04);
+                    background: rgba(0, 0, 0, 0.035);
                 }
 
                 .navbar-light :global(.nav-link-active) {
-                    color: #8B7355;
-                    background: rgba(139, 115, 85, 0.1);
+                    color: var(--navbar-accent);
+                    background: rgba(139, 115, 85, 0.08);
+                    font-weight: 600;
                 }
 
                 .navbar-light :global(.nav-link-active:hover) {
-                    background: rgba(139, 115, 85, 0.15);
+                    background: rgba(139, 115, 85, 0.12);
                 }
 
                 .nav-links {
@@ -433,15 +442,18 @@ export default function Navbar() {
 
                 .nav-dropdown-menu {
                     position: absolute;
-                    top: calc(100% + 0.5rem);
+                    top: calc(100% + 0.625rem);
                     right: 0;
-                    min-width: 220px;
+                    min-width: 240px;
                     background: #FFFFFF;
                     border: 1px solid var(--navbar-border);
-                    border-radius: 0.75rem;
-                    padding: 0.5rem;
-                    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06);
-                    animation: dropdownFadeIn 0.15s ease;
+                    border-radius: 0.875rem;
+                    padding: 0.625rem;
+                    box-shadow:
+                        0 16px 40px rgba(0, 0, 0, 0.1),
+                        0 4px 12px rgba(0, 0, 0, 0.05),
+                        0 0 0 1px rgba(0, 0, 0, 0.02);
+                    animation: dropdownFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
                     z-index: 50;
                 }
 

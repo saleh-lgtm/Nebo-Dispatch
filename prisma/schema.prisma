@@ -76,8 +76,10 @@ model User {
   passwordResetTokens PasswordResetToken[]
   quotesCreated       Quote[]              @relation("QuotesCreated")
   quotesAssigned      Quote[]              @relation("QuotesAssigned")
+  quoteActions        QuoteAction[]
   presence            UserPresence?
   eventsCreated       Event[]
+  sopsCreated         SOP[]
 
   // Time Off and Shift Swap relations
   timeOffRequests     TimeOffRequest[]
@@ -338,15 +340,32 @@ model Quote {
   notes        String?     @db.Text
   status       QuoteStatus @default(PENDING)
 
+  // NEW: Source and service date
+  source          String?   // e.g., "Phone", "Email", "Website", "Walk-in", "Referral"
+  dateOfService   DateTime? // When the service is needed
+
   // Follow-up tracking
   followUpCount Int       @default(0)
   lastFollowUp  DateTime?
   nextFollowUp  DateTime?
   followUpNotes String?   @db.Text
 
+  // NEW: Action tracking
+  lastActionAt  DateTime? // Last time any action was taken
+  actionCount   Int       @default(0)
+  isFlagged     Boolean   @default(false) // Flagged if no action taken
+
+  // NEW: Expiration (72 hours after creation)
+  expiresAt     DateTime  // Auto-set to 72 hours after creation
+
   // Conversion tracking
   convertedAt   DateTime?
   reservationId String?   // Link to reservation if converted
+
+  // NEW: Outcome tracking
+  outcome       QuoteOutcome? // WON, LOST, or null if pending
+  outcomeReason String?      @db.Text // Reason for outcome
+  outcomeAt     DateTime?
 
   // Creator
   createdById   String
@@ -360,6 +379,9 @@ model Quote {
   shiftId       String?
   shift         Shift?    @relation(fields: [shiftId], references: [id])
 
+  // Quote action history
+  actions       QuoteAction[]
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -367,6 +389,42 @@ model Quote {
   @@index([assignedToId])
   @@index([nextFollowUp])
   @@index([shiftId])
+  @@index([expiresAt])
+  @@index([isFlagged])
+  @@index([lastActionAt])
+}
+
+// Track all actions/updates on a quote
+model QuoteAction {
+  id          String           @id @default(cuid())
+  quoteId     String
+  quote       Quote            @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User             @relation(fields: [userId], references: [id])
+  actionType  QuoteActionType
+  notes       String?          @db.Text
+  metadata    Json?            // Additional data about the action
+  createdAt   DateTime         @default(now())
+
+  @@index([quoteId, createdAt])
+  @@index([userId])
+}
+
+enum QuoteActionType {
+  CREATED       // Quote was created
+  CALLED        // Called the client
+  EMAILED       // Emailed the client
+  TEXTED        // Texted the client
+  FOLLOW_UP     // General follow-up
+  NOTE_ADDED    // Added a note
+  REASSIGNED    // Quote was reassigned
+  STATUS_CHANGE // Status was changed
+  OUTCOME_SET   // Outcome (won/lost) was recorded
+}
+
+enum QuoteOutcome {
+  WON   // Quote converted to booking
+  LOST  // Quote lost to competitor or customer declined
 }
 
 enum QuoteStatus {
@@ -501,4 +559,27 @@ model AdminTask {
 
   @@index([isActive, createdAt])
   @@index([assignedToId])
+}
+
+// Standard Operating Procedures (SOPs)
+model SOP {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique // URL-friendly identifier
+  description String?   @db.Text // Brief description shown in list
+  content     String    @db.Text // Full SOP content (markdown supported)
+  category    String?   // e.g., "Customer Service", "Operations", "Safety"
+  isPublished Boolean   @default(true)
+  order       Int       @default(0) // For manual ordering
+
+  // Creator/Editor
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([isPublished, order])
+  @@index([category])
+  @@index([slug])
 }

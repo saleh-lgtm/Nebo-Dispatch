@@ -6,6 +6,7 @@ import { getGlobalNotes } from "@/lib/notesActions";
 import { getPendingQuotes } from "@/lib/quoteActions";
 import { getOnlineUsers, getActiveShiftUsers } from "@/lib/presenceActions";
 import { getUpcomingEvents } from "@/lib/eventActions";
+import { getUserNextShift } from "@/lib/schedulerActions";
 import DashboardClient from "./DashboardClient";
 
 export default async function DashboardPage() {
@@ -28,6 +29,7 @@ export default async function DashboardPage() {
         activeShiftUsers,
         recentReports,
         upcomingEvents,
+        nextShift,
     ] = await Promise.all([
         // User count for admins
         isAdmin ? prisma.user.count({ where: { isActive: true } }) : Promise.resolve(0),
@@ -64,6 +66,9 @@ export default async function DashboardPage() {
 
         // Upcoming events
         getUpcomingEvents(10),
+
+        // Next scheduled shift for non-super-admin
+        isSuperAdmin ? Promise.resolve(null) : getUserNextShift(session.user.id),
     ]);
 
     const stats = {
@@ -81,6 +86,7 @@ export default async function DashboardPage() {
             activeShiftUsers={activeShiftUsers}
             recentReports={recentReports}
             upcomingEvents={upcomingEvents}
+            nextShift={nextShift}
             userId={session.user.id}
             isAdmin={isAdmin}
             isSuperAdmin={isSuperAdmin}
