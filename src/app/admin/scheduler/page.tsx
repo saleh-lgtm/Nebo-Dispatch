@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getDispatchers, getWeekSchedules } from "@/lib/schedulerActions";
-import SchedulerClient from "./SchedulerClient";
+import NewSchedulerClient from "./NewSchedulerClient";
 
 // Helper to get start of week (Sunday 00:00:00 UTC)
 function getWeekStart(date: Date): Date {
@@ -29,7 +29,7 @@ export default async function SchedulerPage() {
     const schedules = await getWeekSchedules(currentWeekStart);
 
     return (
-        <SchedulerClient
+        <NewSchedulerClient
             dispatchers={dispatchers}
             initialSchedules={schedules}
             initialWeekStart={currentWeekStart.toISOString()}
