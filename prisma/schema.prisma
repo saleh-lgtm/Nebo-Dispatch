@@ -12,6 +12,7 @@ datasource db {
 enum Role {
   SUPER_ADMIN
   ADMIN
+  ACCOUNTING
   DISPATCHER
 }
 
@@ -45,6 +46,12 @@ enum ReportStatus {
   SUBMITTED
   REVIEWED
   FLAGGED
+}
+
+enum AccountingFlagStatus {
+  PENDING
+  IN_REVIEW
+  RESOLVED
 }
 
 model User {
@@ -104,6 +111,13 @@ model User {
   sopFavorites          SOPFavorite[]
   sopVersions           SOPVersion[]
   sopQuizAttempts       SOPQuizAttempt[]
+
+  // Accounting flag relations
+  flagsCreated          AccountingFlag[]  @relation("FlaggedBy")
+  flagsReviewed         AccountingFlag[]  @relation("ReviewedBy")
+
+  // Notification relations
+  notifications         Notification[]
 }
 
 model Shift {
@@ -171,6 +185,9 @@ model ShiftReport {
   // Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Accounting flags
+  accountingFlags AccountingFlag[]
 
   @@index([userId, createdAt])
   @@index([status])
@@ -252,6 +269,9 @@ model Affiliate {
 
   submittedById String
   submittedBy   User   @relation(fields: [submittedById], references: [id])
+
+  // Pricing grid for FARM_IN affiliates
+  pricingGrid   AffiliatePricing[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -750,4 +770,91 @@ model SOPQuizAttempt {
 
   @@index([quizId])
   @@index([userId])
+}
+
+// Accounting flag for reservations that need review
+model AccountingFlag {
+  id              String              @id @default(cuid())
+  shiftReportId   String
+  shiftReport     ShiftReport         @relation(fields: [shiftReportId], references: [id], onDelete: Cascade)
+  reservationType String              // "accepted" | "modified" | "cancelled"
+  reservationId   String
+  reservationNotes String?            @db.Text
+
+  flaggedById     String
+  flaggedBy       User                @relation("FlaggedBy", fields: [flaggedById], references: [id])
+  flagReason      String?             @db.Text
+
+  status          AccountingFlagStatus @default(PENDING)
+  reviewedById    String?
+  reviewedBy      User?               @relation("ReviewedBy", fields: [reviewedById], references: [id])
+  reviewedAt      DateTime?
+  accountingNotes String?             @db.Text
+  resolution      String?             @db.Text
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([shiftReportId, reservationType, reservationId])
+  @@index([status])
+  @@index([shiftReportId])
+  @@index([flaggedById])
+}
+
+// Pricing grid for FARM_IN affiliates
+model AffiliatePricing {
+  id           String    @id @default(cuid())
+  affiliateId  String
+  affiliate    Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  serviceType  String    // "Airport Transfer", "Hourly Service", etc.
+  flatRate     Float
+  notes        String?   @db.Text
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([affiliateId, serviceType])
+  @@index([affiliateId])
+}
+
+// Notification types
+enum NotificationType {
+  SHIFT_SWAP_REQUEST     // Someone requested to swap shifts with you
+  SHIFT_SWAP_RESPONSE    // Someone responded to your swap request
+  SHIFT_SWAP_APPROVED    // Admin approved the swap
+  SHIFT_SWAP_REJECTED    // Admin rejected the swap
+  TIME_OFF_APPROVED      // Time off was approved
+  TIME_OFF_REJECTED      // Time off was rejected
+  TASK_ASSIGNED          // New task was assigned to you
+  TASK_DUE_SOON          // Task is due soon
+  SCHEDULE_PUBLISHED     // New schedule was published
+  SOP_REQUIRES_ACK       // SOP requires your acknowledgment
+  GENERAL                // General notification
+}
+
+// User notifications
+model Notification {
+  id           String           @id @default(cuid())
+  userId       String
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         NotificationType
+  title        String
+  message      String           @db.Text
+
+  // Link to related entity
+  entityType   String?          // "ShiftSwapRequest", "TimeOffRequest", "AdminTask", etc.
+  entityId     String?          // ID of the related entity
+
+  // Action URL (where to navigate when clicked)
+  actionUrl    String?
+
+  // Read status
+  isRead       Boolean          @default(false)
+  readAt       DateTime?
+
+  createdAt    DateTime         @default(now())
+
+  @@index([userId, isRead, createdAt])
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
 }

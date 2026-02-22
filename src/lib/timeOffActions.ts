@@ -4,6 +4,10 @@ import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireAuth, requireAdmin } from "./auth-helpers";
 import { createAuditLog } from "./auditActions";
+import {
+    notifyTimeOffDecision,
+    notifyAdminsOfPendingRequest,
+} from "./notificationActions";
 
 export type TimeOffType = "VACATION" | "SICK" | "PERSONAL" | "OTHER";
 
@@ -52,6 +56,17 @@ export async function requestTimeOff(
 
     revalidatePath("/schedule");
     revalidatePath("/admin/scheduler");
+
+    // Notify admins about the new time off request
+    const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { name: true },
+    });
+    await notifyAdminsOfPendingRequest(
+        "TIME_OFF",
+        timeOffRequest.id,
+        user?.name || "A dispatcher"
+    );
 
     return timeOffRequest;
 }
@@ -160,6 +175,9 @@ export async function approveTimeOff(id: string, adminNotes?: string) {
     revalidatePath("/schedule");
     revalidatePath("/admin/scheduler");
 
+    // Notify the user that their time off was approved
+    await notifyTimeOffDecision(request.userId, id, true, adminNotes);
+
     return updated;
 }
 
@@ -202,6 +220,9 @@ export async function rejectTimeOff(id: string, adminNotes?: string) {
 
     revalidatePath("/schedule");
     revalidatePath("/admin/scheduler");
+
+    // Notify the user that their time off was rejected
+    await notifyTimeOffDecision(request.userId, id, false, adminNotes);
 
     return updated;
 }

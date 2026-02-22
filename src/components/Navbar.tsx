@@ -27,7 +27,9 @@ import {
     CheckSquare,
     BookOpen,
     Clock,
+    Calculator,
 } from "lucide-react";
+import NotificationBell from "./NotificationBell";
 
 interface NavLinkProps {
     href: string;
@@ -109,6 +111,7 @@ function RoleBadge({ role }: { role: string }) {
     const config = {
         SUPER_ADMIN: { label: "Super Admin", icon: <ShieldCheck size={12} />, className: "badge-super-admin" },
         ADMIN: { label: "Admin", icon: <Shield size={12} />, className: "badge-admin" },
+        ACCOUNTING: { label: "Accounting", icon: <Calculator size={12} />, className: "badge-accounting" },
         DISPATCHER: { label: "Dispatcher", icon: <Briefcase size={12} />, className: "badge-dispatcher" },
     }[role] || { label: role, icon: null, className: "" };
 
@@ -145,6 +148,8 @@ export default function Navbar() {
     const role = session.user.role;
     const isSuperAdmin = role === "SUPER_ADMIN";
     const isAdmin = role === "ADMIN" || isSuperAdmin;
+    const isAccounting = role === "ACCOUNTING";
+    const hasAccountingAccess = isAccounting || isAdmin;
     const isDispatcher = role === "DISPATCHER";
 
     const closeMobileMenu = () => setMobileMenuOpen(false);
@@ -172,6 +177,10 @@ export default function Navbar() {
 
                         <NavLink href="/affiliates" icon={<Users size={18} />} label="Affiliates" />
                         <NavLink href="/sops" icon={<BookOpen size={18} />} label="SOPs" />
+
+                        {hasAccountingAccess && (
+                            <NavLink href="/accounting" icon={<Calculator size={18} />} label="Accounting" />
+                        )}
 
                         {isAdmin && (
                             <>
@@ -207,6 +216,7 @@ export default function Navbar() {
                         )}
 
                         <div className="nav-divider" />
+                        <NotificationBell />
                         <NavLink href="/settings" icon={<Settings size={18} />} label="Settings" />
 
                         <div className="nav-divider" />
@@ -274,6 +284,16 @@ export default function Navbar() {
                         <NavLink href="/affiliates" icon={<Users size={18} />} label="Affiliates" onClick={closeMobileMenu} />
                         <NavLink href="/sops" icon={<BookOpen size={18} />} label="SOPs" onClick={closeMobileMenu} />
                     </div>
+
+                    {hasAccountingAccess && (
+                        <div className="mobile-nav-section">
+                            <span className="mobile-section-label">
+                                <Calculator size={12} />
+                                Accounting
+                            </span>
+                            <NavLink href="/accounting" icon={<Calculator size={18} />} label="Accounting Dashboard" onClick={closeMobileMenu} />
+                        </div>
+                    )}
 
                     {isAdmin && (
                         <div className="mobile-nav-section">
@@ -510,6 +530,11 @@ export default function Navbar() {
                 :global(.badge-dispatcher) {
                     background: var(--success-bg);
                     color: var(--success);
+                }
+
+                :global(.badge-accounting) {
+                    background: rgba(168, 85, 247, 0.15);
+                    color: #c084fc;
                 }
 
                 /* Mobile Menu Button */

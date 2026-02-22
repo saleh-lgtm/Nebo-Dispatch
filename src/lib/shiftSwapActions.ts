@@ -4,6 +4,12 @@ import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireAuth, requireAdmin } from "./auth-helpers";
 import { createAuditLog } from "./auditActions";
+import {
+    notifyShiftSwapRequest,
+    notifyShiftSwapResponse,
+    notifyShiftSwapAdminDecision,
+    notifyAdminsOfPendingRequest,
+} from "./notificationActions";
 
 // Request a shift swap
 export async function requestShiftSwap(
@@ -101,6 +107,9 @@ export async function requestShiftSwap(
 
     revalidatePath("/schedule");
     revalidatePath("/admin/scheduler");
+
+    // Notify the target user about the swap request
+    await notifyShiftSwapRequest(targetUserId, session.user.id, swapRequest.id);
 
     return swapRequest;
 }
@@ -225,6 +234,15 @@ export async function respondToSwap(
     revalidatePath("/schedule");
     revalidatePath("/admin/scheduler");
 
+    // Notify the requester about the target's response
+    await notifyShiftSwapResponse(request.requesterId, session.user.id, id, accept);
+
+    // If accepted, notify admins that swap is pending their approval
+    if (accept) {
+        const requesterName = updated.requester?.name || "A dispatcher";
+        await notifyAdminsOfPendingRequest("SHIFT_SWAP", id, requesterName);
+    }
+
     return updated;
 }
 
@@ -289,6 +307,14 @@ export async function adminApproveSwap(id: string, adminNotes?: string) {
     revalidatePath("/schedule");
     revalidatePath("/admin/scheduler");
 
+    // Notify both users that the swap was approved
+    await notifyShiftSwapAdminDecision(
+        request.requesterId,
+        request.targetUserId,
+        id,
+        true
+    );
+
     return { success: true };
 }
 
@@ -328,6 +354,14 @@ export async function adminRejectSwap(id: string, adminNotes?: string) {
 
     revalidatePath("/schedule");
     revalidatePath("/admin/scheduler");
+
+    // Notify both users that the swap was rejected
+    await notifyShiftSwapAdminDecision(
+        request.requesterId,
+        request.targetUserId,
+        id,
+        false
+    );
 
     return updated;
 }

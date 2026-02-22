@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireAdmin, requireAuth } from "./auth-helpers";
 import { createAuditLog } from "./auditActions";
+import { notifyTaskAssigned, notifyTaskAssignedToAll } from "./notificationActions";
 
 export interface CreateAdminTaskData {
     title: string;
@@ -42,6 +43,13 @@ export async function createAdminTask(data: CreateAdminTaskData) {
         task.id,
         { title: data.title, assignToAll: data.assignToAll, assignedToId: data.assignedToId, dueDate: data.dueDate }
     );
+
+    // Notify assigned users about the new task
+    if (data.assignToAll) {
+        await notifyTaskAssignedToAll(task.id, data.title);
+    } else if (data.assignedToId) {
+        await notifyTaskAssigned(data.assignedToId, task.id, data.title);
+    }
 
     revalidatePath("/admin/tasks");
     revalidatePath("/dashboard");

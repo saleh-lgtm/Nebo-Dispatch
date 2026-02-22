@@ -24,6 +24,7 @@ import {
     Briefcase,
     FileEdit,
 } from "lucide-react";
+import NotificationBell from "./NotificationBell";
 
 interface NavItemProps {
     href: string;
@@ -118,6 +119,9 @@ export default function SuperAdminSidebar({ user }: Props) {
                             </span>
                         </div>
                     )}
+                    <div className="sa-user-actions">
+                        <NotificationBell />
+                    </div>
                 </div>
 
                 {/* Navigation */}
@@ -284,6 +288,14 @@ export default function SuperAdminSidebar({ user }: Props) {
                     font-weight: 600;
                     text-transform: uppercase;
                     letter-spacing: 0.05em;
+                }
+
+                .sa-user-actions {
+                    margin-left: auto;
+                }
+
+                .sa-sidebar.collapsed .sa-user-actions {
+                    display: none;
                 }
 
                 .sa-sidebar.collapsed .sa-user-card {
