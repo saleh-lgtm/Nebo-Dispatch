@@ -37,6 +37,7 @@ export type AuditEntity =
     | "ShiftSwapRequest"
     | "Event"
     | "AdminTask"
+    | "AdminTaskCompletion"
     | "SOP";
 
 /**

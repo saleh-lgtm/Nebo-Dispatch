@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getAdminTasks } from "@/lib/taskActions";
+import { getTaskProgress } from "@/lib/taskActions";
 import { getDispatchers } from "@/lib/schedulerActions";
 import TasksClient from "./TasksClient";
 
@@ -17,7 +17,7 @@ export default async function AdminTasksPage() {
     }
 
     const [tasks, dispatchers] = await Promise.all([
-        getAdminTasks(),
+        getTaskProgress(),
         getDispatchers(),
     ]);
 

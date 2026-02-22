@@ -20,6 +20,8 @@ import QuotesPanel from "@/components/QuotesPanel";
 import ActiveUsersPanel from "@/components/ActiveUsersPanel";
 import RecentReportsPanel from "@/components/RecentReportsPanel";
 import EventsPanel from "@/components/EventsPanel";
+import TasksPanel from "@/components/TasksPanel";
+import AdminTaskProgressPanel from "@/components/AdminTaskProgressPanel";
 
 interface GlobalNote {
     id: string;
@@ -123,6 +125,40 @@ interface NextShift {
     shiftEnd: Date;
 }
 
+interface Task {
+    id: string;
+    title: string;
+    description: string | null;
+    priority: number;
+    dueDate?: Date | null;
+    assignToAll: boolean;
+    createdBy?: { id: string; name: string | null };
+    isCompleted: boolean;
+    completedAt: Date | null;
+    completionNotes: string | null;
+}
+
+interface TaskWithProgress {
+    id: string;
+    title: string;
+    description: string | null;
+    priority: number;
+    dueDate: Date | null;
+    assignToAll: boolean;
+    assignedTo: { id: string; name: string | null } | null;
+    createdBy: { id: string; name: string | null };
+    completions: {
+        userId: string;
+        completedAt: Date;
+        notes: string | null;
+        user: { id: string; name: string | null };
+    }[];
+    targetCount: number;
+    completedCount: number;
+    progress: number;
+    isOverdue: boolean;
+}
+
 interface Props {
     initialStats: {
         userCount: number;
@@ -136,6 +172,8 @@ interface Props {
     recentReports: ShiftReport[];
     upcomingEvents: Event[];
     nextShift: NextShift | null;
+    myTasks: Task[];
+    taskProgress: TaskWithProgress[];
     userId: string;
     isAdmin: boolean;
     isSuperAdmin: boolean;
@@ -150,6 +188,8 @@ export default function DashboardClient({
     recentReports,
     upcomingEvents,
     nextShift,
+    myTasks,
+    taskProgress,
     userId,
     isAdmin,
     isSuperAdmin,
@@ -334,6 +374,9 @@ export default function DashboardClient({
             {/* Main Content */}
             <div className="content-grid">
                 <div className="content-col">
+                    {/* My Tasks */}
+                    {myTasks.length > 0 && <TasksPanel tasks={myTasks} />}
+
                     {/* Global Notes */}
                     <div className="card notes-card">
                         <div className="card-header">
@@ -375,6 +418,11 @@ export default function DashboardClient({
 
                 <div className="content-col">
                     <EventsPanel events={upcomingEvents} isAdmin={isAdmin} />
+
+                    {/* Admin Task Progress */}
+                    {isAdmin && taskProgress.length > 0 && (
+                        <AdminTaskProgressPanel tasks={taskProgress} />
+                    )}
 
                     {isAdmin && (
                         <ActiveUsersPanel

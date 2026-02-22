@@ -30,6 +30,8 @@ interface SOP {
     description: string | null;
     content: string;
     category: string | null;
+    quickReference: string | null;
+    requiresAcknowledgment: boolean;
     isPublished: boolean;
     order: number;
     createdBy: { id: string; name: string | null };
@@ -50,6 +52,8 @@ export default function SOPsAdminClient({ initialSOPs }: Props) {
         description: "",
         content: "",
         category: "",
+        quickReference: "",
+        requiresAcknowledgment: false,
         isPublished: true,
     });
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -69,6 +73,8 @@ export default function SOPsAdminClient({ initialSOPs }: Props) {
             description: "",
             content: "",
             category: "",
+            quickReference: "",
+            requiresAcknowledgment: false,
             isPublished: true,
         });
         setEditingSOP(null);
@@ -88,6 +94,8 @@ export default function SOPsAdminClient({ initialSOPs }: Props) {
                     description: formData.description || undefined,
                     content: formData.content,
                     category: formData.category || undefined,
+                    quickReference: formData.quickReference || undefined,
+                    requiresAcknowledgment: formData.requiresAcknowledgment,
                     isPublished: formData.isPublished,
                 });
                 setSOPs((prev) =>
@@ -101,6 +109,8 @@ export default function SOPsAdminClient({ initialSOPs }: Props) {
                     description: formData.description || undefined,
                     content: formData.content,
                     category: formData.category || undefined,
+                    quickReference: formData.quickReference || undefined,
+                    requiresAcknowledgment: formData.requiresAcknowledgment,
                     isPublished: formData.isPublished,
                 });
                 setSOPs((prev) => [
@@ -123,6 +133,8 @@ export default function SOPsAdminClient({ initialSOPs }: Props) {
             description: sop.description || "",
             content: sop.content,
             category: sop.category || "",
+            quickReference: sop.quickReference || "",
+            requiresAcknowledgment: sop.requiresAcknowledgment,
             isPublished: sop.isPublished,
         });
         setShowForm(true);
@@ -233,7 +245,14 @@ export default function SOPsAdminClient({ initialSOPs }: Props) {
                                 <tr key={sop.id}>
                                     <td>
                                         <div className="sop-title">
-                                            <span className="title-text">{sop.title}</span>
+                                            <div className="title-row">
+                                                <span className="title-text">{sop.title}</span>
+                                                {sop.requiresAcknowledgment && (
+                                                    <span className="ack-badge" title="Requires acknowledgment">
+                                                        <AlertTriangle size={12} />
+                                                    </span>
+                                                )}
+                                            </div>
                                             {sop.description && (
                                                 <span className="title-desc">{sop.description}</span>
                                             )}
@@ -380,6 +399,29 @@ export default function SOPsAdminClient({ initialSOPs }: Props) {
                                     onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                                 />
                                 <p className="form-hint">Tip: You can use Markdown formatting (headings, lists, bold, etc.)</p>
+                            </div>
+
+                            <div className="form-group">
+                                <label>Quick Reference (Optional)</label>
+                                <textarea
+                                    placeholder="Add a brief summary or key points for quick reference..."
+                                    className="quick-ref-textarea"
+                                    value={formData.quickReference}
+                                    onChange={(e) => setFormData({ ...formData, quickReference: e.target.value })}
+                                />
+                                <p className="form-hint">Shown as a collapsible section at the top of the SOP</p>
+                            </div>
+
+                            <div className="toggle-row">
+                                <label className="toggle-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.requiresAcknowledgment}
+                                        onChange={(e) => setFormData({ ...formData, requiresAcknowledgment: e.target.checked })}
+                                    />
+                                    <span>Requires Acknowledgment</span>
+                                </label>
+                                <span className="toggle-hint">Users must confirm they've read and understood this SOP</span>
                             </div>
 
                             <div className="publish-toggle">
@@ -598,9 +640,27 @@ export default function SOPsAdminClient({ initialSOPs }: Props) {
                     gap: 0.25rem;
                 }
 
+                .title-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+
                 .title-text {
                     font-weight: 500;
                     color: var(--text-primary);
+                }
+
+                .ack-badge {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 20px;
+                    height: 20px;
+                    background: var(--warning-bg);
+                    color: var(--warning);
+                    border-radius: 50%;
+                    flex-shrink: 0;
                 }
 
                 .title-desc {
@@ -842,6 +902,26 @@ export default function SOPsAdminClient({ initialSOPs }: Props) {
                     height: 250px;
                     resize: vertical;
                     font-family: monospace;
+                }
+
+                .quick-ref-textarea {
+                    height: 100px;
+                    resize: vertical;
+                }
+
+                .toggle-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                    padding: 0.875rem 1rem;
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-md);
+                }
+
+                .toggle-hint {
+                    font-size: 0.75rem;
+                    color: var(--text-muted);
                 }
 
                 .form-hint {

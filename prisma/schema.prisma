@@ -94,9 +94,16 @@ model User {
   swapRequestsReviewed ShiftSwapRequest[]  @relation("SwapReviewer")
 
   // Admin task assignment
-  assignedShiftTasks  ShiftTask[]          @relation("TaskAssigner")
-  adminTasksCreated   AdminTask[]          @relation("AdminTaskCreator")
-  adminTasksAssigned  AdminTask[]          @relation("AdminTaskAssignee")
+  assignedShiftTasks    ShiftTask[]            @relation("TaskAssigner")
+  adminTasksCreated     AdminTask[]            @relation("AdminTaskCreator")
+  adminTasksAssigned    AdminTask[]            @relation("AdminTaskAssignee")
+  adminTaskCompletions  AdminTaskCompletion[]
+
+  // SOP relations
+  sopReads              SOPRead[]
+  sopFavorites          SOPFavorite[]
+  sopVersions           SOPVersion[]
+  sopQuizAttempts       SOPQuizAttempt[]
 }
 
 model Shift {
@@ -560,11 +567,31 @@ model AdminTask {
   createdBy    User      @relation("AdminTaskCreator", fields: [createdById], references: [id])
   isActive     Boolean   @default(true)
   priority     Int       @default(0)
+  dueDate      DateTime?                  // Optional due date for the task
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
+  // Track completions by users
+  completions  AdminTaskCompletion[]
+
   @@index([isActive, createdAt])
   @@index([assignedToId])
+  @@index([dueDate])
+}
+
+// Track task completions per user
+model AdminTaskCompletion {
+  id          String    @id @default(cuid())
+  taskId      String
+  task        AdminTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  completedAt DateTime  @default(now())
+  notes       String?   @db.Text  // Optional completion notes
+
+  @@unique([taskId, userId])  // Each user can only complete a task once
+  @@index([userId])
+  @@index([taskId])
 }
 
 // Standard Operating Procedures (SOPs)
@@ -578,6 +605,12 @@ model SOP {
   isPublished Boolean   @default(true)
   order       Int       @default(0) // For manual ordering
 
+  // Quick reference mode - condensed key steps
+  quickReference String?  @db.Text
+
+  // Acknowledgment required
+  requiresAcknowledgment Boolean @default(false)
+
   // Creator/Editor
   createdById String
   createdBy   User      @relation(fields: [createdById], references: [id])
@@ -585,7 +618,136 @@ model SOP {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  // Relations
+  reads       SOPRead[]
+  favorites   SOPFavorite[]
+  versions    SOPVersion[]
+  relatedFrom SOPRelated[] @relation("RelatedFrom")
+  relatedTo   SOPRelated[] @relation("RelatedTo")
+  quiz        SOPQuiz?
+
   @@index([isPublished, order])
   @@index([category])
   @@index([slug])
+}
+
+// Track who has read/acknowledged an SOP
+model SOPRead {
+  id        String   @id @default(cuid())
+  sopId     String
+  sop       SOP      @relation(fields: [sopId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+
+  readAt    DateTime @default(now())
+  acknowledged Boolean @default(false)
+  acknowledgedAt DateTime?
+
+  @@unique([sopId, userId])
+  @@index([sopId])
+  @@index([userId])
+}
+
+// User favorites/bookmarks
+model SOPFavorite {
+  id        String   @id @default(cuid())
+  sopId     String
+  sop       SOP      @relation(fields: [sopId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([sopId, userId])
+  @@index([userId])
+}
+
+// Version history for SOPs
+model SOPVersion {
+  id          String   @id @default(cuid())
+  sopId       String
+  sop         SOP      @relation(fields: [sopId], references: [id], onDelete: Cascade)
+
+  version     Int
+  title       String
+  content     String   @db.Text
+  description String?  @db.Text
+  quickReference String? @db.Text
+
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+
+  changeNote  String?
+  createdAt   DateTime @default(now())
+
+  @@unique([sopId, version])
+  @@index([sopId])
+}
+
+// Link related SOPs together
+model SOPRelated {
+  id        String   @id @default(cuid())
+  fromSopId String
+  fromSop   SOP      @relation("RelatedFrom", fields: [fromSopId], references: [id], onDelete: Cascade)
+  toSopId   String
+  toSop     SOP      @relation("RelatedTo", fields: [toSopId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([fromSopId, toSopId])
+  @@index([fromSopId])
+  @@index([toSopId])
+}
+
+// Quiz for an SOP
+model SOPQuiz {
+  id        String   @id @default(cuid())
+  sopId     String   @unique
+  sop       SOP      @relation(fields: [sopId], references: [id], onDelete: Cascade)
+
+  title     String?
+  passingScore Int   @default(80)
+  isActive  Boolean  @default(true)
+
+  questions SOPQuizQuestion[]
+  attempts  SOPQuizAttempt[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Quiz questions
+model SOPQuizQuestion {
+  id        String   @id @default(cuid())
+  quizId    String
+  quiz      SOPQuiz  @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  question  String   @db.Text
+  options   String   @db.Text
+  correctAnswer Int
+  explanation String? @db.Text
+  order     Int      @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([quizId])
+}
+
+// Quiz attempts by users
+model SOPQuizAttempt {
+  id        String   @id @default(cuid())
+  quizId    String
+  quiz      SOPQuiz  @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+
+  score     Int
+  passed    Boolean
+  answers   String   @db.Text
+
+  startedAt  DateTime @default(now())
+  completedAt DateTime?
+
+  @@index([quizId])
+  @@index([userId])
 }
