@@ -9,6 +9,7 @@ const protectedRoutes = [
     "/affiliates",
     "/settings",
     "/admin",
+    "/accounting",
 ];
 
 // Routes only for unauthenticated users
@@ -63,6 +64,16 @@ export async function middleware(request: NextRequest) {
             userRole !== "SUPER_ADMIN"
         ) {
             return NextResponse.redirect(new URL("/admin/scheduler", request.url));
+        }
+    }
+
+    // Check role-based access for accounting routes
+    if (pathname.startsWith("/accounting") && isAuthenticated) {
+        const userRole = token.role as string;
+
+        // Only ACCOUNTING, ADMIN, and SUPER_ADMIN can access accounting routes
+        if (userRole !== "ACCOUNTING" && userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+            return NextResponse.redirect(new URL("/dashboard", request.url));
         }
     }
 

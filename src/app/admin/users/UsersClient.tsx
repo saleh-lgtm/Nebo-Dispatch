@@ -15,7 +15,7 @@ interface UserData {
     id: string;
     name: string | null;
     email: string | null;
-    role: "SUPER_ADMIN" | "ADMIN" | "DISPATCHER";
+    role: "SUPER_ADMIN" | "ADMIN" | "ACCOUNTING" | "DISPATCHER";
     isActive: boolean;
     lastLogin: Date | null;
     createdAt: Date;
@@ -45,7 +45,7 @@ export default function UsersClient({ users, stats, currentUserId }: Props) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
-    const [filter, setFilter] = useState<"all" | "SUPER_ADMIN" | "ADMIN" | "DISPATCHER">("all");
+    const [filter, setFilter] = useState<"all" | "SUPER_ADMIN" | "ADMIN" | "ACCOUNTING" | "DISPATCHER">("all");
     const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
     // Form states

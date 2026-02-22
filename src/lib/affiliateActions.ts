@@ -32,6 +32,9 @@ export async function getAffiliatesWithStatus(
         ],
         include: {
             submittedBy: { select: { id: true, name: true, email: true } },
+            pricingGrid: {
+                orderBy: { serviceType: "asc" },
+            },
         },
     });
 }

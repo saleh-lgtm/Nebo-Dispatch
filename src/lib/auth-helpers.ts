@@ -48,6 +48,13 @@ export async function requireAdmin(): Promise<AuthSession> {
 }
 
 /**
+ * Require ACCOUNTING, ADMIN, or SUPER_ADMIN role
+ */
+export async function requireAccounting(): Promise<AuthSession> {
+    return requireRole(["SUPER_ADMIN", "ADMIN", "ACCOUNTING"]);
+}
+
+/**
  * Check if role can manage users (create, update, delete)
  * Only SUPER_ADMIN can manage users
  */

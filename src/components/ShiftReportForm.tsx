@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, memo } from "react";
-import { Plus, Trash2, ClipboardCheck, Send, AlertCircle, Bookmark, Phone, Mail, FileText, TrendingUp, MessageSquare, Lightbulb, Clock, CheckCircle, Minus, X, DollarSign, User } from "lucide-react";
+import { Plus, Trash2, ClipboardCheck, Send, AlertCircle, Bookmark, Phone, Mail, FileText, TrendingUp, MessageSquare, Lightbulb, Clock, CheckCircle, Minus, X, DollarSign, User, Flag } from "lucide-react";
 import { toggleTask, saveShiftReport } from "@/lib/actions";
 import { createQuote } from "@/lib/quoteActions";
 
 interface ReservationEntry {
     id: string;
     notes: string;
+    flaggedForAccounting?: boolean;
+    flagReason?: string;
 }
 
 interface Quote {
@@ -105,6 +107,41 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
     const handleSubmit = async () => {
         setIsSubmitting(true);
         try {
+            // Collect flagged reservations from all categories
+            const flaggedReservations: Array<{
+                reservationType: "accepted" | "modified" | "cancelled";
+                reservationId: string;
+                reservationNotes?: string;
+                flagReason?: string;
+            }> = [];
+
+            accepted.filter(r => r.flaggedForAccounting && r.id).forEach(r => {
+                flaggedReservations.push({
+                    reservationType: "accepted",
+                    reservationId: r.id,
+                    reservationNotes: r.notes,
+                    flagReason: r.flagReason,
+                });
+            });
+
+            modified.filter(r => r.flaggedForAccounting && r.id).forEach(r => {
+                flaggedReservations.push({
+                    reservationType: "modified",
+                    reservationId: r.id,
+                    reservationNotes: r.notes,
+                    flagReason: r.flagReason,
+                });
+            });
+
+            cancelled.filter(r => r.flaggedForAccounting && r.id).forEach(r => {
+                flaggedReservations.push({
+                    reservationType: "cancelled",
+                    reservationId: r.id,
+                    reservationNotes: r.notes,
+                    flagReason: r.flagReason,
+                });
+            });
+
             const data = {
                 shiftId: activeShift.id,
                 userId: session.user.id,
@@ -118,6 +155,7 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
                 acceptedReservations: accepted.length > 0 ? accepted : undefined,
                 modifiedReservations: modified.length > 0 ? modified : undefined,
                 cancelledReservations: cancelled.length > 0 ? cancelled : undefined,
+                flaggedReservations: flaggedReservations.length > 0 ? flaggedReservations : undefined,
                 clockOut: true
             };
 
@@ -1070,49 +1108,82 @@ function ReservationSection({ title, data, setter, add, update, remove, color }:
                     <Plus size={12} /> Add
                 </button>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 {data.map((item: any, index: number) => (
-                    <div key={index} style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                        <input
-                            placeholder="Res #"
-                            value={item.id}
-                            onChange={(e) => update(setter, index, "id", e.target.value)}
-                            style={{
-                                width: "80px",
-                                padding: "0.5rem",
-                                background: "rgba(0, 0, 0, 0.2)",
-                                border: "1px solid rgba(255, 255, 255, 0.1)",
-                                borderRadius: "6px",
-                                color: "var(--text-primary)",
-                                fontSize: "0.8rem",
-                            }}
-                        />
-                        <input
-                            placeholder="Notes"
-                            value={item.notes}
-                            onChange={(e) => update(setter, index, "notes", e.target.value)}
-                            style={{
-                                flex: 1,
-                                padding: "0.5rem",
-                                background: "rgba(0, 0, 0, 0.2)",
-                                border: "1px solid rgba(255, 255, 255, 0.1)",
-                                borderRadius: "6px",
-                                color: "var(--text-primary)",
-                                fontSize: "0.8rem",
-                            }}
-                        />
-                        <button
-                            onClick={() => remove(setter, index)}
-                            style={{
-                                padding: "0.375rem",
-                                background: "none",
-                                border: "none",
-                                color: "#f87171",
-                                cursor: "pointer",
-                            }}
-                        >
-                            <Trash2 size={14} />
-                        </button>
+                    <div key={index} style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
+                        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                            <input
+                                placeholder="Res #"
+                                value={item.id}
+                                onChange={(e) => update(setter, index, "id", e.target.value)}
+                                style={{
+                                    width: "80px",
+                                    padding: "0.5rem",
+                                    background: "rgba(0, 0, 0, 0.2)",
+                                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                                    borderRadius: "6px",
+                                    color: "var(--text-primary)",
+                                    fontSize: "0.8rem",
+                                }}
+                            />
+                            <input
+                                placeholder="Notes"
+                                value={item.notes}
+                                onChange={(e) => update(setter, index, "notes", e.target.value)}
+                                style={{
+                                    flex: 1,
+                                    padding: "0.5rem",
+                                    background: "rgba(0, 0, 0, 0.2)",
+                                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                                    borderRadius: "6px",
+                                    color: "var(--text-primary)",
+                                    fontSize: "0.8rem",
+                                }}
+                            />
+                            <button
+                                onClick={() => update(setter, index, "flaggedForAccounting", !item.flaggedForAccounting)}
+                                title={item.flaggedForAccounting ? "Remove accounting flag" : "Flag for accounting review"}
+                                style={{
+                                    padding: "0.375rem",
+                                    background: item.flaggedForAccounting ? "rgba(245, 158, 11, 0.2)" : "none",
+                                    border: item.flaggedForAccounting ? "1px solid rgba(245, 158, 11, 0.4)" : "none",
+                                    borderRadius: "6px",
+                                    color: item.flaggedForAccounting ? "#fbbf24" : "var(--text-secondary)",
+                                    cursor: "pointer",
+                                    transition: "all 0.2s",
+                                }}
+                            >
+                                <Flag size={14} />
+                            </button>
+                            <button
+                                onClick={() => remove(setter, index)}
+                                style={{
+                                    padding: "0.375rem",
+                                    background: "none",
+                                    border: "none",
+                                    color: "#f87171",
+                                    cursor: "pointer",
+                                }}
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        </div>
+                        {item.flaggedForAccounting && (
+                            <input
+                                placeholder="Reason for accounting review..."
+                                value={item.flagReason || ""}
+                                onChange={(e) => update(setter, index, "flagReason", e.target.value)}
+                                style={{
+                                    padding: "0.5rem",
+                                    background: "rgba(245, 158, 11, 0.1)",
+                                    border: "1px solid rgba(245, 158, 11, 0.2)",
+                                    borderRadius: "6px",
+                                    color: "var(--text-primary)",
+                                    fontSize: "0.75rem",
+                                    marginLeft: "0",
+                                }}
+                            />
+                        )}
                     </div>
                 ))}
                 {data.length === 0 && (

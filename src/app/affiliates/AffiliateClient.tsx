@@ -26,8 +26,16 @@ import { submitAffiliate } from "@/lib/actions";
 import { approveAffiliate, rejectAffiliate, deleteAffiliate, updateAffiliate } from "@/lib/affiliateActions";
 import { useToast } from "@/hooks/useToast";
 import Modal from "@/components/ui/Modal";
+import AffiliatePricingGrid from "@/components/AffiliatePricingGrid";
 
 type AffiliateType = "FARM_IN" | "FARM_OUT";
+
+interface PricingEntry {
+    id: string;
+    serviceType: string;
+    flatRate: number;
+    notes: string | null;
+}
 
 interface Affiliate {
     id: string;
@@ -42,6 +50,7 @@ interface Affiliate {
     type: AffiliateType;
     createdAt: Date;
     submittedBy: { id: string; name: string | null; email: string | null };
+    pricingGrid?: PricingEntry[];
 }
 
 interface Props {
@@ -79,6 +88,7 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
     });
 
     const [editModal, setEditModal] = useState<{ open: boolean; affiliate: Affiliate | null }>({ open: false, affiliate: null });
+    const [pricingModal, setPricingModal] = useState<{ open: boolean; affiliate: Affiliate | null }>({ open: false, affiliate: null });
     const [editData, setEditData] = useState({
         name: "",
         email: "",
@@ -388,6 +398,17 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
                                                 >
                                                     <Edit3 size={16} /> Edit
                                                 </button>
+                                                {affiliate.type === "FARM_IN" && (
+                                                    <button
+                                                        onClick={() => {
+                                                            setPricingModal({ open: true, affiliate });
+                                                            setActionDropdown(null);
+                                                        }}
+                                                        style={{ display: "flex", alignItems: "center", gap: "0.5rem", width: "100%", padding: "0.75rem 1rem", background: "none", border: "none", cursor: "pointer", color: "#4ade80", textAlign: "left" }}
+                                                    >
+                                                        <DollarSign size={16} /> Pricing Grid
+                                                    </button>
+                                                )}
                                                 {!affiliate.isApproved && (
                                                     <>
                                                         <button
@@ -775,6 +796,24 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
                         </button>
                     </div>
                 </form>
+            </Modal>
+
+            {/* Pricing Grid Modal */}
+            <Modal
+                isOpen={pricingModal.open}
+                onClose={() => setPricingModal({ open: false, affiliate: null })}
+                title="Affiliate Pricing"
+                size="lg"
+            >
+                {pricingModal.affiliate && (
+                    <AffiliatePricingGrid
+                        affiliateId={pricingModal.affiliate.id}
+                        affiliateName={pricingModal.affiliate.name}
+                        pricing={pricingModal.affiliate.pricingGrid || []}
+                        isAdmin={isAdmin}
+                        onClose={() => setPricingModal({ open: false, affiliate: null })}
+                    />
+                )}
             </Modal>
         </div>
     );

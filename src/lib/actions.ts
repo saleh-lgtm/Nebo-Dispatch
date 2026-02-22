@@ -35,13 +35,21 @@ export async function toggleTask(entryId: string, isCompleted: boolean) {
     revalidatePath("/reports/shift");
 }
 
+interface FlaggedReservation {
+    reservationType: "accepted" | "modified" | "cancelled";
+    reservationId: string;
+    reservationNotes?: string;
+    flagReason?: string;
+}
+
 export async function saveShiftReport(data: Record<string, unknown> & {
     shiftId: string;
     userId: string;
     clockOut?: boolean;
+    flaggedReservations?: FlaggedReservation[];
 }) {
     const session = await requireAuth();
-    const { shiftId, userId, clockOut, ...reportData } = data;
+    const { shiftId, userId, clockOut, flaggedReservations, ...reportData } = data;
 
     // Ensure user can only save their own report
     if (session.user.id !== userId) {
@@ -70,6 +78,30 @@ export async function saveShiftReport(data: Record<string, unknown> & {
             challenges: reportData.challenges as string | undefined,
         },
     });
+
+    // Create accounting flags for flagged reservations
+    if (flaggedReservations && flaggedReservations.length > 0) {
+        await prisma.accountingFlag.createMany({
+            data: flaggedReservations.map((flag) => ({
+                shiftReportId: report.id,
+                reservationType: flag.reservationType,
+                reservationId: flag.reservationId,
+                reservationNotes: flag.reservationNotes,
+                flagReason: flag.flagReason,
+                flaggedById: session.user.id,
+                status: "PENDING" as const,
+            })),
+            skipDuplicates: true,
+        });
+
+        await createAuditLog(
+            session.user.id,
+            "CREATE",
+            "AccountingFlag",
+            report.id,
+            { flagCount: flaggedReservations.length }
+        );
+    }
 
     await createAuditLog(
         session.user.id,
