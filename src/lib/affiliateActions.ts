@@ -6,14 +6,23 @@ import { requireAdmin, requireAuth } from "./auth-helpers";
 import { createAuditLog } from "./auditActions";
 
 // Get all affiliates with optional filter
-export async function getAffiliatesWithStatus(status?: "all" | "pending" | "approved") {
+export async function getAffiliatesWithStatus(
+    status?: "all" | "pending" | "approved",
+    affiliateType?: "FARM_IN" | "FARM_OUT"
+) {
     await requireAuth();
 
-    const where = status === "pending"
-        ? { isApproved: false }
-        : status === "approved"
-            ? { isApproved: true }
-            : {};
+    const where: { isApproved?: boolean; type?: "FARM_IN" | "FARM_OUT" } = {};
+
+    if (status === "pending") {
+        where.isApproved = false;
+    } else if (status === "approved") {
+        where.isApproved = true;
+    }
+
+    if (affiliateType) {
+        where.type = affiliateType;
+    }
 
     return await prisma.affiliate.findMany({
         where,
@@ -28,12 +37,27 @@ export async function getAffiliatesWithStatus(status?: "all" | "pending" | "appr
 }
 
 // Get pending affiliates count (for admin badge)
-export async function getPendingAffiliatesCount() {
+export async function getPendingAffiliatesCount(affiliateType?: "FARM_IN" | "FARM_OUT") {
     await requireAdmin();
 
-    return await prisma.affiliate.count({
-        where: { isApproved: false },
-    });
+    const where: { isApproved: boolean; type?: "FARM_IN" | "FARM_OUT" } = { isApproved: false };
+    if (affiliateType) {
+        where.type = affiliateType;
+    }
+
+    return await prisma.affiliate.count({ where });
+}
+
+// Get pending counts for both types
+export async function getPendingAffiliatesCounts() {
+    await requireAdmin();
+
+    const [farmInCount, farmOutCount] = await Promise.all([
+        prisma.affiliate.count({ where: { isApproved: false, type: "FARM_IN" } }),
+        prisma.affiliate.count({ where: { isApproved: false, type: "FARM_OUT" } }),
+    ]);
+
+    return { farmInCount, farmOutCount };
 }
 
 // Approve an affiliate (ADMIN/SUPER_ADMIN only)

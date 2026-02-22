@@ -19,11 +19,15 @@ import {
     Trash2,
     Edit3,
     Building2,
+    ArrowDownLeft,
+    ArrowUpRight,
 } from "lucide-react";
 import { submitAffiliate } from "@/lib/actions";
 import { approveAffiliate, rejectAffiliate, deleteAffiliate, updateAffiliate } from "@/lib/affiliateActions";
 import { useToast } from "@/hooks/useToast";
 import Modal from "@/components/ui/Modal";
+
+type AffiliateType = "FARM_IN" | "FARM_OUT";
 
 interface Affiliate {
     id: string;
@@ -35,6 +39,7 @@ interface Affiliate {
     notes: string | null;
     cityTransferRate: string | null;
     isApproved: boolean;
+    type: AffiliateType;
     createdAt: Date;
     submittedBy: { id: string; name: string | null; email: string | null };
 }
@@ -43,16 +48,19 @@ interface Props {
     initialAffiliates: Affiliate[];
     session: { user: { id: string; name?: string | null; email?: string | null; role: string } };
     isAdmin: boolean;
-    pendingCount: number;
+    pendingCounts: { farmInCount: number; farmOutCount: number };
 }
 
-export default function AffiliateClient({ initialAffiliates, session, isAdmin, pendingCount }: Props) {
+export default function AffiliateClient({ initialAffiliates, session, isAdmin, pendingCounts }: Props) {
     const router = useRouter();
     const { addToast } = useToast();
     const [affiliates] = useState(initialAffiliates);
     const [search, setSearch] = useState("");
     const [showForm, setShowForm] = useState(false);
-    const [activeTab, setActiveTab] = useState<"all" | "pending" | "approved">(pendingCount > 0 ? "pending" : "approved");
+    const [typeTab, setTypeTab] = useState<AffiliateType>("FARM_OUT");
+    const [statusTab, setStatusTab] = useState<"all" | "pending" | "approved">(
+        (typeTab === "FARM_IN" ? pendingCounts.farmInCount : pendingCounts.farmOutCount) > 0 ? "pending" : "approved"
+    );
     const [loading, setLoading] = useState(false);
     const [actionDropdown, setActionDropdown] = useState<string | null>(null);
     const [rejectModal, setRejectModal] = useState<{ open: boolean; affiliate: Affiliate | null }>({ open: false, affiliate: null });
@@ -66,7 +74,8 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
         cities: [] as string[],
         cityInput: "",
         cityTransferRate: "",
-        notes: ""
+        notes: "",
+        type: "FARM_OUT" as AffiliateType
     });
 
     const [editModal, setEditModal] = useState<{ open: boolean; affiliate: Affiliate | null }>({ open: false, affiliate: null });
@@ -81,15 +90,20 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
         notes: ""
     });
 
+    const currentPendingCount = typeTab === "FARM_IN" ? pendingCounts.farmInCount : pendingCounts.farmOutCount;
+
     const filteredAffiliates = affiliates.filter((a) => {
+        // Filter by type first
+        if (a.type !== typeTab) return false;
+
         const matchesSearch = a.name.toLowerCase().includes(search.toLowerCase()) ||
             a.state.toLowerCase().includes(search.toLowerCase()) ||
             a.cities.some(c => c.toLowerCase().includes(search.toLowerCase()));
 
         if (!isAdmin) return matchesSearch && a.isApproved;
 
-        if (activeTab === "pending") return matchesSearch && !a.isApproved;
-        if (activeTab === "approved") return matchesSearch && a.isApproved;
+        if (statusTab === "pending") return matchesSearch && !a.isApproved;
+        if (statusTab === "approved") return matchesSearch && a.isApproved;
         return matchesSearch;
     });
 
@@ -109,10 +123,11 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
                 cities: formData.cities,
                 cityTransferRate: formData.cityTransferRate || undefined,
                 notes: formData.notes || undefined,
-                submittedById: session.user.id
+                submittedById: session.user.id,
+                type: formData.type
             });
             setShowForm(false);
-            setFormData({ name: "", email: "", phone: "", state: "", cities: [], cityInput: "", cityTransferRate: "", notes: "" });
+            setFormData({ name: "", email: "", phone: "", state: "", cities: [], cityInput: "", cityTransferRate: "", notes: "", type: "FARM_OUT" });
             addToast("Affiliate submitted for admin approval!", "success");
             router.refresh();
         } catch {
@@ -166,18 +181,25 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
     };
 
     const addCity = (isEdit = false) => {
-        const data = isEdit ? editData : formData;
-        const setData = isEdit ? setEditData : setFormData;
-        const city = data.cityInput.trim();
-        if (city && !data.cities.includes(city)) {
-            setData({ ...data, cities: [...data.cities, city], cityInput: "" });
+        if (isEdit) {
+            const city = editData.cityInput.trim();
+            if (city && !editData.cities.includes(city)) {
+                setEditData({ ...editData, cities: [...editData.cities, city], cityInput: "" });
+            }
+        } else {
+            const city = formData.cityInput.trim();
+            if (city && !formData.cities.includes(city)) {
+                setFormData({ ...formData, cities: [...formData.cities, city], cityInput: "" });
+            }
         }
     };
 
     const removeCity = (cityToRemove: string, isEdit = false) => {
-        const data = isEdit ? editData : formData;
-        const setData = isEdit ? setEditData : setFormData;
-        setData({ ...data, cities: data.cities.filter(c => c !== cityToRemove) });
+        if (isEdit) {
+            setEditData({ ...editData, cities: editData.cities.filter(c => c !== cityToRemove) });
+        } else {
+            setFormData({ ...formData, cities: formData.cities.filter(c => c !== cityToRemove) });
+        }
     };
 
     const handleApprove = async (affiliate: Affiliate) => {
@@ -230,7 +252,9 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
             <header className="flex justify-between items-center flex-wrap gap-4">
                 <div>
                     <h1 className="font-display" style={{ fontSize: "2rem" }}>Affiliate Directory</h1>
-                    <p style={{ color: "var(--text-secondary)" }}>Manage farm-out partners and network rates</p>
+                    <p style={{ color: "var(--text-secondary)" }}>
+                        Manage your Farm In and Farm Out affiliate network
+                    </p>
                 </div>
                 <button onClick={() => setShowForm(true)} className="btn btn-primary">
                     <Plus size={18} />
@@ -238,37 +262,69 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
                 </button>
             </header>
 
-            {/* Admin Tabs */}
-            {isAdmin && (
-                <div className="flex gap-2 flex-wrap">
+            {/* Type Tabs - Farm In / Farm Out */}
+            <div className="flex flex-col gap-4">
+                <div className="flex gap-2">
                     <button
-                        onClick={() => setActiveTab("pending")}
-                        className={`btn ${activeTab === "pending" ? "btn-primary" : "btn-ghost"}`}
+                        onClick={() => setTypeTab("FARM_OUT")}
+                        className={`btn ${typeTab === "FARM_OUT" ? "btn-primary" : "btn-ghost"}`}
+                        style={{ minWidth: "140px" }}
                     >
-                        <Clock size={16} />
-                        Pending
-                        {pendingCount > 0 && (
+                        <ArrowUpRight size={16} />
+                        Farm Out
+                        {isAdmin && pendingCounts.farmOutCount > 0 && (
                             <span className="badge badge-warning" style={{ marginLeft: "0.5rem" }}>
-                                {pendingCount}
+                                {pendingCounts.farmOutCount}
                             </span>
                         )}
                     </button>
                     <button
-                        onClick={() => setActiveTab("approved")}
-                        className={`btn ${activeTab === "approved" ? "btn-primary" : "btn-ghost"}`}
+                        onClick={() => setTypeTab("FARM_IN")}
+                        className={`btn ${typeTab === "FARM_IN" ? "btn-primary" : "btn-ghost"}`}
+                        style={{ minWidth: "140px" }}
                     >
-                        <ShieldCheck size={16} />
-                        Approved
-                    </button>
-                    <button
-                        onClick={() => setActiveTab("all")}
-                        className={`btn ${activeTab === "all" ? "btn-primary" : "btn-ghost"}`}
-                    >
-                        <Globe size={16} />
-                        All
+                        <ArrowDownLeft size={16} />
+                        Farm In
+                        {isAdmin && pendingCounts.farmInCount > 0 && (
+                            <span className="badge badge-warning" style={{ marginLeft: "0.5rem" }}>
+                                {pendingCounts.farmInCount}
+                            </span>
+                        )}
                     </button>
                 </div>
-            )}
+
+                {/* Status Tabs - Admin Only */}
+                {isAdmin && (
+                    <div className="flex gap-2 flex-wrap">
+                        <button
+                            onClick={() => setStatusTab("pending")}
+                            className={`btn btn-sm ${statusTab === "pending" ? "btn-primary" : "btn-ghost"}`}
+                        >
+                            <Clock size={14} />
+                            Pending
+                            {currentPendingCount > 0 && (
+                                <span className="badge badge-warning" style={{ marginLeft: "0.25rem", fontSize: "0.7rem" }}>
+                                    {currentPendingCount}
+                                </span>
+                            )}
+                        </button>
+                        <button
+                            onClick={() => setStatusTab("approved")}
+                            className={`btn btn-sm ${statusTab === "approved" ? "btn-primary" : "btn-ghost"}`}
+                        >
+                            <ShieldCheck size={14} />
+                            Approved
+                        </button>
+                        <button
+                            onClick={() => setStatusTab("all")}
+                            className={`btn btn-sm ${statusTab === "all" ? "btn-primary" : "btn-ghost"}`}
+                        >
+                            <Globe size={14} />
+                            All
+                        </button>
+                    </div>
+                )}
+            </div>
 
             {/* Search */}
             <div className="glass-card" style={{ padding: "1rem" }}>
@@ -416,7 +472,7 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
                     <div className="glass-card text-center py-12" style={{ gridColumn: "1 / -1" }}>
                         <Globe size={48} className="text-accent mx-auto mb-4" style={{ opacity: 0.3 }} />
                         <p style={{ color: "var(--text-secondary)" }}>
-                            {activeTab === "pending" ? "No pending affiliates to review." : "No affiliates found matching your search."}
+                            {statusTab === "pending" ? "No pending affiliates to review." : `No ${typeTab === "FARM_IN" ? "Farm In" : "Farm Out"} affiliates found.`}
                         </p>
                     </div>
                 )}
@@ -425,6 +481,36 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
             {/* Submit Modal */}
             <Modal isOpen={showForm} onClose={() => setShowForm(false)} title="Submit New Affiliate" size="lg">
                 <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                    {/* Affiliate Type Selection */}
+                    <div className="flex flex-col gap-2">
+                        <label style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+                            Affiliate Type *
+                        </label>
+                        <div className="flex gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setFormData({ ...formData, type: "FARM_OUT" })}
+                                className={`btn flex-1 ${formData.type === "FARM_OUT" ? "btn-primary" : "btn-ghost"}`}
+                                style={{ justifyContent: "center" }}
+                            >
+                                <ArrowUpRight size={16} />
+                                Farm Out
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setFormData({ ...formData, type: "FARM_IN" })}
+                                className={`btn flex-1 ${formData.type === "FARM_IN" ? "btn-primary" : "btn-ghost"}`}
+                                style={{ justifyContent: "center" }}
+                            >
+                                <ArrowDownLeft size={16} />
+                                Farm In
+                            </button>
+                        </div>
+                        <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+                            {formData.type === "FARM_OUT" ? "Partners we send work to" : "Partners that send work to us"}
+                        </p>
+                    </div>
+
                     <div className="flex flex-col gap-1">
                         <label style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
                             Company Name *

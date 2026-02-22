@@ -35,6 +35,11 @@ enum RequestStatus {
   REJECTED
 }
 
+enum AffiliateType {
+  FARM_IN   // Partners that send work to us
+  FARM_OUT  // Partners we send work to
+}
+
 enum ReportStatus {
   DRAFT
   SUBMITTED
@@ -227,15 +232,16 @@ model Schedule {
 }
 
 model Affiliate {
-  id               String   @id @default(cuid())
+  id               String        @id @default(cuid())
   name             String
   email            String
-  phone            String?  // Contact phone number
-  state            String   // State (e.g., "TX", "CA")
-  cities           String[] // Cities served in that state
-  notes            String?  @db.Text
-  cityTransferRate String?  // Pricing/Rate info
-  isApproved       Boolean  @default(false)
+  phone            String?       // Contact phone number
+  state            String        // State (e.g., "TX", "CA")
+  cities           String[]      // Cities served in that state
+  notes            String?       @db.Text
+  cityTransferRate String?       // Pricing/Rate info
+  isApproved       Boolean       @default(false)
+  type             AffiliateType @default(FARM_OUT)
 
   submittedById String
   submittedBy   User   @relation(fields: [submittedById], references: [id])
