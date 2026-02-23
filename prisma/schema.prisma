@@ -48,6 +48,19 @@ enum ReportStatus {
   FLAGGED
 }
 
+enum RetailLeadOutcome {
+  WON
+  NEEDS_FOLLOW_UP
+  LOST
+}
+
+enum LostReason {
+  VEHICLE_TYPE
+  AVAILABILITY
+  PRICING
+  OTHER
+}
+
 enum AccountingFlagStatus {
   PENDING
   IN_REVIEW
@@ -130,6 +143,16 @@ model Shift {
   clockIn    DateTime            @default(now())
   clockOut   DateTime?
   totalHours Float?
+
+  // Schedule comparison
+  scheduledStart DateTime?       // The scheduled start time for comparison
+  scheduledEnd   DateTime?       // The scheduled end time for comparison
+  earlyClockIn   Int?            // Minutes early (positive) or late (negative)
+  earlyClockOut  Int?            // Minutes early (positive) or late (negative)
+
+  // Flag for incomplete report
+  incompleteReportFlag Boolean   @default(false)
+
   reports    ShiftReport[]
   tasks      ShiftTask[]
   requests   SchedulingRequest[]
@@ -192,9 +215,36 @@ model ShiftReport {
   // Accounting flags
   accountingFlags AccountingFlag[]
 
+  // Retail lead tracking
+  retailLeads RetailLead[]
+
   @@index([userId, createdAt])
   @@index([status])
   @@index([createdAt])
+}
+
+// Retail lead tracking for shift reports
+model RetailLead {
+  id             String            @id @default(cuid())
+  shiftReportId  String
+  shiftReport    ShiftReport       @relation(fields: [shiftReportId], references: [id], onDelete: Cascade)
+
+  // What the customer requested
+  serviceRequested String          @db.Text
+
+  // Outcome tracking
+  outcome        RetailLeadOutcome
+
+  // If lost, why?
+  lostReason     LostReason?
+  lostReasonOther String?          @db.Text  // If lostReason is OTHER
+
+  // Additional notes
+  notes          String?           @db.Text
+
+  createdAt      DateTime          @default(now())
+
+  @@index([shiftReportId])
 }
 
 model TaskTemplate {

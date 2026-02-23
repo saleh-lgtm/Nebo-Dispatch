@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import {
@@ -28,6 +29,7 @@ import {
     BookOpen,
     Clock,
     Calculator,
+    MessageSquare,
 } from "lucide-react";
 import NotificationBell from "./NotificationBell";
 
@@ -159,7 +161,7 @@ export default function Navbar() {
             <nav className="navbar" role="navigation" aria-label="Main navigation">
                 <div className="navbar-inner">
                     <Link href="/dashboard" className="navbar-brand" aria-label="Nebo Rides Dashboard">
-                        <img src="/logo.png" alt="" className="brand-logo" aria-hidden="true" />
+                        <Image src="/logo.png" alt="" className="brand-logo" width={32} height={32} aria-hidden="true" priority />
                     </Link>
 
                     {/* Desktop Navigation */}
@@ -202,6 +204,7 @@ export default function Navbar() {
                                         <NavLink href="/admin/sops" icon={<BookOpen size={16} />} label="Manage SOPs" />
                                         <NavLink href="/admin/reports" icon={<FileText size={16} />} label="Shift Reports" />
                                         <NavLink href="/admin/hours" icon={<Clock size={16} />} label="Hours Tracking" />
+                                        <NavLink href="/admin/sms" icon={<MessageSquare size={16} />} label="SMS Dashboard" />
                                         <NavLink href="/admin/analytics" icon={<BarChart3 size={16} />} label="Analytics" />
                                     </div>
                                     {isSuperAdmin && (
@@ -317,6 +320,7 @@ export default function Navbar() {
                             <NavLink href="/admin/sops" icon={<BookOpen size={18} />} label="Manage SOPs" onClick={closeMobileMenu} />
                             <NavLink href="/admin/reports" icon={<FileText size={18} />} label="Shift Reports" onClick={closeMobileMenu} />
                             <NavLink href="/admin/hours" icon={<Clock size={18} />} label="Hours Tracking" onClick={closeMobileMenu} />
+                            <NavLink href="/admin/sms" icon={<MessageSquare size={18} />} label="SMS Dashboard" onClick={closeMobileMenu} />
                             <NavLink href="/admin/analytics" icon={<BarChart3 size={18} />} label="Analytics" onClick={closeMobileMenu} />
                         </div>
                     )}
