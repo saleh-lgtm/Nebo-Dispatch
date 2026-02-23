@@ -261,6 +261,22 @@ export async function clockOut(forceWithoutReport = false): Promise<{
         },
     });
 
+    // Reset all task completions for this dispatcher (Option A)
+    // Admin tasks persist, but completions are reset for the next shift
+    const deletedCompletions = await prisma.adminTaskCompletion.deleteMany({
+        where: { userId },
+    });
+
+    if (deletedCompletions.count > 0) {
+        await createAuditLog(
+            session.user.id,
+            "DELETE",
+            "AdminTaskCompletion",
+            "bulk",
+            { action: "shift_reset", completionsCleared: deletedCompletions.count }
+        );
+    }
+
     await createAuditLog(session.user.id, "CLOCK_OUT", "Shift", activeShift.id, {
         totalHours: Math.round(totalHours * 100) / 100,
         earlyClockOut,
@@ -297,4 +313,57 @@ export async function getIncompleteReportShifts() {
         orderBy: { clockOut: "desc" },
         take: 50,
     });
+}
+
+/**
+ * Check if user can logout - blocks if they have an active shift without a submitted report
+ */
+export async function canLogout(): Promise<{
+    allowed: boolean;
+    reason?: string;
+    hasActiveShift: boolean;
+    hasSubmittedReport: boolean;
+    shiftId?: string;
+}> {
+    const session = await requireAuth();
+    const userId = session.user.id;
+
+    // Only dispatchers need shift report validation
+    if (session.user.role !== "DISPATCHER") {
+        return { allowed: true, hasActiveShift: false, hasSubmittedReport: true };
+    }
+
+    // Get active shift
+    const activeShift = await prisma.shift.findFirst({
+        where: { userId, clockOut: null },
+        include: {
+            reports: {
+                where: { status: { in: ["SUBMITTED", "REVIEWED"] } },
+                take: 1,
+            },
+        },
+    });
+
+    if (!activeShift) {
+        return { allowed: true, hasActiveShift: false, hasSubmittedReport: true };
+    }
+
+    const hasReport = activeShift.reports.length > 0;
+
+    if (!hasReport) {
+        return {
+            allowed: false,
+            reason: "You must submit a shift report before logging out. Please complete your shift report first.",
+            hasActiveShift: true,
+            hasSubmittedReport: false,
+            shiftId: activeShift.id,
+        };
+    }
+
+    return {
+        allowed: true,
+        hasActiveShift: true,
+        hasSubmittedReport: true,
+        shiftId: activeShift.id,
+    };
 }

@@ -162,6 +162,22 @@ export async function saveShiftReport(data: Record<string, unknown> & {
             },
         });
 
+        // Reset all task completions for this dispatcher (Option A)
+        // Admin tasks persist, but completions are reset for the next shift
+        const deletedCompletions = await prisma.adminTaskCompletion.deleteMany({
+            where: { userId: session.user.id },
+        });
+
+        if (deletedCompletions.count > 0) {
+            await createAuditLog(
+                session.user.id,
+                "DELETE",
+                "AdminTaskCompletion",
+                "bulk",
+                { action: "shift_reset", completionsCleared: deletedCompletions.count }
+            );
+        }
+
         await createAuditLog(
             session.user.id,
             "CLOCK_OUT",
