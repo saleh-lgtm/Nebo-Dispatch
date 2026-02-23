@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import {
     LayoutDashboard,
@@ -30,9 +30,11 @@ import {
     Clock,
     Calculator,
     MessageSquare,
+    AlertCircle,
 } from "lucide-react";
 import NotificationBell from "./NotificationBell";
 import ClockButton from "./ClockButton";
+import { canLogout } from "@/lib/clockActions";
 
 interface NavLinkProps {
     href: string;
@@ -129,7 +131,10 @@ function RoleBadge({ role }: { role: string }) {
 export default function Navbar() {
     const { data: session } = useSession();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [logoutError, setLogoutError] = useState<string | null>(null);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
     const pathname = usePathname();
+    const router = useRouter();
 
     useEffect(() => {
         setMobileMenuOpen(false);
@@ -146,6 +151,42 @@ export default function Navbar() {
         };
     }, [mobileMenuOpen]);
 
+    // Clear logout error after 5 seconds
+    useEffect(() => {
+        if (logoutError) {
+            const timer = setTimeout(() => setLogoutError(null), 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [logoutError]);
+
+    const handleLogout = useCallback(async () => {
+        if (isLoggingOut) return;
+
+        setIsLoggingOut(true);
+        setLogoutError(null);
+
+        try {
+            const result = await canLogout();
+
+            if (!result.allowed) {
+                setLogoutError(result.reason || "Cannot logout at this time");
+                // Redirect to shift report if they have an active shift
+                if (result.hasActiveShift && !result.hasSubmittedReport) {
+                    router.push("/reports/shift");
+                }
+                return;
+            }
+
+            await signOut();
+        } catch (error) {
+            console.error("Logout check failed:", error);
+            // On error, allow logout anyway
+            await signOut();
+        } finally {
+            setIsLoggingOut(false);
+        }
+    }, [isLoggingOut, router]);
+
     if (!session) return null;
 
     const role = session.user.role;
@@ -159,6 +200,17 @@ export default function Navbar() {
 
     return (
         <>
+            {/* Logout Error Toast */}
+            {logoutError && (
+                <div className="logout-error-toast" role="alert">
+                    <AlertCircle size={18} />
+                    <span>{logoutError}</span>
+                    <button onClick={() => setLogoutError(null)} aria-label="Dismiss">
+                        <X size={16} />
+                    </button>
+                </div>
+            )}
+
             <nav className="navbar" role="navigation" aria-label="Main navigation">
                 <div className="navbar-inner">
                     <Link href="/dashboard" className="navbar-brand" aria-label="Nebo Rides Dashboard">
@@ -183,6 +235,7 @@ export default function Navbar() {
 
                         <NavLink href="/affiliates" icon={<Users size={18} />} label="Affiliates" />
                         <NavLink href="/sops" icon={<BookOpen size={18} />} label="SOPs" />
+                        <NavLink href="/sms" icon={<MessageSquare size={18} />} label="SMS" />
 
                         {hasAccountingAccess && (
                             <NavLink href="/accounting" icon={<Calculator size={18} />} label="Accounting" />
@@ -228,12 +281,13 @@ export default function Navbar() {
 
                         <div className="nav-divider" />
                         <button
-                            onClick={() => signOut()}
+                            onClick={handleLogout}
                             className="nav-link logout-btn"
                             aria-label="Sign out"
+                            disabled={isLoggingOut}
                         >
                             <LogOut size={18} />
-                            <span>Logout</span>
+                            <span>{isLoggingOut ? "..." : "Logout"}</span>
                         </button>
                     </div>
 
@@ -290,6 +344,7 @@ export default function Navbar() {
                         )}
                         <NavLink href="/affiliates" icon={<Users size={18} />} label="Affiliates" onClick={closeMobileMenu} />
                         <NavLink href="/sops" icon={<BookOpen size={18} />} label="SOPs" onClick={closeMobileMenu} />
+                        <NavLink href="/sms" icon={<MessageSquare size={18} />} label="SMS" onClick={closeMobileMenu} />
                     </div>
 
                     {hasAccountingAccess && (
@@ -345,19 +400,71 @@ export default function Navbar() {
                         <NavLink href="/settings" icon={<Settings size={18} />} label="Settings" onClick={closeMobileMenu} />
                         <button
                             onClick={() => {
-                                signOut();
+                                handleLogout();
                                 closeMobileMenu();
                             }}
                             className="nav-link logout-btn"
+                            disabled={isLoggingOut}
                         >
                             <LogOut size={18} />
-                            <span>Sign Out</span>
+                            <span>{isLoggingOut ? "..." : "Sign Out"}</span>
                         </button>
                     </div>
                 </div>
             </div>
 
             <style jsx>{`
+                /* Logout Error Toast */
+                .logout-error-toast {
+                    position: fixed;
+                    top: 70px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: var(--danger-bg);
+                    border: 1px solid var(--danger);
+                    color: var(--danger);
+                    padding: 0.75rem 1rem;
+                    border-radius: var(--radius-md);
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    font-size: 0.875rem;
+                    font-weight: 500;
+                    z-index: 1000;
+                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+                    animation: slideDown 0.3s ease;
+                    max-width: 90%;
+                }
+
+                .logout-error-toast button {
+                    background: none;
+                    border: none;
+                    color: var(--danger);
+                    cursor: pointer;
+                    padding: 0.25rem;
+                    border-radius: var(--radius-sm);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    opacity: 0.7;
+                    transition: opacity 0.15s ease;
+                }
+
+                .logout-error-toast button:hover {
+                    opacity: 1;
+                }
+
+                @keyframes slideDown {
+                    from {
+                        opacity: 0;
+                        transform: translateX(-50%) translateY(-10px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateX(-50%) translateY(0);
+                    }
+                }
+
                 /* Navbar Base */
                 .navbar {
                     background: var(--bg-card);
