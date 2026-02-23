@@ -117,8 +117,9 @@ export default function SMSClient({ initialLogs, totalLogs, initialStats }: Prop
             } else {
                 setSendStatus({ type: "error", message: result.error || "Failed to send SMS" });
             }
-        } catch (error) {
-            setSendStatus({ type: "error", message: "An error occurred while sending SMS" });
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : "An error occurred while sending SMS";
+            setSendStatus({ type: "error", message: errorMessage });
         } finally {
             setIsSending(false);
         }
