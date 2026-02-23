@@ -17,22 +17,29 @@ function normalizePhoneNumber(phone: string): string {
     return `+1${digits}`;
 }
 
-// Twilio webhook validation (optional but recommended for production)
-function validateTwilioRequest(req: NextRequest, body: string): boolean {
+// Twilio webhook validation - ENFORCED for security
+// Set TWILIO_SKIP_SIGNATURE_VALIDATION=true ONLY in development
+function validateTwilioRequest(req: NextRequest, body: string): { valid: boolean; error?: string } {
+    // Allow skipping validation only in development with explicit flag
+    if (process.env.TWILIO_SKIP_SIGNATURE_VALIDATION === "true") {
+        console.warn("⚠️ Twilio signature validation SKIPPED - only use in development!");
+        return { valid: true };
+    }
+
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     if (!authToken) {
-        console.warn("TWILIO_AUTH_TOKEN not set, skipping request validation");
-        return true; // Skip validation if no auth token (for development)
+        console.error("TWILIO_AUTH_TOKEN not set - webhook validation will fail");
+        return { valid: false, error: "Server configuration error" };
     }
 
     const twilioSignature = req.headers.get("x-twilio-signature");
     if (!twilioSignature) {
-        console.warn("No Twilio signature found in request");
-        return false;
+        console.warn("No Twilio signature found in request - possible spoofing attempt");
+        return { valid: false, error: "Missing signature" };
     }
 
-    // Get the full URL for validation
-    const url = req.url;
+    // Get the webhook URL (use TWILIO_WEBHOOK_URL for proxy/tunnel scenarios)
+    const webhookUrl = process.env.TWILIO_WEBHOOK_URL || req.url;
 
     // Parse the body as form data
     const params: Record<string, string> = {};
@@ -41,13 +48,30 @@ function validateTwilioRequest(req: NextRequest, body: string): boolean {
         params[key] = value;
     });
 
-    return twilio.validateRequest(authToken, twilioSignature, url, params);
+    const isValid = twilio.validateRequest(authToken, twilioSignature, webhookUrl, params);
+    if (!isValid) {
+        console.warn("Invalid Twilio signature - request rejected");
+        return { valid: false, error: "Invalid signature" };
+    }
+
+    return { valid: true };
 }
+
+// Opt-out keywords that carriers require handling
+const OPT_OUT_KEYWORDS = ["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"];
+const HELP_KEYWORDS = ["HELP", "INFO"];
 
 export async function POST(req: NextRequest) {
     try {
         // Get the raw body for validation
         const body = await req.text();
+
+        // Validate the request is from Twilio
+        const validation = validateTwilioRequest(req, body);
+        if (!validation.valid) {
+            console.error("Twilio webhook validation failed:", validation.error);
+            return new NextResponse("Forbidden", { status: 403 });
+        }
 
         // Parse the form data
         const formData = new URLSearchParams(body);
@@ -67,7 +91,44 @@ export async function POST(req: NextRequest) {
 
         // Normalize phone numbers for conversation threading
         const normalizedFrom = normalizePhoneNumber(from);
-        const conversationPhone = normalizedFrom; // Use the sender's number as conversation identifier
+        const conversationPhone = normalizedFrom;
+
+        // Check for opt-out/help keywords
+        const upperMessage = messageBody.trim().toUpperCase();
+        let autoReply = "";
+
+        if (OPT_OUT_KEYWORDS.includes(upperMessage)) {
+            // Mark user as opted out in database
+            await prisma.sMSOptOut.upsert({
+                where: { phoneNumber: normalizedFrom },
+                create: {
+                    phoneNumber: normalizedFrom,
+                    optedOutAt: new Date(),
+                },
+                update: {
+                    optedOutAt: new Date(),
+                    optedInAt: null,
+                },
+            });
+            autoReply = "You have been unsubscribed and will not receive further messages. Reply START to resubscribe.";
+            console.log(`User ${from} opted out of SMS`);
+        } else if (upperMessage === "START") {
+            // Opt user back in
+            await prisma.sMSOptOut.upsert({
+                where: { phoneNumber: normalizedFrom },
+                create: {
+                    phoneNumber: normalizedFrom,
+                    optedInAt: new Date(),
+                },
+                update: {
+                    optedInAt: new Date(),
+                },
+            });
+            autoReply = "You have been resubscribed to messages from Nebo Rides. Reply STOP to unsubscribe.";
+            console.log(`User ${from} opted back in to SMS`);
+        } else if (HELP_KEYWORDS.includes(upperMessage)) {
+            autoReply = "Nebo Rides SMS Support. Reply STOP to unsubscribe. For help, call us or visit our website.";
+        }
 
         // Store the incoming SMS in the database
         await prisma.sMSLog.create({
@@ -85,9 +146,13 @@ export async function POST(req: NextRequest) {
 
         console.log(`Received SMS from ${from}: ${messageBody.substring(0, 50)}...`);
 
-        // Return TwiML response (empty response - no auto-reply)
-        // You can customize this to send an auto-reply if needed
-        const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
+        // Return TwiML response with optional auto-reply
+        const twimlResponse = autoReply
+            ? `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Message>${autoReply}</Message>
+</Response>`
+            : `<?xml version="1.0" encoding="UTF-8"?>
 <Response></Response>`;
 
         return new NextResponse(twimlResponse, {

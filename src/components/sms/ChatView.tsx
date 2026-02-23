@@ -1,7 +1,17 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, Phone, ArrowLeft, CheckCircle, Clock, XCircle } from "lucide-react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { Send, Loader2, Phone, ArrowLeft, CheckCircle, Clock, XCircle, AlertTriangle } from "lucide-react";
+
+// Calculate SMS segments (GSM-7: 160 chars, Unicode: 70 chars per segment)
+function calculateSegments(message: string): { segments: number; charsLeft: number; isUnicode: boolean } {
+    if (!message) return { segments: 0, charsLeft: 160, isUnicode: false };
+    const isUnicode = /[^\x00-\x7F]/.test(message);
+    const charsPerSegment = isUnicode ? 70 : 160;
+    const segments = Math.ceil(message.length / charsPerSegment);
+    const charsLeft = (segments * charsPerSegment) - message.length;
+    return { segments, charsLeft, isUnicode };
+}
 
 interface Message {
     id: string;
@@ -26,6 +36,9 @@ export default function ChatView({ phoneNumber, messages, onSendMessage, onBack,
     const [newMessage, setNewMessage] = useState("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+
+    // Calculate message segments for cost awareness
+    const segmentInfo = useMemo(() => calculateSegments(newMessage), [newMessage]);
 
     const formatPhone = (phone: string) => {
         if (phone.startsWith("+1") && phone.length === 12) {
@@ -153,15 +166,26 @@ export default function ChatView({ phoneNumber, messages, onSendMessage, onBack,
 
             {/* Input Area */}
             <form onSubmit={handleSubmit} className="chat-input-area">
-                <textarea
-                    ref={inputRef}
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Type a message..."
-                    rows={1}
-                    disabled={isSending}
-                />
+                <div className="input-wrapper">
+                    <textarea
+                        ref={inputRef}
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Type a message..."
+                        rows={1}
+                        disabled={isSending}
+                    />
+                    {newMessage.length > 0 && (
+                        <div className={`segment-info ${segmentInfo.segments > 1 ? "warning" : ""}`}>
+                            {segmentInfo.segments > 1 && <AlertTriangle size={12} />}
+                            <span>
+                                {segmentInfo.charsLeft} chars left
+                                {segmentInfo.segments > 1 && ` · ${segmentInfo.segments} segments`}
+                            </span>
+                        </div>
+                    )}
+                </div>
                 <button type="submit" disabled={!newMessage.trim() || isSending} className="send-btn">
                     {isSending ? <Loader2 size={20} className="spin" /> : <Send size={20} />}
                 </button>
@@ -348,8 +372,13 @@ export default function ChatView({ phoneNumber, messages, onSendMessage, onBack,
                     border-top: 1px solid var(--border);
                 }
 
-                .chat-input-area textarea {
+                .input-wrapper {
                     flex: 1;
+                    position: relative;
+                }
+
+                .chat-input-area textarea {
+                    width: 100%;
                     padding: 0.75rem 1rem;
                     background: var(--bg-secondary);
                     border: 1px solid var(--border);
@@ -369,6 +398,24 @@ export default function ChatView({ phoneNumber, messages, onSendMessage, onBack,
 
                 .chat-input-area textarea::placeholder {
                     color: var(--text-muted);
+                }
+
+                .segment-info {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.25rem;
+                    font-size: 0.6875rem;
+                    color: var(--text-muted);
+                    margin-top: 0.25rem;
+                    padding-left: 1rem;
+                }
+
+                .segment-info.warning {
+                    color: #f59e0b;
+                }
+
+                .segment-info.warning :global(svg) {
+                    color: #f59e0b;
                 }
 
                 .send-btn {

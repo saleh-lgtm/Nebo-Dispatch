@@ -54,12 +54,57 @@ const SMS_TEMPLATES = {
         `Hi ${details.name}, your ride scheduled for ${details.date} at ${details.time} has been cancelled. Contact us if you have questions.`,
 };
 
+// Calculate message segments (for cost estimation)
+function calculateSegments(message: string): number {
+    // GSM-7: 160 chars per segment, UCS-2: 70 chars per segment
+    const hasUnicode = /[^\x00-\x7F]/.test(message);
+    const charsPerSegment = hasUnicode ? 70 : 160;
+    return Math.ceil(message.length / charsPerSegment);
+}
+
+// Check if a phone number has opted out
+async function isOptedOut(phoneNumber: string): Promise<boolean> {
+    const optOut = await prisma.sMSOptOut.findUnique({
+        where: { phoneNumber },
+    });
+    // User is opted out if record exists AND optedInAt is null or before optedOutAt
+    if (!optOut || !optOut.optedOutAt) return false;
+    if (!optOut.optedInAt) return true;
+    return optOut.optedOutAt > optOut.optedInAt;
+}
+
 // Send a single SMS
 export async function sendSMS(to: string, message: string) {
     const session = await requireAuth();
 
-    // Format phone number (ensure it starts with +1 for US)
-    const formattedPhone = formatPhoneNumber(to);
+    // Validate and format phone number
+    let formattedPhone: string;
+    try {
+        formattedPhone = formatPhoneNumber(to);
+    } catch {
+        return {
+            success: false,
+            error: "Invalid phone number format. Must be a valid E.164 number (e.g., +1234567890).",
+        };
+    }
+
+    // Check opt-out status
+    if (await isOptedOut(formattedPhone)) {
+        console.warn(`SMS blocked: ${formattedPhone} has opted out`);
+        return {
+            success: false,
+            error: "This number has opted out of SMS messages. They can reply START to resubscribe.",
+        };
+    }
+
+    // Calculate segments and warn if multi-segment
+    const segments = calculateSegments(message);
+    if (segments > 1) {
+        console.info(`SMS to ${formattedPhone} will be sent as ${segments} segments (longer messages cost more)`);
+    }
+
+    // Get status callback URL from environment
+    const statusCallbackUrl = process.env.TWILIO_STATUS_CALLBACK_URL;
 
     try {
         const twilioPhoneNumber = getTwilioPhoneNumber();
@@ -69,6 +114,7 @@ export async function sendSMS(to: string, message: string) {
             body: message,
             from: formattedFrom,
             to: formattedPhone,
+            ...(statusCallbackUrl && { statusCallback: statusCallbackUrl }),
         });
 
         // Log the SMS
@@ -77,7 +123,7 @@ export async function sendSMS(to: string, message: string) {
             message,
             status: result.status,
             messageSid: result.sid,
-            segments: result.numSegments ? parseInt(result.numSegments) : 1,
+            segments: result.numSegments ? parseInt(result.numSegments) : segments,
             sentById: session.user.id,
         });
 
@@ -85,7 +131,7 @@ export async function sendSMS(to: string, message: string) {
             success: true,
             messageSid: result.sid,
             status: result.status,
-            segments: result.numSegments,
+            segments: result.numSegments || segments,
         };
     } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -280,28 +326,42 @@ export async function getSMSStats() {
     };
 }
 
+// Validate E.164 phone number format
+function validateE164(phone: string): boolean {
+    const pattern = /^\+[1-9]\d{1,14}$/;
+    return pattern.test(phone);
+}
+
 // Helper: Format phone number to E.164 format
 function formatPhoneNumber(phone: string): string {
     // Remove all non-digit characters
     const digits = phone.replace(/\D/g, "");
 
+    let formatted: string;
+
     // If it's a 10-digit US number, add +1
     if (digits.length === 10) {
-        return `+1${digits}`;
+        formatted = `+1${digits}`;
     }
-
     // If it already has country code
-    if (digits.length === 11 && digits.startsWith("1")) {
-        return `+${digits}`;
+    else if (digits.length === 11 && digits.startsWith("1")) {
+        formatted = `+${digits}`;
     }
-
-    // If it already starts with +, return as-is
-    if (phone.startsWith("+")) {
-        return phone;
+    // If it already starts with +, use as-is
+    else if (phone.startsWith("+")) {
+        formatted = phone;
     }
-
     // Default: assume US and add +1
-    return `+1${digits}`;
+    else {
+        formatted = `+1${digits}`;
+    }
+
+    // Validate the formatted number
+    if (!validateE164(formatted)) {
+        throw new Error(`Invalid phone number format: ${phone}. Must be a valid E.164 number.`);
+    }
+
+    return formatted;
 }
 
 // Helper: Log SMS to database
@@ -421,7 +481,30 @@ export async function getConversationMessages(
 export async function sendConversationSMS(phoneNumber: string, message: string) {
     const session = await requireAuth();
 
-    const normalizedPhone = formatPhoneNumber(phoneNumber);
+    // Validate and format phone number
+    let normalizedPhone: string;
+    try {
+        normalizedPhone = formatPhoneNumber(phoneNumber);
+    } catch {
+        return {
+            success: false,
+            error: "Invalid phone number format. Must be a valid E.164 number (e.g., +1234567890).",
+        };
+    }
+
+    // Check opt-out status
+    if (await isOptedOut(normalizedPhone)) {
+        return {
+            success: false,
+            error: "This number has opted out of SMS messages. They can reply START to resubscribe.",
+        };
+    }
+
+    // Calculate segments
+    const segments = calculateSegments(message);
+
+    // Get status callback URL from environment
+    const statusCallbackUrl = process.env.TWILIO_STATUS_CALLBACK_URL;
 
     try {
         const twilioPhoneNumber = getTwilioPhoneNumber();
@@ -432,6 +515,7 @@ export async function sendConversationSMS(phoneNumber: string, message: string) 
             body: message,
             from: formattedFrom,
             to: normalizedPhone,
+            ...(statusCallbackUrl && { statusCallback: statusCallbackUrl }),
         });
 
         // Log with conversation phone
@@ -443,7 +527,7 @@ export async function sendConversationSMS(phoneNumber: string, message: string) 
                 message: message,
                 status: result.status,
                 messageSid: result.sid,
-                segments: result.numSegments ? parseInt(result.numSegments) : 1,
+                segments: result.numSegments ? parseInt(result.numSegments) : segments,
                 sentById: session.user.id,
                 conversationPhone: normalizedPhone,
             },
@@ -453,6 +537,7 @@ export async function sendConversationSMS(phoneNumber: string, message: string) 
             success: true,
             messageSid: result.sid,
             status: result.status,
+            segments: result.numSegments || segments,
         };
     } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";

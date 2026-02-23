@@ -975,6 +975,18 @@ model SMSLog {
   @@index([conversationPhone, createdAt])
 }
 
+// SMS Opt-Out tracking for compliance
+model SMSOptOut {
+  id          String    @id @default(cuid())
+  phoneNumber String    @unique // E.164 format phone number
+  optedOutAt  DateTime? // When user opted out
+  optedInAt   DateTime? // When user opted back in (null = still opted out)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([phoneNumber])
+}
+
 // ============================================
 // FLEET VEHICLE MANAGEMENT
 // ============================================
