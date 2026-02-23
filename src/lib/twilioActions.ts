@@ -307,6 +307,7 @@ function formatPhoneNumber(phone: string): string {
 // Helper: Log SMS to database
 async function logSMS(data: {
     to: string;
+    from?: string;
     message: string;
     status: string;
     messageSid?: string;
@@ -315,8 +316,13 @@ async function logSMS(data: {
     sentById?: string;
 }) {
     try {
+        // Normalize phone number for conversation threading
+        const conversationPhone = formatPhoneNumber(data.to);
+
         await prisma.sMSLog.create({
             data: {
+                direction: "OUTBOUND",
+                from: data.from,
                 to: data.to,
                 message: data.message,
                 status: data.status,
@@ -324,9 +330,137 @@ async function logSMS(data: {
                 segments: data.segments || 1,
                 error: data.error,
                 sentById: data.sentById,
+                conversationPhone: conversationPhone,
             },
         });
     } catch (e) {
         console.error("Failed to log SMS:", e);
+    }
+}
+
+// Get list of unique conversations (grouped by phone number)
+export async function getConversations(options?: {
+    limit?: number;
+    offset?: number;
+}) {
+    await requireAuth();
+
+    const { limit = 50, offset = 0 } = options || {};
+
+    // Get distinct conversation phones with the latest message
+    const conversations = await prisma.$queryRaw<
+        Array<{
+            conversationPhone: string;
+            lastMessage: string;
+            lastMessageAt: Date;
+            messageCount: bigint;
+            unreadCount: bigint;
+        }>
+    >`
+        SELECT
+            "conversationPhone",
+            (SELECT message FROM "SMSLog" s2 WHERE s2."conversationPhone" = s1."conversationPhone" ORDER BY "createdAt" DESC LIMIT 1) as "lastMessage",
+            MAX("createdAt") as "lastMessageAt",
+            COUNT(*) as "messageCount",
+            COUNT(*) FILTER (WHERE direction = 'INBOUND' AND status = 'received') as "unreadCount"
+        FROM "SMSLog" s1
+        WHERE "conversationPhone" IS NOT NULL
+        GROUP BY "conversationPhone"
+        ORDER BY MAX("createdAt") DESC
+        LIMIT ${limit}
+        OFFSET ${offset}
+    `;
+
+    // Convert BigInt to number for JSON serialization
+    const formattedConversations = conversations.map(conv => ({
+        ...conv,
+        messageCount: Number(conv.messageCount),
+        unreadCount: Number(conv.unreadCount),
+    }));
+
+    const total = await prisma.sMSLog.groupBy({
+        by: ["conversationPhone"],
+        where: { conversationPhone: { not: null } },
+    });
+
+    return { conversations: formattedConversations, total: total.length };
+}
+
+// Get messages for a specific conversation (by phone number)
+export async function getConversationMessages(
+    phoneNumber: string,
+    options?: { limit?: number; offset?: number }
+) {
+    await requireAuth();
+
+    const { limit = 100, offset = 0 } = options || {};
+
+    // Normalize the phone number
+    const normalizedPhone = formatPhoneNumber(phoneNumber);
+
+    const messages = await prisma.sMSLog.findMany({
+        where: {
+            conversationPhone: normalizedPhone,
+        },
+        orderBy: { createdAt: "asc" },
+        take: limit,
+        skip: offset,
+        include: {
+            sentBy: { select: { id: true, name: true } },
+        },
+    });
+
+    const total = await prisma.sMSLog.count({
+        where: { conversationPhone: normalizedPhone },
+    });
+
+    return { messages, total };
+}
+
+// Send SMS within a conversation (for the chat UI)
+export async function sendConversationSMS(phoneNumber: string, message: string) {
+    const session = await requireAuth();
+
+    const normalizedPhone = formatPhoneNumber(phoneNumber);
+
+    try {
+        const twilioPhoneNumber = getTwilioPhoneNumber();
+        const twilioClient = getClient();
+        const formattedFrom = formatPhoneNumber(twilioPhoneNumber);
+
+        const result = await twilioClient.messages.create({
+            body: message,
+            from: formattedFrom,
+            to: normalizedPhone,
+        });
+
+        // Log with conversation phone
+        await prisma.sMSLog.create({
+            data: {
+                direction: "OUTBOUND",
+                from: formattedFrom,
+                to: normalizedPhone,
+                message: message,
+                status: result.status,
+                messageSid: result.sid,
+                segments: result.numSegments ? parseInt(result.numSegments) : 1,
+                sentById: session.user.id,
+                conversationPhone: normalizedPhone,
+            },
+        });
+
+        return {
+            success: true,
+            messageSid: result.sid,
+            status: result.status,
+        };
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        console.error("Failed to send SMS:", errorMessage);
+
+        return {
+            success: false,
+            error: errorMessage,
+        };
     }
 }

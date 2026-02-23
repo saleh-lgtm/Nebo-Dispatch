@@ -941,25 +941,38 @@ model Notification {
   @@index([entityType, entityId])
 }
 
+// SMS Message Direction
+enum SMSDirection {
+  INBOUND   // Received from customer
+  OUTBOUND  // Sent to customer
+}
+
 // SMS Log for tracking Twilio messages
 model SMSLog {
-  id          String   @id @default(cuid())
-  to          String   // Recipient phone number
-  message     String   @db.Text
-  status      String   // queued, sent, delivered, failed, etc.
-  messageSid  String?  // Twilio message SID
-  segments    Int      @default(1) // Number of SMS segments
-  error       String?  @db.Text // Error message if failed
+  id          String       @id @default(cuid())
+  direction   SMSDirection @default(OUTBOUND)
+  from        String?      // Sender phone number (for inbound, this is customer)
+  to          String       // Recipient phone number
+  message     String       @db.Text
+  status      String       // queued, sent, delivered, failed, received, etc.
+  messageSid  String?      // Twilio message SID
+  segments    Int          @default(1) // Number of SMS segments
+  error       String?      @db.Text // Error message if failed
 
-  // Optional: link to user who sent it
+  // Optional: link to user who sent it (for outbound)
   sentById    String?
-  sentBy      User?    @relation(fields: [sentById], references: [id])
+  sentBy      User?        @relation(fields: [sentById], references: [id])
+
+  // For threading conversations by phone number
+  conversationPhone String? // Normalized phone number for conversation grouping
 
   createdAt   DateTime @default(now())
 
   @@index([status, createdAt])
   @@index([to])
+  @@index([from])
   @@index([sentById])
+  @@index([conversationPhone, createdAt])
 }
 
 // ============================================
