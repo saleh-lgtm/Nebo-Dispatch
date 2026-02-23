@@ -1355,6 +1355,13 @@ export default function VehicleDetailClient({ vehicle }: Props) {
                     max-height: 90vh;
                     overflow-y: auto;
                     padding: 1.5rem;
+                    position: relative;
+                    z-index: 201;
+                }
+
+                .modal-content form {
+                    position: relative;
+                    z-index: 1;
                 }
 
                 .modal-header {
@@ -1377,6 +1384,10 @@ export default function VehicleDetailClient({ vehicle }: Props) {
                     margin-bottom: 1rem;
                 }
 
+                .form-grid .form-group {
+                    margin-bottom: 0;
+                }
+
                 .form-group {
                     display: flex;
                     flex-direction: column;
@@ -1393,12 +1404,28 @@ export default function VehicleDetailClient({ vehicle }: Props) {
                 .form-group input,
                 .form-group select,
                 .form-group textarea {
+                    width: 100%;
+                    box-sizing: border-box;
                     padding: 0.625rem 0.875rem;
                     background: var(--bg-secondary);
                     border: 1px solid var(--border);
                     border-radius: var(--radius-md);
                     color: var(--text-primary);
                     font-size: 0.875rem;
+                    -webkit-appearance: none;
+                    appearance: none;
+                }
+
+                .form-group input[type="date"] {
+                    cursor: pointer;
+                }
+
+                .form-group select {
+                    cursor: pointer;
+                    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+                    background-repeat: no-repeat;
+                    background-position: right 0.75rem center;
+                    padding-right: 2rem;
                 }
 
                 .form-group input:focus,
