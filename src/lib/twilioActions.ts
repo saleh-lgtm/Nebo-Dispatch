@@ -4,6 +4,7 @@ import twilio from "twilio";
 import prisma from "@/lib/prisma";
 import { requireAuth, requireAdmin } from "./auth-helpers";
 import { createAuditLog } from "./auditActions";
+import { rateLimitedSend } from "./smsRateLimiter";
 
 // Initialize Twilio client lazily to catch initialization errors
 let client: ReturnType<typeof twilio> | null = null;
@@ -110,12 +111,16 @@ export async function sendSMS(to: string, message: string) {
         const twilioPhoneNumber = getTwilioPhoneNumber();
         const twilioClient = getClient();
         const formattedFrom = formatPhoneNumber(twilioPhoneNumber);
-        const result = await twilioClient.messages.create({
-            body: message,
-            from: formattedFrom,
-            to: formattedPhone,
-            ...(statusCallbackUrl && { statusCallback: statusCallbackUrl }),
-        });
+
+        // Use rate limiter with retry logic
+        const result = await rateLimitedSend(() =>
+            twilioClient.messages.create({
+                body: message,
+                from: formattedFrom,
+                to: formattedPhone,
+                ...(statusCallbackUrl && { statusCallback: statusCallbackUrl }),
+            })
+        );
 
         // Log the SMS
         await logSMS({
@@ -511,12 +516,15 @@ export async function sendConversationSMS(phoneNumber: string, message: string) 
         const twilioClient = getClient();
         const formattedFrom = formatPhoneNumber(twilioPhoneNumber);
 
-        const result = await twilioClient.messages.create({
-            body: message,
-            from: formattedFrom,
-            to: normalizedPhone,
-            ...(statusCallbackUrl && { statusCallback: statusCallbackUrl }),
-        });
+        // Use rate limiter with retry logic
+        const result = await rateLimitedSend(() =>
+            twilioClient.messages.create({
+                body: message,
+                from: formattedFrom,
+                to: normalizedPhone,
+                ...(statusCallbackUrl && { statusCallback: statusCallbackUrl }),
+            })
+        );
 
         // Log with conversation phone
         await prisma.sMSLog.create({

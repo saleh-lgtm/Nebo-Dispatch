@@ -8,6 +8,8 @@ import {
     Loader2,
     MessageCircle,
     Plus,
+    Wifi,
+    WifiOff,
 } from "lucide-react";
 import {
     getConversations,
@@ -16,6 +18,7 @@ import {
 } from "@/lib/twilioActions";
 import ConversationList from "@/components/sms/ConversationList";
 import ChatView from "@/components/sms/ChatView";
+import { useRealtimeSMS } from "@/hooks/useRealtimeSMS";
 
 interface SMSLog {
     id: string;
@@ -45,6 +48,65 @@ export default function SMSConversationsClient() {
     const [isSendingChat, setIsSendingChat] = useState(false);
     const [showNewConversation, setShowNewConversation] = useState(false);
     const [newPhoneNumber, setNewPhoneNumber] = useState("");
+    const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
+
+    // Real-time SMS updates
+    useRealtimeSMS({
+        conversationPhone: selectedPhone || undefined,
+        enabled: true,
+        onNewMessage: useCallback((message) => {
+            // Add new message to conversation
+            setConversationMessages((prev) => {
+                // Avoid duplicates
+                if (prev.some((m) => m.id === message.id)) return prev;
+                return [...prev, {
+                    id: message.id,
+                    direction: message.direction,
+                    from: message.from,
+                    to: message.to,
+                    message: message.message,
+                    status: message.status,
+                    createdAt: new Date(message.createdAt),
+                    sentBy: null,
+                }];
+            });
+
+            // Update conversation list
+            setConversations((prev) => {
+                const existing = prev.find(
+                    (c) => c.conversationPhone === message.conversationPhone
+                );
+                if (existing) {
+                    return prev.map((c) =>
+                        c.conversationPhone === message.conversationPhone
+                            ? {
+                                ...c,
+                                lastMessage: message.message,
+                                lastMessageAt: new Date(message.createdAt),
+                                messageCount: c.messageCount + 1,
+                                unreadCount: message.direction === "INBOUND" ? c.unreadCount + 1 : c.unreadCount,
+                            }
+                            : c
+                    ).sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime());
+                }
+                // New conversation - refresh the list
+                loadConversations();
+                return prev;
+            });
+
+            setIsRealtimeConnected(true);
+        }, []),
+        onStatusUpdate: useCallback((messageSid, newStatus) => {
+            // Update message status in real-time
+            setConversationMessages((prev) =>
+                prev.map((m) =>
+                    m.id === messageSid || (m as unknown as { messageSid?: string }).messageSid === messageSid
+                        ? { ...m, status: newStatus }
+                        : m
+                )
+            );
+        }, []),
+    });
 
     const loadConversations = useCallback(async () => {
         setIsLoadingConversations(true);
@@ -82,14 +144,15 @@ export default function SMSConversationsClient() {
         }
     }, [selectedPhone, loadConversationMessages]);
 
-    // Auto-refresh conversations every 10 seconds
+    // Fallback polling - less frequent since we have real-time updates
+    // Only polls every 30 seconds as a backup
     useEffect(() => {
         const interval = setInterval(() => {
             loadConversations();
             if (selectedPhone) {
                 loadConversationMessages(selectedPhone);
             }
-        }, 10000);
+        }, 30000); // 30 seconds instead of 10
         return () => clearInterval(interval);
     }, [selectedPhone, loadConversations, loadConversationMessages]);
 
@@ -151,6 +214,9 @@ export default function SMSConversationsClient() {
                     </div>
                 </div>
                 <div className="header-actions">
+                    <div className={`realtime-status ${isRealtimeConnected ? "connected" : ""}`} title={isRealtimeConnected ? "Real-time updates active" : "Connecting..."}>
+                        {isRealtimeConnected ? <Wifi size={14} /> : <WifiOff size={14} />}
+                    </div>
                     <button
                         onClick={() => setShowNewConversation(true)}
                         className="btn-new-conversation"
@@ -298,6 +364,23 @@ export default function SMSConversationsClient() {
                     display: flex;
                     align-items: center;
                     gap: 0.75rem;
+                }
+
+                .realtime-status {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 28px;
+                    height: 28px;
+                    border-radius: 50%;
+                    background: var(--bg-secondary);
+                    color: var(--text-muted);
+                    transition: all 0.3s;
+                }
+
+                .realtime-status.connected {
+                    background: #10b98120;
+                    color: #10b981;
                 }
 
                 .btn-new-conversation {

@@ -355,6 +355,9 @@ model Affiliate {
   // File attachments
   attachments   AffiliateAttachment[]
 
+  // SMS contacts linked to this affiliate
+  smsContacts   SMSContact[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -496,6 +499,9 @@ model Quote {
 
   // Quote action history
   actions       QuoteAction[]
+
+  // SMS contacts linked to this quote's client
+  smsContacts   SMSContact[]
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -947,6 +953,32 @@ enum SMSDirection {
   OUTBOUND  // Sent to customer
 }
 
+// SMS Contact - Links phone numbers to entities (Affiliates, Quotes, etc.)
+model SMSContact {
+  id          String   @id @default(cuid())
+  phoneNumber String   @unique // E.164 format phone number
+  name        String?  // Display name for the contact
+
+  // Entity linking - only one should be set
+  affiliateId String?
+  affiliate   Affiliate? @relation(fields: [affiliateId], references: [id])
+  quoteId     String?
+  quote       Quote?     @relation(fields: [quoteId], references: [id])
+
+  // Custom contacts (not linked to any entity)
+  customLabel String?  // e.g., "VIP Customer", "Vendor", etc.
+  notes       String?  @db.Text
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // SMS messages linked to this contact
+  messages    SMSLog[]
+
+  @@index([affiliateId])
+  @@index([quoteId])
+}
+
 // SMS Log for tracking Twilio messages
 model SMSLog {
   id          String       @id @default(cuid())
@@ -966,6 +998,10 @@ model SMSLog {
   // For threading conversations by phone number
   conversationPhone String? // Normalized phone number for conversation grouping
 
+  // Link to contact (auto-resolved from phone number)
+  contactId   String?
+  contact     SMSContact?  @relation(fields: [contactId], references: [id])
+
   createdAt   DateTime @default(now())
 
   @@index([status, createdAt])
@@ -973,6 +1009,7 @@ model SMSLog {
   @@index([from])
   @@index([sentById])
   @@index([conversationPhone, createdAt])
+  @@index([contactId])
 }
 
 // SMS Opt-Out tracking for compliance
