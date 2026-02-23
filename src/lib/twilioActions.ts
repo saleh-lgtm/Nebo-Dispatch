@@ -21,7 +21,14 @@ function getClient() {
     return client;
 }
 
-const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
+// Read at runtime, not module load time
+function getTwilioPhoneNumber(): string {
+    const phoneNumber = process.env.TWILIO_PHONE_NUMBER;
+    if (!phoneNumber) {
+        throw new Error("TWILIO_PHONE_NUMBER environment variable is not set");
+    }
+    return phoneNumber;
+}
 
 // Message templates (internal use only, not exported to avoid "use server" issues)
 const SMS_TEMPLATES = {
@@ -51,16 +58,13 @@ const SMS_TEMPLATES = {
 export async function sendSMS(to: string, message: string) {
     const session = await requireAuth();
 
-    if (!TWILIO_PHONE_NUMBER) {
-        throw new Error("Twilio phone number not configured");
-    }
-
     // Format phone number (ensure it starts with +1 for US)
     const formattedPhone = formatPhoneNumber(to);
 
     try {
+        const twilioPhoneNumber = getTwilioPhoneNumber();
         const twilioClient = getClient();
-        const formattedFrom = formatPhoneNumber(TWILIO_PHONE_NUMBER);
+        const formattedFrom = formatPhoneNumber(twilioPhoneNumber);
         const result = await twilioClient.messages.create({
             body: message,
             from: formattedFrom,
