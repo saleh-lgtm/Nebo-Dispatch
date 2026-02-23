@@ -1,0 +1,267 @@
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 1rem;
+}
+
+.modal {
+    width: 100%;
+    max-width: 800px;
+    max-height: 90vh;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: modalIn 0.2s ease;
+}
+
+@keyframes modalIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.headerTitle {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--primary);
+}
+
+.headerTitle h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.headerActions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btnPrimary {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 1rem;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.btnPrimary:hover {
+    background: var(--primary-hover);
+}
+
+.closeBtn {
+    padding: 0.5rem;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: var(--radius-md);
+    transition: all 0.15s;
+}
+
+.closeBtn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.tabs {
+    padding: 1rem 1.5rem 0;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.tab {
+    padding: 0.5rem 1rem;
+    border-radius: 9999px;
+    border: none;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.tab:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.tab.active {
+    background: var(--primary);
+    color: white;
+}
+
+.content {
+    flex: 1;
+    overflow: auto;
+    padding: 1rem 1.5rem 1.5rem;
+}
+
+.emptyState {
+    text-align: center;
+    padding: 3rem 0;
+    color: var(--text-muted);
+}
+
+.emptyState svg {
+    opacity: 0.2;
+    margin-bottom: 1rem;
+}
+
+.emptyState p {
+    font-size: 1rem;
+    margin-bottom: 0.25rem;
+    color: var(--text-secondary);
+}
+
+.emptyState span {
+    font-size: 0.875rem;
+}
+
+.quotesList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.quoteCard {
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.quoteCard:hover {
+    border-color: var(--primary);
+    transform: translateX(4px);
+}
+
+.quoteCard.flagged {
+    background: rgba(239, 68, 68, 0.05);
+    border-color: rgba(239, 68, 68, 0.2);
+}
+
+.quoteCard.overdue {
+    border-left: 3px solid var(--danger);
+}
+
+.quoteHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+}
+
+.quoteTitle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.flagIcon {
+    color: var(--danger);
+}
+
+.quoteTitle h4 {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.statusBadge {
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.expiryBadge {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    background: var(--warning-bg);
+    color: var(--warning);
+    border-radius: 9999px;
+    font-size: 0.65rem;
+    font-weight: 600;
+}
+
+.expiryBadge.expired {
+    background: var(--danger-bg);
+    color: var(--danger);
+}
+
+.quoteMetaRight {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.25rem;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.quoteMetaRight span {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.quoteSubtitle {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+}
+
+.quoteDetails {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.quoteDetails span {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.overdueText {
+    color: var(--danger) !important;
+}
+
+.quoteFooter {
+    margin-top: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}

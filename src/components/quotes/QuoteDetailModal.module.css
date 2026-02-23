@@ -1,0 +1,500 @@
+.loadingOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 120;
+    color: var(--text-secondary);
+}
+
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 120;
+    padding: 1rem;
+}
+
+.modal {
+    width: 100%;
+    max-width: 700px;
+    max-height: 90vh;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: modalIn 0.2s ease;
+}
+
+@keyframes modalIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+}
+
+.headerLeft {
+    flex: 1;
+}
+
+.headerTitle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.flag {
+    color: var(--danger);
+}
+
+.headerTitle h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.headerSubtitle {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.closeBtn {
+    padding: 0.5rem;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: var(--radius-md);
+}
+
+.statsRow {
+    padding: 0.75rem 1.5rem;
+    background: var(--bg-secondary);
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    flex-wrap: wrap;
+}
+
+.statsRow span {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.urgent {
+    color: var(--danger);
+}
+
+.tabs {
+    padding: 0.75rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 0.5rem;
+}
+
+.tabs button {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-md);
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.tabs button:hover {
+    background: var(--bg-hover);
+}
+
+.tabs button.active {
+    background: var(--primary-soft);
+    color: var(--primary);
+}
+
+.content {
+    flex: 1;
+    overflow: auto;
+    padding: 1.25rem 1.5rem;
+}
+
+.actionsTab {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.actionInput {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+}
+
+.actionInput textarea {
+    width: 100%;
+    height: 70px;
+    padding: 0.75rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.9rem;
+    resize: none;
+    margin-bottom: 0.75rem;
+}
+
+.actionInput textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.actionBtns {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.actionBtns button {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.actionBtns button:hover:not(:disabled) {
+    background: var(--bg-hover);
+    border-color: var(--primary);
+}
+
+.actionBtns button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.outcomeBtns {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.outcomeBtns button {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.won {
+    background: var(--success-bg);
+    border: 1px solid var(--success-border);
+    color: var(--success);
+}
+
+.won:hover {
+    background: var(--success);
+    color: white;
+}
+
+.lost {
+    background: var(--danger-bg);
+    border: 1px solid var(--danger-border);
+    color: var(--danger);
+}
+
+.lost:hover {
+    background: var(--danger);
+    color: white;
+}
+
+.outcomeBox {
+    padding: 1rem;
+    border-radius: var(--radius-md);
+}
+
+.outcomeWon {
+    background: var(--success-bg);
+    border: 1px solid var(--success-border);
+}
+
+.outcomeLost {
+    background: var(--danger-bg);
+    border: 1px solid var(--danger-border);
+}
+
+.outcomeHeader {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.outcomeWon .outcomeHeader {
+    color: var(--success);
+}
+
+.outcomeLost .outcomeHeader {
+    color: var(--danger);
+}
+
+.outcomeDate {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
+.outcomeBox p {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.activitySection h4 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+}
+
+.activityList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.activityItem {
+    padding: 0.75rem 1rem;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    border-left: 3px solid var(--primary);
+}
+
+.activityHeader {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.25rem;
+}
+
+.activityType {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-weight: 500;
+    font-size: 0.875rem;
+}
+
+.activityTime {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.activityNotes {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+}
+
+.activityUser {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.noActivity {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+.detailsTab {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.detailSection h4 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+}
+
+.detailGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.detailItem {
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+}
+
+.label {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-bottom: 0.25rem;
+}
+
+.value {
+    font-size: 0.875rem;
+    color: var(--text-primary);
+}
+
+.notesText {
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    white-space: pre-wrap;
+}
+
+.metaSection {
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+}
+
+.metaRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+}
+
+.metaRow:first-child {
+    margin-bottom: 0.5rem;
+}
+
+.metaRow span:first-child {
+    color: var(--text-muted);
+}
+
+/* Outcome Modal */
+.outcomeOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 130;
+    padding: 1rem;
+}
+
+.outcomeModal {
+    width: 100%;
+    max-width: 400px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    animation: modalIn 0.2s ease;
+}
+
+.outcomeModal h3 {
+    font-size: 1.125rem;
+    margin-bottom: 1rem;
+}
+
+.formGroup {
+    margin-bottom: 1rem;
+}
+
+.formGroup label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    margin-bottom: 0.375rem;
+}
+
+.outcomeModal textarea {
+    width: 100%;
+    height: 80px;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-family: inherit;
+    resize: none;
+}
+
+.outcomeActions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.btnSuccess {
+    flex: 1;
+    padding: 0.75rem;
+    background: var(--success);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.btnDanger {
+    flex: 1;
+    padding: 0.75rem;
+    background: var(--danger);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.btnSecondary {
+    padding: 0.75rem 1rem;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+}
