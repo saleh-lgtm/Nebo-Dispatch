@@ -152,6 +152,7 @@ export default function SuperAdminSidebar({ user }: Props) {
                     <NavSection title="Reports & Analytics" collapsed={collapsed}>
                         <NavItem href="/admin/reports" icon={<FileText size={18} />} label="Shift Reports" collapsed={collapsed} />
                         <NavItem href="/admin/analytics" icon={<BarChart3 size={18} />} label="Analytics" collapsed={collapsed} />
+                        <NavItem href="/accounting" icon={<Calculator size={18} />} label="Accounting" collapsed={collapsed} />
                     </NavSection>
 
                     <NavSection title="System" collapsed={collapsed}>
