@@ -5,11 +5,21 @@ import prisma from "@/lib/prisma";
 import { requireAuth, requireAdmin } from "./auth-helpers";
 import { createAuditLog } from "./auditActions";
 
-// Initialize Twilio client
-const client = twilio(
-    process.env.TWILIO_ACCOUNT_SID,
-    process.env.TWILIO_AUTH_TOKEN
-);
+// Initialize Twilio client lazily to catch initialization errors
+let client: ReturnType<typeof twilio> | null = null;
+
+function getClient() {
+    if (!client) {
+        if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+            throw new Error("Twilio credentials not configured. Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN.");
+        }
+        client = twilio(
+            process.env.TWILIO_ACCOUNT_SID,
+            process.env.TWILIO_AUTH_TOKEN
+        );
+    }
+    return client;
+}
 
 const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
 
@@ -49,7 +59,8 @@ export async function sendSMS(to: string, message: string) {
     const formattedPhone = formatPhoneNumber(to);
 
     try {
-        const result = await client.messages.create({
+        const twilioClient = getClient();
+        const result = await twilioClient.messages.create({
             body: message,
             from: TWILIO_PHONE_NUMBER,
             to: formattedPhone,
@@ -182,8 +193,17 @@ export async function sendCancellation(
 
 // Send custom SMS (admin only)
 export async function sendCustomSMS(phone: string, message: string) {
-    await requireAdmin();
-    return sendSMS(phone, message);
+    try {
+        await requireAdmin();
+        return await sendSMS(phone, message);
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        console.error("sendCustomSMS error:", error);
+        return {
+            success: false,
+            error: errorMessage,
+        };
+    }
 }
 
 // Get SMS history
