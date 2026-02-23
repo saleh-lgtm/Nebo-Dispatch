@@ -6,7 +6,18 @@ import { getDispatcherSchedule } from "@/lib/actions";
 import { getUserRequests, getUpcomingShifts, getPastShifts } from "@/lib/requestActions";
 import { getMyTimeOffRequests, getPendingTimeOffRequests } from "@/lib/timeOffActions";
 import { getMySwapRequests, getPendingSwapRequests } from "@/lib/shiftSwapActions";
-import ScheduleClient from "./ScheduleClient";
+import dynamic from "next/dynamic";
+
+const ScheduleClient = dynamic(() => import("./ScheduleClient"), {
+    loading: () => (
+        <div className="page-container">
+            <div className="page-header">
+                <h1 className="page-title">My Schedule</h1>
+            </div>
+            <div className="skeleton-card" style={{ height: "500px" }} />
+        </div>
+    ),
+});
 
 export default async function SchedulePage() {
     const session = await getServerSession(authOptions);

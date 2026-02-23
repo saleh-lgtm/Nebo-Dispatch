@@ -10,6 +10,7 @@ export default defineConfig({
     seed: "node ./prisma/seed.js",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // Use direct connection for migrations (faster, no pooler timeout)
+    url: process.env["DIRECT_URL"] || process.env["DATABASE_URL"],
   } as any,
 });

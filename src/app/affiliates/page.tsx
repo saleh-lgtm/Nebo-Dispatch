@@ -2,7 +2,18 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getAffiliatesWithStatus, getPendingAffiliatesCounts } from "@/lib/affiliateActions";
-import AffiliateClient from "./AffiliateClient";
+import dynamic from "next/dynamic";
+
+const AffiliateClient = dynamic(() => import("./AffiliateClient"), {
+    loading: () => (
+        <div className="page-container">
+            <div className="page-header">
+                <h1 className="page-title">Affiliates</h1>
+            </div>
+            <div className="skeleton-card" style={{ height: "400px" }} />
+        </div>
+    ),
+});
 
 export default async function AffiliatesPage() {
     const session = await getServerSession(authOptions);

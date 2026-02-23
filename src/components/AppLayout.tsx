@@ -1,8 +1,52 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import Navbar from "./Navbar";
-import SuperAdminSidebar from "./SuperAdminSidebar";
+import dynamic from "next/dynamic";
+
+// Dynamic imports for heavy layout components - improves initial load
+const Navbar = dynamic(() => import("./Navbar"), {
+    loading: () => <NavbarSkeleton />,
+    ssr: false,
+});
+
+const SuperAdminSidebar = dynamic(() => import("./SuperAdminSidebar"), {
+    loading: () => <SidebarSkeleton />,
+    ssr: false,
+});
+
+function NavbarSkeleton() {
+    return (
+        <nav className="navbar-skeleton">
+            <div className="skeleton" style={{ width: "32px", height: "32px", borderRadius: "8px" }} />
+            <div style={{ display: "flex", gap: "0.5rem", marginLeft: "auto" }}>
+                {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="skeleton" style={{ width: "70px", height: "32px", borderRadius: "6px" }} />
+                ))}
+            </div>
+        </nav>
+    );
+}
+
+function SidebarSkeleton() {
+    return (
+        <aside className="sidebar-skeleton">
+            <div className="skeleton" style={{ width: "100%", height: "60px" }} />
+            <div style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <div key={i} className="skeleton" style={{ width: "100%", height: "36px", borderRadius: "6px" }} />
+                ))}
+            </div>
+        </aside>
+    );
+}
+
+function LoadingSpinner() {
+    return (
+        <div className="app-loading">
+            <div className="spinner" />
+        </div>
+    );
+}
 
 interface Props {
     children: React.ReactNode;
@@ -11,22 +55,12 @@ interface Props {
 export default function AppLayout({ children }: Props) {
     const { data: session, status } = useSession();
 
-    // Show nothing while loading
+    // Show loading spinner while checking auth
     if (status === "loading") {
-        return (
-            <div style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                minHeight: "100vh",
-                background: "var(--bg-primary)"
-            }}>
-                <div className="loading-spinner" />
-            </div>
-        );
+        return <LoadingSpinner />;
     }
 
-    // Not logged in - show regular navbar (handles redirect)
+    // Not logged in - show minimal layout
     if (!session) {
         return (
             <>
@@ -53,38 +87,6 @@ export default function AppLayout({ children }: Props) {
                         &copy; {new Date().getFullYear()} Nebo Rides. All rights reserved.
                     </footer>
                 </div>
-
-                <style jsx>{`
-                    .sa-main-wrapper {
-                        margin-left: 260px;
-                        min-height: 100vh;
-                        display: flex;
-                        flex-direction: column;
-                        transition: margin-left 0.2s ease;
-                    }
-
-                    .sa-main-content {
-                        flex: 1;
-                        padding: 2rem;
-                        max-width: 1400px;
-                        width: 100%;
-                        margin: 0 auto;
-                    }
-
-                    .sa-footer {
-                        padding: 1.5rem 2rem;
-                        text-align: center;
-                        color: var(--text-secondary);
-                        font-size: 0.8125rem;
-                        border-top: 1px solid var(--border);
-                    }
-
-                    @media (max-width: 1024px) {
-                        .sa-main-wrapper {
-                            margin-left: 70px;
-                        }
-                    }
-                `}</style>
             </>
         );
     }
