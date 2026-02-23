@@ -60,9 +60,10 @@ export async function sendSMS(to: string, message: string) {
 
     try {
         const twilioClient = getClient();
+        const formattedFrom = formatPhoneNumber(TWILIO_PHONE_NUMBER);
         const result = await twilioClient.messages.create({
             body: message,
-            from: TWILIO_PHONE_NUMBER,
+            from: formattedFrom,
             to: formattedPhone,
         });
 
