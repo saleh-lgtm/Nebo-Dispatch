@@ -214,7 +214,16 @@ export default function Navbar() {
             <nav className="navbar" role="navigation" aria-label="Main navigation">
                 <div className="navbar-inner">
                     <Link href="/dashboard" className="navbar-brand" aria-label="Nebo Rides Dashboard">
-                        <Image src="/logo.png" alt="" className="brand-logo" width={32} height={32} aria-hidden="true" priority />
+                        <Image
+                            src="/logo.png"
+                            alt=""
+                            className="brand-logo"
+                            width={112}
+                            height={32}
+                            sizes="112px"
+                            aria-hidden="true"
+                            priority
+                        />
                     </Link>
 
                     {/* Desktop Navigation */}
