@@ -41,7 +41,8 @@ export type AuditEntity =
     | "SOP"
     | "AccountingFlag"
     | "AffiliatePricing"
-    | "SMS";
+    | "SMS"
+    | "RetailLead";
 
 /**
  * Create an audit log entry

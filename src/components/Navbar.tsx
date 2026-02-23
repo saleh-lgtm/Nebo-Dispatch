@@ -32,6 +32,7 @@ import {
     MessageSquare,
 } from "lucide-react";
 import NotificationBell from "./NotificationBell";
+import ClockButton from "./ClockButton";
 
 interface NavLinkProps {
     href: string;
@@ -172,7 +173,10 @@ export default function Navbar() {
                             <>
                                 <NavLink href="/schedule" icon={<Calendar size={18} />} label="Schedule" />
                                 {isDispatcher && (
-                                    <NavLink href="/reports/shift" icon={<ClipboardList size={18} />} label="Shift Report" />
+                                    <>
+                                        <ClockButton />
+                                        <NavLink href="/reports/shift" icon={<ClipboardList size={18} />} label="Shift Report" />
+                                    </>
                                 )}
                             </>
                         )}

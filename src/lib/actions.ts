@@ -42,14 +42,23 @@ interface FlaggedReservation {
     flagReason?: string;
 }
 
+interface RetailLeadInput {
+    serviceRequested: string;
+    outcome: "WON" | "NEEDS_FOLLOW_UP" | "LOST";
+    lostReason?: "VEHICLE_TYPE" | "AVAILABILITY" | "PRICING" | "OTHER";
+    lostReasonOther?: string;
+    notes?: string;
+}
+
 export async function saveShiftReport(data: Record<string, unknown> & {
     shiftId: string;
     userId: string;
     clockOut?: boolean;
     flaggedReservations?: FlaggedReservation[];
+    retailLeads?: RetailLeadInput[];
 }) {
     const session = await requireAuth();
-    const { shiftId, userId, clockOut, flaggedReservations, ...reportData } = data;
+    const { shiftId, userId, clockOut, flaggedReservations, retailLeads, ...reportData } = data;
 
     // Ensure user can only save their own report
     if (session.user.id !== userId) {
@@ -100,6 +109,28 @@ export async function saveShiftReport(data: Record<string, unknown> & {
             "AccountingFlag",
             report.id,
             { flagCount: flaggedReservations.length }
+        );
+    }
+
+    // Create retail leads
+    if (retailLeads && retailLeads.length > 0) {
+        await prisma.retailLead.createMany({
+            data: retailLeads.map((lead) => ({
+                shiftReportId: report.id,
+                serviceRequested: lead.serviceRequested,
+                outcome: lead.outcome,
+                lostReason: lead.lostReason || null,
+                lostReasonOther: lead.lostReasonOther || null,
+                notes: lead.notes || null,
+            })),
+        });
+
+        await createAuditLog(
+            session.user.id,
+            "CREATE",
+            "RetailLead",
+            report.id,
+            { leadCount: retailLeads.length }
         );
     }
 
