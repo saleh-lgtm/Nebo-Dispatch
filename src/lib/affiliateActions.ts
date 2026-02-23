@@ -4,6 +4,8 @@ import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireAdmin, requireAuth } from "./auth-helpers";
 import { createAuditLog } from "./auditActions";
+import { deleteFile } from "./storageActions";
+import { STORAGE_BUCKETS } from "./supabase";
 
 // Get all affiliates with optional filter
 export async function getAffiliatesWithStatus(
@@ -34,6 +36,12 @@ export async function getAffiliatesWithStatus(
             submittedBy: { select: { id: true, name: true, email: true } },
             pricingGrid: {
                 orderBy: { serviceType: "asc" },
+            },
+            attachments: {
+                include: {
+                    uploadedBy: { select: { id: true, name: true } },
+                },
+                orderBy: { createdAt: "desc" },
             },
         },
     });
@@ -164,4 +172,117 @@ export async function deleteAffiliate(id: string) {
     );
 
     revalidatePath("/affiliates");
+}
+
+// ============================================
+// AFFILIATE ATTACHMENTS
+// ============================================
+
+export interface CreateAttachmentData {
+    affiliateId: string;
+    title: string;
+    description?: string;
+    documentType?: string;
+    fileUrl: string;
+    fileName: string;
+    fileSize?: number;
+    mimeType?: string;
+}
+
+// Get attachments for an affiliate
+export async function getAffiliateAttachments(affiliateId: string) {
+    await requireAuth();
+
+    return await prisma.affiliateAttachment.findMany({
+        where: { affiliateId },
+        include: {
+            uploadedBy: {
+                select: { id: true, name: true },
+            },
+        },
+        orderBy: { createdAt: "desc" },
+    });
+}
+
+// Upload a new attachment
+export async function uploadAffiliateAttachment(data: CreateAttachmentData) {
+    const session = await requireAdmin();
+
+    const attachment = await prisma.affiliateAttachment.create({
+        data: {
+            affiliateId: data.affiliateId,
+            title: data.title,
+            description: data.description,
+            documentType: data.documentType,
+            fileUrl: data.fileUrl,
+            fileName: data.fileName,
+            fileSize: data.fileSize,
+            mimeType: data.mimeType,
+            uploadedById: session.user.id,
+        },
+    });
+
+    await createAuditLog(
+        session.user.id,
+        "CREATE",
+        "AffiliateAttachment",
+        attachment.id,
+        { affiliateId: data.affiliateId, title: data.title, fileName: data.fileName }
+    );
+
+    revalidatePath("/affiliates");
+    return attachment;
+}
+
+// Delete an attachment
+export async function deleteAffiliateAttachment(id: string) {
+    const session = await requireAdmin();
+
+    const attachment = await prisma.affiliateAttachment.findUnique({
+        where: { id },
+    });
+
+    if (!attachment) {
+        throw new Error("Attachment not found");
+    }
+
+    // Delete file from storage
+    try {
+        await deleteFile(STORAGE_BUCKETS.AFFILIATE_ATTACHMENTS, attachment.fileUrl);
+    } catch (error) {
+        console.error("Failed to delete attachment file:", error);
+    }
+
+    await prisma.affiliateAttachment.delete({
+        where: { id },
+    });
+
+    await createAuditLog(
+        session.user.id,
+        "DELETE",
+        "AffiliateAttachment",
+        id,
+        { affiliateId: attachment.affiliateId, title: attachment.title }
+    );
+
+    revalidatePath("/affiliates");
+}
+
+// Get affiliate with attachments
+export async function getAffiliateWithAttachments(id: string) {
+    await requireAuth();
+
+    return await prisma.affiliate.findUnique({
+        where: { id },
+        include: {
+            submittedBy: { select: { id: true, name: true, email: true } },
+            pricingGrid: { orderBy: { serviceType: "asc" } },
+            attachments: {
+                include: {
+                    uploadedBy: { select: { id: true, name: true } },
+                },
+                orderBy: { createdAt: "desc" },
+            },
+        },
+    });
 }

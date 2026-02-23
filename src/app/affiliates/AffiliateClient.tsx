@@ -21,12 +21,14 @@ import {
     Building2,
     ArrowDownLeft,
     ArrowUpRight,
+    Paperclip,
 } from "lucide-react";
 import { submitAffiliate } from "@/lib/actions";
 import { approveAffiliate, rejectAffiliate, deleteAffiliate, updateAffiliate } from "@/lib/affiliateActions";
 import { useToast } from "@/hooks/useToast";
 import Modal from "@/components/ui/Modal";
 import AffiliatePricingGrid from "@/components/AffiliatePricingGrid";
+import AffiliateAttachments from "@/components/affiliates/AffiliateAttachments";
 
 type AffiliateType = "FARM_IN" | "FARM_OUT";
 
@@ -35,6 +37,18 @@ interface PricingEntry {
     serviceType: string;
     flatRate: number;
     notes: string | null;
+}
+
+interface AttachmentEntry {
+    id: string;
+    title: string;
+    description: string | null;
+    documentType: string | null;
+    fileUrl: string;
+    fileName: string;
+    fileSize: number | null;
+    createdAt: Date;
+    uploadedBy: { id: string; name: string | null };
 }
 
 interface Affiliate {
@@ -51,6 +65,7 @@ interface Affiliate {
     createdAt: Date;
     submittedBy: { id: string; name: string | null; email: string | null };
     pricingGrid?: PricingEntry[];
+    attachments?: AttachmentEntry[];
 }
 
 interface Props {
@@ -89,6 +104,7 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
 
     const [editModal, setEditModal] = useState<{ open: boolean; affiliate: Affiliate | null }>({ open: false, affiliate: null });
     const [pricingModal, setPricingModal] = useState<{ open: boolean; affiliate: Affiliate | null }>({ open: false, affiliate: null });
+    const [attachmentsModal, setAttachmentsModal] = useState<{ open: boolean; affiliate: Affiliate | null }>({ open: false, affiliate: null });
     const [editData, setEditData] = useState({
         name: "",
         email: "",
@@ -409,6 +425,15 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
                                                         <DollarSign size={16} /> Pricing Grid
                                                     </button>
                                                 )}
+                                                <button
+                                                    onClick={() => {
+                                                        setAttachmentsModal({ open: true, affiliate });
+                                                        setActionDropdown(null);
+                                                    }}
+                                                    style={{ display: "flex", alignItems: "center", gap: "0.5rem", width: "100%", padding: "0.75rem 1rem", background: "none", border: "none", cursor: "pointer", color: "var(--text-primary)", textAlign: "left" }}
+                                                >
+                                                    <Paperclip size={16} /> Attachments
+                                                </button>
                                                 {!affiliate.isApproved && (
                                                     <>
                                                         <button
@@ -812,6 +837,23 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
                         pricing={pricingModal.affiliate.pricingGrid || []}
                         isAdmin={isAdmin}
                         onClose={() => setPricingModal({ open: false, affiliate: null })}
+                    />
+                )}
+            </Modal>
+
+            {/* Attachments Modal */}
+            <Modal
+                isOpen={attachmentsModal.open}
+                onClose={() => setAttachmentsModal({ open: false, affiliate: null })}
+                title="Affiliate Attachments"
+                size="lg"
+            >
+                {attachmentsModal.affiliate && (
+                    <AffiliateAttachments
+                        affiliateId={attachmentsModal.affiliate.id}
+                        affiliateName={attachmentsModal.affiliate.name}
+                        attachments={attachmentsModal.affiliate.attachments || []}
+                        isAdmin={isAdmin}
                     />
                 )}
             </Modal>

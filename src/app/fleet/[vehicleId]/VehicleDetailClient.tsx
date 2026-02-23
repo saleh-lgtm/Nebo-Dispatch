@@ -33,7 +33,7 @@ import {
 } from "@/lib/fleetActions";
 import { uploadFileFromFormData } from "@/lib/storageActions";
 import { STORAGE_BUCKETS } from "@/lib/supabase";
-import { useToast } from "@/components/ui/ToastProvider";
+import { useToast } from "@/hooks/useToast";
 import ExpirationBadge from "@/components/fleet/ExpirationBadge";
 import FileUpload from "@/components/ui/FileUpload";
 

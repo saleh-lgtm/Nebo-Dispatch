@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { VehicleType, VehicleStatus } from "@prisma/client";
 import { createVehicle, updateVehicle, deleteVehicle, updateVehicleStatus } from "@/lib/fleetActions";
-import { useToast } from "@/components/ui/ToastProvider";
+import { useToast } from "@/hooks/useToast";
 import ExpirationBadge, { getExpirationStatus } from "@/components/fleet/ExpirationBadge";
 
 interface VehicleWithDocs {
