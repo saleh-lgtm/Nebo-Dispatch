@@ -3,7 +3,27 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getPerformanceMetrics, getDispatcherComparison, getDailyTrend } from "@/lib/analyticsActions";
 import { getDispatcherHours } from "@/lib/hoursActions";
-import AnalyticsClient from "./AnalyticsClient";
+import dynamic from "next/dynamic";
+
+const AnalyticsClient = dynamic(() => import("./AnalyticsClient"), {
+    loading: () => <AnalyticsLoading />,
+});
+
+function AnalyticsLoading() {
+    return (
+        <div className="page-container">
+            <div className="page-header">
+                <h1 className="page-title">Analytics Dashboard</h1>
+            </div>
+            <div className="skeleton-grid">
+                <div className="skeleton-card" style={{ height: "120px" }} />
+                <div className="skeleton-card" style={{ height: "120px" }} />
+                <div className="skeleton-card" style={{ height: "120px" }} />
+                <div className="skeleton-card" style={{ height: "120px" }} />
+            </div>
+        </div>
+    );
+}
 
 export default async function AnalyticsPage() {
     const session = await getServerSession(authOptions);

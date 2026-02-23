@@ -3,7 +3,22 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getAuditLogs, getAuditStats } from "@/lib/auditActions";
 import { getAllUsers } from "@/lib/userManagementActions";
-import AuditClient from "./AuditClient";
+import dynamic from "next/dynamic";
+
+const AuditClient = dynamic(() => import("./AuditClient"), {
+    loading: () => <AuditLoading />,
+});
+
+function AuditLoading() {
+    return (
+        <div className="page-container">
+            <div className="page-header">
+                <h1 className="page-title">Audit Logs</h1>
+            </div>
+            <div className="skeleton-card" style={{ height: "400px" }} />
+        </div>
+    );
+}
 
 export default async function AdminAuditPage() {
     const session = await getServerSession(authOptions);

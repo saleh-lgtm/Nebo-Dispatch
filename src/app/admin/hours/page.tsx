@@ -3,7 +3,16 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getDispatcherHours, getActiveShifts, getTeamTotals } from "@/lib/hoursActions";
-import HoursClient from "./HoursClient";
+import dynamic from "next/dynamic";
+
+const HoursClient = dynamic(() => import("./HoursClient"), {
+    loading: () => (
+        <div className="page-container">
+            <div className="page-header"><h1 className="page-title">Hours Tracking</h1></div>
+            <div className="skeleton-card" style={{ height: "400px" }} />
+        </div>
+    ),
+});
 
 export default async function AdminHoursPage() {
     const session = await getServerSession(authOptions);

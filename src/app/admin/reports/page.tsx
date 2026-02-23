@@ -3,7 +3,16 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getAllShiftReports, getReportStats, getTeamPerformance } from "@/lib/shiftReportActions";
-import ReportsClient from "./ReportsClient";
+import dynamic from "next/dynamic";
+
+const ReportsClient = dynamic(() => import("./ReportsClient"), {
+    loading: () => (
+        <div className="page-container">
+            <div className="page-header"><h1 className="page-title">Shift Reports</h1></div>
+            <div className="skeleton-card" style={{ height: "400px" }} />
+        </div>
+    ),
+});
 
 export default async function AdminReportsPage() {
     const session = await getServerSession(authOptions);

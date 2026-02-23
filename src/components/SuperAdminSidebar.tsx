@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
@@ -23,6 +24,7 @@ import {
     ShieldCheck,
     Briefcase,
     FileEdit,
+    Calculator,
 } from "lucide-react";
 import NotificationBell from "./NotificationBell";
 
@@ -94,7 +96,7 @@ export default function SuperAdminSidebar({ user }: Props) {
                 {/* Header */}
                 <div className="sa-sidebar-header">
                     <Link href="/dashboard" className="sa-brand">
-                        <img src="/logo.png" alt="Nebo" className="sa-brand-logo" />
+                        <Image src="/logo.png" alt="Nebo" className="sa-brand-logo" width={32} height={32} priority />
                         {!collapsed && <span className="sa-brand-text">Nebo Admin</span>}
                     </Link>
                     <button
