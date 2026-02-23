@@ -10,7 +10,6 @@ import {
     StickyNote,
     User,
     Crown,
-    Users,
     ArrowRight,
     PlayCircle,
 } from "lucide-react";
@@ -273,44 +272,7 @@ export default function DashboardClient({
                     </div>
                 )}
 
-                {/* Online Users */}
-                {isAdmin && (
-                    <div className="stat-card">
-                        <div className="stat-content">
-                            <div className="stat-icon icon-success">
-                                <Users size={22} />
-                            </div>
-                            <div className="stat-text">
-                                <span className="stat-label">Online Now</span>
-                                <span className="stat-value">{onlineUsers.length} users</span>
-                            </div>
-                        </div>
-                        <div className="stat-footer">
-                            <PlayCircle size={14} />
-                            <span>{activeShiftUsers.length} on active shift</span>
-                        </div>
-                    </div>
-                )}
-
-                {/* Total Users */}
-                {isAdmin && (
-                    <div className="stat-card">
-                        <div className="stat-content">
-                            <div className="stat-icon icon-info">
-                                <Shield size={22} />
-                            </div>
-                            <div className="stat-text">
-                                <span className="stat-label">Team Members</span>
-                                <span className="stat-value">{initialStats.userCount} total</span>
-                            </div>
-                        </div>
-                        <div className="stat-footer">
-                            <span>Manage team access</span>
-                        </div>
-                    </div>
-                )}
-
-                {/* Pending Quotes */}
+                {/* Pending Quotes - priority for all */}
                 <div className="stat-card">
                     <div className="stat-content">
                         <div className="stat-icon icon-warning">
@@ -369,15 +331,34 @@ export default function DashboardClient({
                         </div>
                     </div>
                 )}
+
+                {/* Team Members - admin only */}
+                {isAdmin && (
+                    <div className="stat-card">
+                        <div className="stat-content">
+                            <div className="stat-icon icon-info">
+                                <Shield size={22} />
+                            </div>
+                            <div className="stat-text">
+                                <span className="stat-label">Team Members</span>
+                                <span className="stat-value">{initialStats.userCount} total</span>
+                            </div>
+                        </div>
+                        <div className="stat-footer">
+                            <PlayCircle size={14} />
+                            <span>{activeShiftUsers.length} on shift</span>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Main Content */}
             <div className="content-grid">
                 <div className="content-col">
-                    {/* My Tasks */}
+                    {/* My Tasks - Priority */}
                     {myTasks.length > 0 && <TasksPanel tasks={myTasks} />}
 
-                    {/* Global Notes */}
+                    {/* Global Notes - Important announcements */}
                     <div className="card notes-card">
                         <div className="card-header">
                             <StickyNote size={18} className="header-icon" />
@@ -409,11 +390,6 @@ export default function DashboardClient({
                     </div>
 
                     <QuotesPanel quotes={pendingQuotes} />
-                    <RecentReportsPanel
-                        reports={recentReports}
-                        isAdmin={isSuperAdmin}
-                        currentUserId={userId}
-                    />
                 </div>
 
                 <div className="content-col">
@@ -424,15 +400,24 @@ export default function DashboardClient({
                         <AdminTaskProgressPanel tasks={taskProgress} />
                     )}
 
-                    {isAdmin && (
-                        <ActiveUsersPanel
-                            initialOnlineUsers={onlineUsers}
-                            initialActiveShiftUsers={activeShiftUsers}
-                            currentUserId={userId}
-                        />
-                    )}
+                    <RecentReportsPanel
+                        reports={recentReports}
+                        isAdmin={isSuperAdmin}
+                        currentUserId={userId}
+                    />
                 </div>
             </div>
+
+            {/* Admin Only: Team Activity (Lower Priority) */}
+            {isAdmin && (
+                <div className="admin-section">
+                    <ActiveUsersPanel
+                        initialOnlineUsers={onlineUsers}
+                        initialActiveShiftUsers={activeShiftUsers}
+                        currentUserId={userId}
+                    />
+                </div>
+            )}
 
             <style jsx>{`
                 .dashboard {
@@ -719,6 +704,11 @@ export default function DashboardClient({
 
                 .empty-state p {
                     font-size: 0.875rem;
+                }
+
+                /* Admin Section - Lower Priority */
+                .admin-section {
+                    margin-top: 1.5rem;
                 }
 
                 /* Responsive */
