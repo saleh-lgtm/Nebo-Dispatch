@@ -42,7 +42,13 @@ export type AuditEntity =
     | "AccountingFlag"
     | "AffiliatePricing"
     | "SMS"
-    | "RetailLead";
+    | "RetailLead"
+    | "FleetVehicle"
+    | "VehiclePermit"
+    | "VehicleInsurance"
+    | "VehicleRegistration"
+    | "VehicleDocument"
+    | "AffiliateAttachment";
 
 /**
  * Create an audit log entry
