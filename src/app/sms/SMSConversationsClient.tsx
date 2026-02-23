@@ -54,7 +54,7 @@ export default function SMSConversationsClient() {
     useRealtimeSMS({
         conversationPhone: selectedPhone || undefined,
         enabled: true,
-        onNewMessage: useCallback((message) => {
+        onNewMessage: useCallback((message: { id: string; direction: "INBOUND" | "OUTBOUND"; from: string | null; to: string; message: string; status: string; createdAt: string; conversationPhone: string | null }) => {
             // Add new message to conversation
             setConversationMessages((prev) => {
                 // Avoid duplicates
@@ -96,7 +96,7 @@ export default function SMSConversationsClient() {
 
             setIsRealtimeConnected(true);
         }, []),
-        onStatusUpdate: useCallback((messageSid, newStatus) => {
+        onStatusUpdate: useCallback((messageSid: string, newStatus: string) => {
             // Update message status in real-time
             setConversationMessages((prev) =>
                 prev.map((m) =>

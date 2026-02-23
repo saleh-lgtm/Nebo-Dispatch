@@ -31,6 +31,7 @@ import {
     Calculator,
     MessageSquare,
     AlertCircle,
+    Activity,
 } from "lucide-react";
 import NotificationBell from "./NotificationBell";
 import ClockButton from "./ClockButton";
@@ -114,10 +115,10 @@ function NavDropdown({ label, icon, children, badge, activePrefix = "/admin" }: 
 
 function RoleBadge({ role }: { role: string }) {
     const config = {
-        SUPER_ADMIN: { label: "Super Admin", icon: <ShieldCheck size={12} />, className: "badge-super-admin" },
-        ADMIN: { label: "Admin", icon: <Shield size={12} />, className: "badge-admin" },
-        ACCOUNTING: { label: "Accounting", icon: <Calculator size={12} />, className: "badge-accounting" },
-        DISPATCHER: { label: "Dispatcher", icon: <Briefcase size={12} />, className: "badge-dispatcher" },
+        SUPER_ADMIN: { label: "SYS_ADMIN", icon: <ShieldCheck size={10} />, className: "badge-super-admin" },
+        ADMIN: { label: "ADMIN", icon: <Shield size={10} />, className: "badge-admin" },
+        ACCOUNTING: { label: "ACCT", icon: <Calculator size={10} />, className: "badge-accounting" },
+        DISPATCHER: { label: "OPS", icon: <Briefcase size={10} />, className: "badge-dispatcher" },
     }[role] || { label: role, icon: null, className: "" };
 
     return (
@@ -125,6 +126,34 @@ function RoleBadge({ role }: { role: string }) {
             {config.icon}
             <span>{config.label}</span>
         </span>
+    );
+}
+
+// Live clock component
+function LiveClock() {
+    const [time, setTime] = useState<string>("");
+
+    useEffect(() => {
+        const updateTime = () => {
+            const now = new Date();
+            setTime(now.toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: false,
+            }));
+        };
+
+        updateTime();
+        const interval = setInterval(updateTime, 1000);
+        return () => clearInterval(interval);
+    }, []);
+
+    return (
+        <div className="system-clock">
+            <span className="clock-time">{time || "--:--:--"}</span>
+            <span className="clock-label">SYS_TIME</span>
+        </div>
     );
 }
 
@@ -212,42 +241,66 @@ export default function Navbar() {
             )}
 
             <nav className="navbar" role="navigation" aria-label="Main navigation">
+                {/* Top status bar */}
+                <div className="status-bar">
+                    <div className="status-bar-inner">
+                        <div className="status-left">
+                            <span className="status-indicator online">
+                                <Activity size={10} />
+                                <span>SYSTEM ONLINE</span>
+                            </span>
+                            <span className="status-divider">//</span>
+                            <span className="status-item">
+                                <span className="status-label">USER:</span>
+                                <span className="status-value">{session.user.name?.toUpperCase() || "UNKNOWN"}</span>
+                            </span>
+                            <RoleBadge role={role} />
+                        </div>
+                        <div className="status-right">
+                            <LiveClock />
+                        </div>
+                    </div>
+                </div>
+
                 <div className="navbar-inner">
                     <Link href="/dashboard" className="navbar-brand" aria-label="Nebo Rides Dashboard">
-                        <Image
-                            src="/logo.png"
-                            alt=""
-                            className="brand-logo"
-                            width={112}
-                            height={32}
-                            sizes="112px"
-                            aria-hidden="true"
-                            priority
-                        />
+                        <div className="brand-container">
+                            <Image
+                                src="/logo.png"
+                                alt=""
+                                className="brand-logo"
+                                width={112}
+                                height={32}
+                                sizes="112px"
+                                aria-hidden="true"
+                                priority
+                            />
+                            <span className="brand-label">DISPATCH</span>
+                        </div>
                     </Link>
 
                     {/* Desktop Navigation */}
                     <div className="nav-links desktop-nav">
-                        <NavLink href="/dashboard" icon={<LayoutDashboard size={18} />} label="Dashboard" />
+                        <NavLink href="/dashboard" icon={<LayoutDashboard size={16} />} label="Dashboard" />
 
                         {!isSuperAdmin && (
                             <>
-                                <NavLink href="/schedule" icon={<Calendar size={18} />} label="Schedule" />
+                                <NavLink href="/schedule" icon={<Calendar size={16} />} label="Schedule" />
                                 {isDispatcher && (
                                     <>
                                         <ClockButton />
-                                        <NavLink href="/reports/shift" icon={<ClipboardList size={18} />} label="Shift Report" />
+                                        <NavLink href="/reports/shift" icon={<ClipboardList size={16} />} label="Report" />
                                     </>
                                 )}
                             </>
                         )}
 
-                        <NavLink href="/affiliates" icon={<Users size={18} />} label="Affiliates" />
-                        <NavLink href="/sops" icon={<BookOpen size={18} />} label="SOPs" />
-                        <NavLink href="/sms" icon={<MessageSquare size={18} />} label="SMS" />
+                        <NavLink href="/affiliates" icon={<Users size={16} />} label="Affiliates" />
+                        <NavLink href="/sops" icon={<BookOpen size={16} />} label="SOPs" />
+                        <NavLink href="/sms" icon={<MessageSquare size={16} />} label="SMS" />
 
                         {hasAccountingAccess && (
-                            <NavLink href="/accounting" icon={<Calculator size={18} />} label="Accounting" />
+                            <NavLink href="/accounting" icon={<Calculator size={16} />} label="Accounting" />
                         )}
 
                         {isAdmin && (
@@ -255,29 +308,29 @@ export default function Navbar() {
                                 <div className="nav-divider" />
                                 <NavDropdown
                                     label="Admin"
-                                    icon={<Shield size={18} />}
+                                    icon={<Shield size={16} />}
                                     badge={isSuperAdmin ? "SA" : undefined}
                                 >
                                     <div className="dropdown-section">
-                                        <span className="dropdown-section-label">Scheduling</span>
-                                        <NavLink href="/admin/scheduler" icon={<CalendarClock size={16} />} label="Dispatcher Scheduler" />
-                                        <NavLink href="/admin/requests" icon={<FileEdit size={16} />} label="Pending Requests" />
+                                        <span className="dropdown-section-label">// Scheduling</span>
+                                        <NavLink href="/admin/scheduler" icon={<CalendarClock size={14} />} label="Dispatcher Scheduler" />
+                                        <NavLink href="/admin/requests" icon={<FileEdit size={14} />} label="Pending Requests" />
                                     </div>
                                     <div className="dropdown-section">
-                                        <span className="dropdown-section-label">Team</span>
-                                        <NavLink href="/admin/tasks" icon={<CheckSquare size={16} />} label="Admin Tasks" />
-                                        <NavLink href="/admin/notes" icon={<StickyNote size={16} />} label="Global Notes" />
-                                        <NavLink href="/admin/sops" icon={<BookOpen size={16} />} label="Manage SOPs" />
-                                        <NavLink href="/admin/reports" icon={<FileText size={16} />} label="Shift Reports" />
-                                        <NavLink href="/admin/hours" icon={<Clock size={16} />} label="Hours Tracking" />
-                                        <NavLink href="/admin/sms" icon={<MessageSquare size={16} />} label="SMS Dashboard" />
-                                        <NavLink href="/admin/analytics" icon={<BarChart3 size={16} />} label="Analytics" />
+                                        <span className="dropdown-section-label">// Team Ops</span>
+                                        <NavLink href="/admin/tasks" icon={<CheckSquare size={14} />} label="Admin Tasks" />
+                                        <NavLink href="/admin/notes" icon={<StickyNote size={14} />} label="Global Notes" />
+                                        <NavLink href="/admin/sops" icon={<BookOpen size={14} />} label="Manage SOPs" />
+                                        <NavLink href="/admin/reports" icon={<FileText size={14} />} label="Shift Reports" />
+                                        <NavLink href="/admin/hours" icon={<Clock size={14} />} label="Hours Tracking" />
+                                        <NavLink href="/admin/sms" icon={<MessageSquare size={14} />} label="SMS Dashboard" />
+                                        <NavLink href="/admin/analytics" icon={<BarChart3 size={14} />} label="Analytics" />
                                     </div>
                                     {isSuperAdmin && (
                                         <div className="dropdown-section">
-                                            <span className="dropdown-section-label">System</span>
-                                            <NavLink href="/admin/users" icon={<UserCog size={16} />} label="User Management" />
-                                            <NavLink href="/admin/audit" icon={<History size={16} />} label="Audit Log" />
+                                            <span className="dropdown-section-label">// System</span>
+                                            <NavLink href="/admin/users" icon={<UserCog size={14} />} label="User Management" />
+                                            <NavLink href="/admin/audit" icon={<History size={14} />} label="Audit Log" />
                                         </div>
                                     )}
                                 </NavDropdown>
@@ -286,7 +339,7 @@ export default function Navbar() {
 
                         <div className="nav-divider" />
                         <NotificationBell />
-                        <NavLink href="/settings" icon={<Settings size={18} />} label="Settings" />
+                        <NavLink href="/settings" icon={<Settings size={16} />} label="Settings" />
 
                         <div className="nav-divider" />
                         <button
@@ -295,8 +348,8 @@ export default function Navbar() {
                             aria-label="Sign out"
                             disabled={isLoggingOut}
                         >
-                            <LogOut size={18} />
-                            <span>{isLoggingOut ? "..." : "Logout"}</span>
+                            <LogOut size={16} />
+                            <span>{isLoggingOut ? "..." : "Exit"}</span>
                         </button>
                     </div>
 
@@ -308,7 +361,7 @@ export default function Navbar() {
                         aria-controls="mobile-nav"
                         aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
                     >
-                        {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                        {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
                     </button>
                 </div>
             </nav>
@@ -343,70 +396,58 @@ export default function Navbar() {
 
                 <div className="mobile-nav-content">
                     <div className="mobile-nav-section">
-                        <span className="mobile-section-label">Main</span>
-                        <NavLink href="/dashboard" icon={<LayoutDashboard size={18} />} label="Dashboard" onClick={closeMobileMenu} />
+                        <span className="mobile-section-label">// Operations</span>
+                        <NavLink href="/dashboard" icon={<LayoutDashboard size={16} />} label="Dashboard" onClick={closeMobileMenu} />
                         {!isSuperAdmin && (
-                            <NavLink href="/schedule" icon={<Calendar size={18} />} label="My Schedule" onClick={closeMobileMenu} />
+                            <NavLink href="/schedule" icon={<Calendar size={16} />} label="My Schedule" onClick={closeMobileMenu} />
                         )}
                         {isDispatcher && (
-                            <NavLink href="/reports/shift" icon={<ClipboardList size={18} />} label="Shift Report" onClick={closeMobileMenu} />
+                            <NavLink href="/reports/shift" icon={<ClipboardList size={16} />} label="Shift Report" onClick={closeMobileMenu} />
                         )}
-                        <NavLink href="/affiliates" icon={<Users size={18} />} label="Affiliates" onClick={closeMobileMenu} />
-                        <NavLink href="/sops" icon={<BookOpen size={18} />} label="SOPs" onClick={closeMobileMenu} />
-                        <NavLink href="/sms" icon={<MessageSquare size={18} />} label="SMS" onClick={closeMobileMenu} />
+                        <NavLink href="/affiliates" icon={<Users size={16} />} label="Affiliates" onClick={closeMobileMenu} />
+                        <NavLink href="/sops" icon={<BookOpen size={16} />} label="SOPs" onClick={closeMobileMenu} />
+                        <NavLink href="/sms" icon={<MessageSquare size={16} />} label="SMS" onClick={closeMobileMenu} />
                     </div>
 
                     {hasAccountingAccess && (
                         <div className="mobile-nav-section">
-                            <span className="mobile-section-label">
-                                <Calculator size={12} />
-                                Accounting
-                            </span>
-                            <NavLink href="/accounting" icon={<Calculator size={18} />} label="Accounting Dashboard" onClick={closeMobileMenu} />
+                            <span className="mobile-section-label">// Accounting</span>
+                            <NavLink href="/accounting" icon={<Calculator size={16} />} label="Accounting Dashboard" onClick={closeMobileMenu} />
                         </div>
                     )}
 
                     {isAdmin && (
                         <div className="mobile-nav-section">
-                            <span className="mobile-section-label">
-                                <Shield size={12} />
-                                Admin - Scheduling
-                            </span>
-                            <NavLink href="/admin/scheduler" icon={<CalendarClock size={18} />} label="Dispatcher Scheduler" onClick={closeMobileMenu} />
-                            <NavLink href="/admin/requests" icon={<FileEdit size={18} />} label="Pending Requests" onClick={closeMobileMenu} />
+                            <span className="mobile-section-label">// Admin - Scheduling</span>
+                            <NavLink href="/admin/scheduler" icon={<CalendarClock size={16} />} label="Dispatcher Scheduler" onClick={closeMobileMenu} />
+                            <NavLink href="/admin/requests" icon={<FileEdit size={16} />} label="Pending Requests" onClick={closeMobileMenu} />
                         </div>
                     )}
 
                     {isAdmin && (
                         <div className="mobile-nav-section">
-                            <span className="mobile-section-label">
-                                <Shield size={12} />
-                                Admin - Team
-                            </span>
-                            <NavLink href="/admin/tasks" icon={<CheckSquare size={18} />} label="Admin Tasks" onClick={closeMobileMenu} />
-                            <NavLink href="/admin/notes" icon={<StickyNote size={18} />} label="Global Notes" onClick={closeMobileMenu} />
-                            <NavLink href="/admin/sops" icon={<BookOpen size={18} />} label="Manage SOPs" onClick={closeMobileMenu} />
-                            <NavLink href="/admin/reports" icon={<FileText size={18} />} label="Shift Reports" onClick={closeMobileMenu} />
-                            <NavLink href="/admin/hours" icon={<Clock size={18} />} label="Hours Tracking" onClick={closeMobileMenu} />
-                            <NavLink href="/admin/sms" icon={<MessageSquare size={18} />} label="SMS Dashboard" onClick={closeMobileMenu} />
-                            <NavLink href="/admin/analytics" icon={<BarChart3 size={18} />} label="Analytics" onClick={closeMobileMenu} />
+                            <span className="mobile-section-label">// Admin - Team</span>
+                            <NavLink href="/admin/tasks" icon={<CheckSquare size={16} />} label="Admin Tasks" onClick={closeMobileMenu} />
+                            <NavLink href="/admin/notes" icon={<StickyNote size={16} />} label="Global Notes" onClick={closeMobileMenu} />
+                            <NavLink href="/admin/sops" icon={<BookOpen size={16} />} label="Manage SOPs" onClick={closeMobileMenu} />
+                            <NavLink href="/admin/reports" icon={<FileText size={16} />} label="Shift Reports" onClick={closeMobileMenu} />
+                            <NavLink href="/admin/hours" icon={<Clock size={16} />} label="Hours Tracking" onClick={closeMobileMenu} />
+                            <NavLink href="/admin/sms" icon={<MessageSquare size={16} />} label="SMS Dashboard" onClick={closeMobileMenu} />
+                            <NavLink href="/admin/analytics" icon={<BarChart3 size={16} />} label="Analytics" onClick={closeMobileMenu} />
                         </div>
                     )}
 
                     {isSuperAdmin && (
                         <div className="mobile-nav-section">
-                            <span className="mobile-section-label">
-                                <ShieldCheck size={12} />
-                                System
-                            </span>
-                            <NavLink href="/admin/users" icon={<UserCog size={18} />} label="User Management" onClick={closeMobileMenu} />
-                            <NavLink href="/admin/audit" icon={<History size={18} />} label="Audit Log" onClick={closeMobileMenu} />
+                            <span className="mobile-section-label">// System</span>
+                            <NavLink href="/admin/users" icon={<UserCog size={16} />} label="User Management" onClick={closeMobileMenu} />
+                            <NavLink href="/admin/audit" icon={<History size={16} />} label="Audit Log" onClick={closeMobileMenu} />
                         </div>
                     )}
 
                     <div className="mobile-nav-section">
-                        <span className="mobile-section-label">Account</span>
-                        <NavLink href="/settings" icon={<Settings size={18} />} label="Settings" onClick={closeMobileMenu} />
+                        <span className="mobile-section-label">// Account</span>
+                        <NavLink href="/settings" icon={<Settings size={16} />} label="Settings" onClick={closeMobileMenu} />
                         <button
                             onClick={() => {
                                 handleLogout();
@@ -415,8 +456,8 @@ export default function Navbar() {
                             className="nav-link logout-btn"
                             disabled={isLoggingOut}
                         >
-                            <LogOut size={18} />
-                            <span>{isLoggingOut ? "..." : "Sign Out"}</span>
+                            <LogOut size={16} />
+                            <span>{isLoggingOut ? "..." : "Exit System"}</span>
                         </button>
                     </div>
                 </div>
@@ -426,21 +467,22 @@ export default function Navbar() {
                 /* Logout Error Toast */
                 .logout-error-toast {
                     position: fixed;
-                    top: 70px;
+                    top: 80px;
                     left: 50%;
                     transform: translateX(-50%);
-                    background: var(--danger-bg);
-                    border: 1px solid var(--danger);
-                    color: var(--danger);
+                    background: var(--alert-red-soft);
+                    border: 1px solid var(--alert-red);
+                    color: var(--alert-red);
                     padding: 0.75rem 1rem;
                     border-radius: var(--radius-md);
                     display: flex;
                     align-items: center;
                     gap: 0.75rem;
-                    font-size: 0.875rem;
-                    font-weight: 500;
+                    font-family: var(--font-mono);
+                    font-size: 0.75rem;
+                    letter-spacing: 0.02em;
                     z-index: 1000;
-                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+                    box-shadow: 0 4px 30px rgba(255, 51, 102, 0.3);
                     animation: slideDown 0.3s ease;
                     max-width: 90%;
                 }
@@ -448,7 +490,7 @@ export default function Navbar() {
                 .logout-error-toast button {
                     background: none;
                     border: none;
-                    color: var(--danger);
+                    color: var(--alert-red);
                     cursor: pointer;
                     padding: 0.25rem;
                     border-radius: var(--radius-sm);
@@ -474,20 +516,103 @@ export default function Navbar() {
                     }
                 }
 
+                /* Status Bar */
+                .status-bar {
+                    background: var(--bg-void);
+                    border-bottom: 1px solid var(--border);
+                    font-family: var(--font-mono);
+                    font-size: 0.625rem;
+                    letter-spacing: 0.08em;
+                }
+
+                .status-bar-inner {
+                    max-width: 1600px;
+                    margin: 0 auto;
+                    padding: 0.375rem 1.5rem;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                }
+
+                .status-left {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                }
+
+                .status-indicator {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.375rem;
+                    text-transform: uppercase;
+                }
+
+                .status-indicator.online {
+                    color: var(--terminal-green);
+                }
+
+                .status-indicator.online :global(svg) {
+                    animation: pulse 2s ease-in-out infinite;
+                }
+
+                .status-divider {
+                    color: var(--text-muted);
+                    opacity: 0.4;
+                }
+
+                .status-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.375rem;
+                }
+
+                .status-label {
+                    color: var(--text-muted);
+                }
+
+                .status-value {
+                    color: var(--text-secondary);
+                }
+
+                .status-right {
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                }
+
+                .system-clock {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+
+                .clock-time {
+                    color: var(--system-cyan);
+                    font-weight: 600;
+                    letter-spacing: 0.1em;
+                    text-shadow: 0 0 10px var(--system-cyan-glow);
+                }
+
+                .clock-label {
+                    color: var(--text-muted);
+                    text-transform: uppercase;
+                }
+
                 /* Navbar Base */
                 .navbar {
-                    background: var(--bg-card);
-                    border-bottom: 1px solid var(--border);
+                    background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-secondary) 100%);
+                    border-bottom: 1px solid var(--terminal-green-border);
                     position: sticky;
                     top: 0;
                     z-index: 100;
+                    box-shadow: 0 0 30px rgba(0, 255, 136, 0.05);
                 }
 
                 .navbar-inner {
-                    max-width: 1500px;
+                    max-width: 1600px;
                     margin: 0 auto;
                     padding: 0 1.5rem;
-                    height: 60px;
+                    height: 52px;
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
@@ -498,61 +623,89 @@ export default function Navbar() {
                     align-items: center;
                 }
 
+                .brand-container {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                }
+
                 .brand-logo {
-                    height: 32px;
+                    height: 28px;
                     width: auto;
+                    filter: brightness(1.1);
+                }
+
+                .brand-label {
+                    font-family: var(--font-condensed);
+                    font-size: 0.5rem;
+                    font-weight: 700;
+                    letter-spacing: 0.2em;
+                    color: var(--terminal-green);
+                    background: var(--terminal-green-soft);
+                    border: 1px solid var(--terminal-green-border);
+                    padding: 0.125rem 0.375rem;
+                    border-radius: var(--radius-sm);
+                    text-transform: uppercase;
                 }
 
                 /* Desktop Navigation */
                 .nav-links {
                     display: flex;
                     align-items: center;
-                    gap: 0.25rem;
+                    gap: 0.125rem;
                 }
 
                 .nav-divider {
                     width: 1px;
-                    height: 24px;
+                    height: 20px;
                     background: var(--border);
-                    margin: 0 0.5rem;
+                    margin: 0 0.375rem;
+                    opacity: 0.5;
                 }
 
                 /* Nav Link Styles */
                 :global(.nav-link) {
                     display: flex;
                     align-items: center;
-                    gap: 0.5rem;
-                    padding: 0.5rem 0.75rem;
-                    border-radius: var(--radius-md);
+                    gap: 0.375rem;
+                    padding: 0.375rem 0.625rem;
+                    border-radius: var(--radius-sm);
                     color: var(--text-secondary);
-                    font-weight: 500;
-                    font-size: 0.8125rem;
-                    transition: all 0.15s ease;
+                    font-family: var(--font-condensed);
+                    font-weight: 600;
+                    font-size: 0.6875rem;
+                    letter-spacing: 0.08em;
+                    text-transform: uppercase;
+                    transition: all 0.1s ease;
                     text-decoration: none;
                     background: none;
-                    border: none;
+                    border: 1px solid transparent;
                     cursor: pointer;
-                    font-family: inherit;
                     white-space: nowrap;
                 }
 
                 :global(.nav-link:hover) {
-                    color: var(--text-primary);
+                    color: var(--terminal-green);
                     background: var(--bg-hover);
+                    border-color: var(--border);
                 }
 
                 :global(.nav-link-active) {
-                    color: var(--primary);
-                    background: var(--primary-soft);
+                    color: var(--terminal-green);
+                    background: var(--terminal-green-soft);
+                    border-color: var(--terminal-green-border);
+                    box-shadow: 0 0 12px var(--terminal-green-glow);
                 }
 
                 :global(.nav-link-active:hover) {
-                    background: var(--primary-soft);
+                    background: var(--terminal-green-soft);
                 }
 
                 :global(.logout-btn:hover) {
-                    color: var(--danger) !important;
-                    background: var(--danger-bg) !important;
+                    color: var(--alert-red) !important;
+                    background: var(--alert-red-soft) !important;
+                    border-color: var(--alert-red-border) !important;
+                    box-shadow: 0 0 12px var(--alert-red-glow) !important;
                 }
 
                 /* Dropdown */
@@ -563,12 +716,13 @@ export default function Navbar() {
                 .nav-dropdown-trigger {
                     display: flex !important;
                     align-items: center !important;
-                    gap: 0.5rem !important;
+                    gap: 0.375rem !important;
                 }
 
                 .dropdown-arrow {
                     transition: transform 0.15s ease;
-                    margin-left: 0.25rem;
+                    margin-left: 0.125rem;
+                    opacity: 0.6;
                 }
 
                 .dropdown-arrow.open {
@@ -576,27 +730,40 @@ export default function Navbar() {
                 }
 
                 .nav-badge {
-                    font-size: 0.625rem;
+                    font-family: var(--font-mono);
+                    font-size: 0.5rem;
                     font-weight: 700;
-                    background: var(--primary);
+                    background: var(--alert-red);
                     color: white;
-                    padding: 0.125rem 0.375rem;
-                    border-radius: 0.25rem;
-                    margin-left: 0.25rem;
+                    padding: 0.0625rem 0.25rem;
+                    border-radius: 0.125rem;
+                    margin-left: 0.125rem;
+                    letter-spacing: 0.05em;
                 }
 
                 .nav-dropdown-menu {
                     position: absolute;
                     top: calc(100% + 0.5rem);
                     right: 0;
-                    min-width: 240px;
+                    min-width: 220px;
                     background: var(--bg-card);
-                    border: 1px solid var(--border);
-                    border-radius: var(--radius-lg);
-                    padding: 0.5rem;
-                    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+                    border: 1px solid var(--terminal-green-border);
+                    border-radius: var(--radius-md);
+                    padding: 0.375rem;
+                    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 20px var(--terminal-green-glow);
                     animation: dropdownFade 0.15s ease;
                     z-index: 50;
+                }
+
+                .nav-dropdown-menu::before {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    height: 2px;
+                    background: linear-gradient(90deg, var(--terminal-green), var(--system-cyan), var(--terminal-green));
+                    border-radius: var(--radius-md) var(--radius-md) 0 0;
                 }
 
                 @keyframes dropdownFade {
@@ -611,7 +778,7 @@ export default function Navbar() {
                 }
 
                 .dropdown-section {
-                    padding: 0.375rem 0;
+                    padding: 0.25rem 0;
                 }
 
                 .dropdown-section:not(:last-child) {
@@ -619,13 +786,15 @@ export default function Navbar() {
                 }
 
                 .dropdown-section-label {
-                    font-size: 0.625rem;
+                    font-family: var(--font-mono);
+                    font-size: 0.5625rem;
                     font-weight: 600;
-                    color: var(--text-muted);
+                    color: var(--terminal-green);
                     text-transform: uppercase;
-                    letter-spacing: 0.08em;
-                    padding: 0.25rem 0.75rem 0.375rem;
+                    letter-spacing: 0.1em;
+                    padding: 0.25rem 0.625rem 0.375rem;
                     display: block;
+                    opacity: 0.7;
                 }
 
                 /* Role Badge */
@@ -633,55 +802,63 @@ export default function Navbar() {
                     display: inline-flex;
                     align-items: center;
                     gap: 0.25rem;
-                    font-size: 0.625rem;
+                    font-family: var(--font-mono);
+                    font-size: 0.5625rem;
                     font-weight: 600;
-                    padding: 0.125rem 0.5rem;
-                    border-radius: 0.25rem;
+                    padding: 0.125rem 0.375rem;
+                    border-radius: var(--radius-sm);
                     text-transform: uppercase;
-                    letter-spacing: 0.05em;
+                    letter-spacing: 0.08em;
+                    border: 1px solid currentColor;
                 }
 
                 :global(.badge-super-admin) {
-                    background: var(--danger-bg);
-                    color: var(--danger);
+                    background: var(--alert-red-soft);
+                    color: var(--alert-red);
+                    box-shadow: 0 0 8px var(--alert-red-glow);
                 }
 
                 :global(.badge-admin) {
-                    background: var(--warning-bg);
-                    color: var(--warning);
+                    background: var(--tactical-amber-soft);
+                    color: var(--tactical-amber);
+                    box-shadow: 0 0 8px var(--tactical-amber-glow);
                 }
 
                 :global(.badge-dispatcher) {
-                    background: var(--success-bg);
-                    color: var(--success);
+                    background: var(--terminal-green-soft);
+                    color: var(--terminal-green);
+                    box-shadow: 0 0 8px var(--terminal-green-glow);
                 }
 
                 :global(.badge-accounting) {
-                    background: rgba(168, 85, 247, 0.15);
+                    background: rgba(168, 85, 247, 0.12);
                     color: #c084fc;
+                    box-shadow: 0 0 8px rgba(168, 85, 247, 0.3);
                 }
 
                 /* Mobile Menu Button */
                 .mobile-menu-btn {
                     display: none;
-                    background: none;
-                    border: none;
-                    color: var(--text-primary);
+                    background: var(--bg-elevated);
+                    border: 1px solid var(--border);
+                    color: var(--terminal-green);
                     cursor: pointer;
-                    padding: 0.5rem;
-                    border-radius: var(--radius-md);
-                    transition: background 0.15s ease;
+                    padding: 0.375rem;
+                    border-radius: var(--radius-sm);
+                    transition: all 0.15s ease;
                 }
 
                 .mobile-menu-btn:hover {
-                    background: var(--bg-hover);
+                    background: var(--terminal-green-soft);
+                    border-color: var(--terminal-green-border);
+                    box-shadow: 0 0 15px var(--terminal-green-glow);
                 }
 
                 /* Mobile Overlay */
                 .mobile-nav-overlay {
                     position: fixed;
                     inset: 0;
-                    background: rgba(0, 0, 0, 0.6);
+                    background: rgba(0, 0, 0, 0.85);
                     backdrop-filter: blur(4px);
                     z-index: 150;
                     animation: fadeIn 0.2s ease;
@@ -697,17 +874,28 @@ export default function Navbar() {
                     position: fixed;
                     top: 0;
                     right: 0;
-                    width: 300px;
+                    width: 280px;
                     max-width: 85vw;
                     height: 100vh;
                     background: var(--bg-primary);
-                    border-left: 1px solid var(--border);
+                    border-left: 1px solid var(--terminal-green-border);
                     z-index: 200;
                     transform: translateX(100%);
                     transition: transform 0.25s ease;
                     overflow-y: auto;
                     display: flex;
                     flex-direction: column;
+                    box-shadow: -10px 0 50px rgba(0, 0, 0, 0.5), 0 0 30px var(--terminal-green-glow);
+                }
+
+                .mobile-nav-drawer::before {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 2px;
+                    height: 100%;
+                    background: linear-gradient(180deg, var(--terminal-green), var(--system-cyan), var(--terminal-green));
                 }
 
                 .mobile-nav-drawer.open {
@@ -718,8 +906,9 @@ export default function Navbar() {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
-                    padding: 1.25rem;
+                    padding: 1rem;
                     border-bottom: 1px solid var(--border);
+                    background: var(--bg-secondary);
                 }
 
                 .mobile-user-info {
@@ -729,16 +918,18 @@ export default function Navbar() {
                 }
 
                 .mobile-avatar {
-                    width: 40px;
-                    height: 40px;
-                    background: var(--primary-soft);
-                    color: var(--primary);
-                    border-radius: 50%;
+                    width: 36px;
+                    height: 36px;
+                    background: var(--terminal-green-soft);
+                    border: 1px solid var(--terminal-green-border);
+                    color: var(--terminal-green);
+                    border-radius: var(--radius-md);
                     display: flex;
                     align-items: center;
                     justify-content: center;
+                    font-family: var(--font-mono);
                     font-weight: 600;
-                    font-size: 1rem;
+                    font-size: 0.875rem;
                 }
 
                 .mobile-user-details {
@@ -748,60 +939,67 @@ export default function Navbar() {
                 }
 
                 .mobile-user-name {
+                    font-family: var(--font-condensed);
                     font-weight: 600;
-                    font-size: 0.875rem;
+                    font-size: 0.8125rem;
                     color: var(--text-primary);
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
                 }
 
                 .mobile-close-btn {
-                    background: none;
-                    border: none;
+                    background: var(--bg-elevated);
+                    border: 1px solid var(--border);
                     color: var(--text-secondary);
                     cursor: pointer;
-                    padding: 0.5rem;
-                    border-radius: var(--radius-md);
+                    padding: 0.375rem;
+                    border-radius: var(--radius-sm);
                     transition: all 0.15s ease;
                 }
 
                 .mobile-close-btn:hover {
-                    background: var(--bg-hover);
-                    color: var(--text-primary);
+                    background: var(--alert-red-soft);
+                    border-color: var(--alert-red-border);
+                    color: var(--alert-red);
                 }
 
                 .mobile-nav-content {
                     flex: 1;
-                    padding: 1rem;
+                    padding: 0.75rem;
                     display: flex;
                     flex-direction: column;
-                    gap: 0.5rem;
+                    gap: 0.25rem;
                 }
 
                 .mobile-nav-section {
                     display: flex;
                     flex-direction: column;
-                    gap: 0.25rem;
-                    padding-bottom: 0.75rem;
+                    gap: 0.125rem;
+                    padding-bottom: 0.5rem;
                 }
 
                 .mobile-nav-section:not(:last-child) {
                     border-bottom: 1px solid var(--border);
-                    margin-bottom: 0.75rem;
+                    margin-bottom: 0.5rem;
                 }
 
                 .mobile-section-label {
-                    font-size: 0.6875rem;
+                    font-family: var(--font-mono);
+                    font-size: 0.5625rem;
                     font-weight: 600;
-                    color: var(--text-muted);
+                    color: var(--terminal-green);
                     text-transform: uppercase;
-                    letter-spacing: 0.08em;
-                    padding: 0.375rem 0.75rem;
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
+                    letter-spacing: 0.1em;
+                    padding: 0.25rem 0.5rem;
+                    opacity: 0.7;
                 }
 
-                /* Responsive */
+                /* Hide status bar on mobile */
                 @media (max-width: 900px) {
+                    .status-bar {
+                        display: none;
+                    }
+
                     .desktop-nav {
                         display: none !important;
                     }

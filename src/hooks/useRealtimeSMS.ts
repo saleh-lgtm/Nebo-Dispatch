@@ -81,8 +81,9 @@ export function useRealtimeSMS({
             : "sms-all";
 
         // Subscribe to SMSLog changes
-        const channel = supabase
-            .channel(channelName)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const channel = (supabase
+            .channel(channelName) as any)
             .on(
                 "postgres_changes",
                 {
@@ -107,7 +108,7 @@ export function useRealtimeSMS({
                 },
                 handleUpdate
             )
-            .subscribe((status) => {
+            .subscribe((status: string) => {
                 if (status === "SUBSCRIBED") {
                     console.log(`Real-time SMS subscription active: ${channelName}`);
                 } else if (status === "CHANNEL_ERROR") {
