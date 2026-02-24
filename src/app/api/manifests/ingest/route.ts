@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     try {
         // Parse the manifest email
-        const trips = parseManifestEmail(body.body);
+        const trips = await parseManifestEmail(body.body);
 
         if (trips.length === 0) {
             return NextResponse.json(

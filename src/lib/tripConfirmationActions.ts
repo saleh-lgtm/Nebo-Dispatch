@@ -7,8 +7,6 @@ import { createAuditLog } from "./auditActions";
 import { revalidatePath } from "next/cache";
 import { ConfirmationStatus } from "@prisma/client";
 
-export type { ConfirmationStatus };
-
 /**
  * Get upcoming confirmations due within the next 3 hours
  * Returns trips sorted by most urgent first
@@ -399,12 +397,12 @@ export async function markExpiredConfirmations() {
 /**
  * Parse manifest email and extract trips
  */
-export function parseManifestEmail(emailBody: string): Array<{
+export async function parseManifestEmail(emailBody: string): Promise<Array<{
     tripNumber: string;
     pickupAt: Date;
     passengerName: string;
     driverName: string;
-}> {
+}>> {
     const trips: Array<{
         tripNumber: string;
         pickupAt: Date;

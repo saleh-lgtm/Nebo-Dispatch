@@ -720,9 +720,9 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
 
                 .day-header {
                     display: flex;
-                    flex-direction: column;
                     align-items: center;
-                    padding: 0.75rem;
+                    justify-content: center;
+                    padding: 1rem 0.75rem;
                     background: var(--bg-secondary);
                     border-bottom: 1px solid var(--border);
                 }
@@ -732,21 +732,15 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
                 }
 
                 .day-name {
-                    font-size: 0.75rem;
-                    font-weight: 600;
-                    color: var(--text-secondary);
+                    font-size: 0.875rem;
+                    font-weight: 700;
+                    color: var(--text-primary);
                     text-transform: uppercase;
                     letter-spacing: 0.05em;
                 }
 
                 .day-column.today .day-name {
                     color: var(--primary);
-                }
-
-                .day-date {
-                    font-size: 1.25rem;
-                    font-weight: 700;
-                    color: var(--text-primary);
                 }
 
                 .day-shifts {

@@ -13,10 +13,8 @@ import {
     AlertTriangle,
     ChevronRight,
 } from "lucide-react";
-import {
-    completeConfirmation,
-    type ConfirmationStatus,
-} from "@/lib/tripConfirmationActions";
+import { completeConfirmation } from "@/lib/tripConfirmationActions";
+import type { ConfirmationStatus } from "@prisma/client";
 import { useRouter } from "next/navigation";
 
 interface Confirmation {
