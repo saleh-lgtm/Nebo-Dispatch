@@ -8,7 +8,6 @@ import { signOut } from "next-auth/react";
 import {
     LayoutDashboard,
     CalendarClock,
-    Users,
     UserCog,
     FileText,
     BarChart3,
@@ -22,12 +21,15 @@ import {
     ChevronLeft,
     ChevronRight,
     ShieldCheck,
+    Shield,
     Briefcase,
     FileEdit,
     Calculator,
     MessageSquare,
     Car,
     Network,
+    Calendar,
+    ClipboardList,
 } from "lucide-react";
 import NotificationBell from "./NotificationBell";
 
@@ -74,10 +76,26 @@ interface Props {
     user: {
         name?: string | null;
         email?: string | null;
+        role?: string;
     };
 }
 
+const ROLE_CONFIG: Record<string, { label: string; icon: typeof ShieldCheck; color: string }> = {
+    SUPER_ADMIN: { label: "Super Admin", icon: ShieldCheck, color: "var(--danger)" },
+    ADMIN: { label: "Admin", icon: Shield, color: "#f59e0b" },
+    ACCOUNTING: { label: "Accounting", icon: Calculator, color: "#3b82f6" },
+    DISPATCHER: { label: "Dispatcher", icon: Briefcase, color: "#22c55e" },
+};
+
 export default function SuperAdminSidebar({ user }: Props) {
+    const role = user.role || "DISPATCHER";
+    const isSuperAdmin = role === "SUPER_ADMIN";
+    const isAdmin = role === "ADMIN" || isSuperAdmin;
+    const isAccounting = role === "ACCOUNTING";
+    const isDispatcher = role === "DISPATCHER";
+    const hasAccountingAccess = isAccounting || isAdmin;
+    const roleConfig = ROLE_CONFIG[role] || ROLE_CONFIG.DISPATCHER;
+    const RoleIcon = roleConfig.icon;
     const [collapsed, setCollapsed] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
 
@@ -100,7 +118,7 @@ export default function SuperAdminSidebar({ user }: Props) {
                 <div className="sa-sidebar-header">
                     <Link href="/dashboard" className="sa-brand">
                         <Image src="/logo.png" alt="Nebo" className="sa-brand-logo" width={32} height={32} priority />
-                        {!collapsed && <span className="sa-brand-text">Nebo Admin</span>}
+                        {!collapsed && <span className="sa-brand-text">NeboOps</span>}
                     </Link>
                     <button
                         onClick={() => setCollapsed(!collapsed)}
@@ -113,14 +131,14 @@ export default function SuperAdminSidebar({ user }: Props) {
 
                 {/* User Info */}
                 <div className="sa-user-card">
-                    <div className="sa-user-avatar">
-                        {(user.name || user.email || "A").charAt(0).toUpperCase()}
+                    <div className="sa-user-avatar" style={{ background: `linear-gradient(135deg, ${roleConfig.color} 0%, ${roleConfig.color}80 100%)` }}>
+                        {(user.name || user.email || "U").charAt(0).toUpperCase()}
                     </div>
                     {!collapsed && (
                         <div className="sa-user-info">
-                            <span className="sa-user-name">{user.name || "Admin"}</span>
-                            <span className="sa-user-role">
-                                <ShieldCheck size={10} /> Super Admin
+                            <span className="sa-user-name">{user.name || "User"}</span>
+                            <span className="sa-user-role" style={{ color: roleConfig.color }}>
+                                <RoleIcon size={10} /> {roleConfig.label}
                             </span>
                         </div>
                     )}
@@ -131,37 +149,72 @@ export default function SuperAdminSidebar({ user }: Props) {
 
                 {/* Navigation */}
                 <nav className="sa-nav">
+                    {/* Overview - All users */}
                     <NavSection title="Overview" collapsed={collapsed}>
                         <NavItem href="/dashboard" icon={<LayoutDashboard size={18} />} label="Dashboard" collapsed={collapsed} />
                     </NavSection>
 
-                    <NavSection title="Scheduling" collapsed={collapsed}>
-                        <NavItem href="/admin/scheduler" icon={<CalendarClock size={18} />} label="Dispatcher Scheduler" collapsed={collapsed} />
-                        <NavItem href="/admin/requests" icon={<FileEdit size={18} />} label="Pending Requests" collapsed={collapsed} />
-                    </NavSection>
+                    {/* Dispatcher-specific */}
+                    {isDispatcher && (
+                        <NavSection title="My Work" collapsed={collapsed}>
+                            <NavItem href="/schedule" icon={<Calendar size={18} />} label="My Schedule" collapsed={collapsed} />
+                            <NavItem href="/reports/shift" icon={<ClipboardList size={18} />} label="Shift Report" collapsed={collapsed} />
+                        </NavSection>
+                    )}
 
-                    <NavSection title="Team Management" collapsed={collapsed}>
-                        <NavItem href="/admin/users" icon={<UserCog size={18} />} label="User Management" collapsed={collapsed} />
-                        <NavItem href="/admin/hours" icon={<Clock size={18} />} label="Hours Tracking" collapsed={collapsed} />
-                        <NavItem href="/admin/tasks" icon={<CheckSquare size={18} />} label="Admin Tasks" collapsed={collapsed} />
-                        <NavItem href="/admin/notes" icon={<StickyNote size={18} />} label="Global Notes" collapsed={collapsed} />
-                        <NavItem href="/admin/sms" icon={<MessageSquare size={18} />} label="SMS Dashboard" collapsed={collapsed} />
-                    </NavSection>
+                    {/* Admin Scheduling */}
+                    {isAdmin && (
+                        <NavSection title="Scheduling" collapsed={collapsed}>
+                            <NavItem href="/admin/scheduler" icon={<CalendarClock size={18} />} label="Dispatcher Scheduler" collapsed={collapsed} />
+                            <NavItem href="/admin/requests" icon={<FileEdit size={18} />} label="Pending Requests" collapsed={collapsed} />
+                        </NavSection>
+                    )}
 
+                    {/* Team Management - Admin only */}
+                    {isAdmin && (
+                        <NavSection title="Team Management" collapsed={collapsed}>
+                            {isSuperAdmin && (
+                                <NavItem href="/admin/users" icon={<UserCog size={18} />} label="User Management" collapsed={collapsed} />
+                            )}
+                            <NavItem href="/admin/hours" icon={<Clock size={18} />} label="Hours Tracking" collapsed={collapsed} />
+                            <NavItem href="/admin/tasks" icon={<CheckSquare size={18} />} label="Admin Tasks" collapsed={collapsed} />
+                            <NavItem href="/admin/notes" icon={<StickyNote size={18} />} label="Global Notes" collapsed={collapsed} />
+                            <NavItem href="/admin/sms" icon={<MessageSquare size={18} />} label="SMS Dashboard" collapsed={collapsed} />
+                        </NavSection>
+                    )}
+
+                    {/* Content - All users */}
                     <NavSection title="Content" collapsed={collapsed}>
                         <NavItem href="/fleet" icon={<Car size={18} />} label="Fleet Management" collapsed={collapsed} />
                         <NavItem href="/network" icon={<Network size={18} />} label="Network" collapsed={collapsed} />
-                        <NavItem href="/admin/sops" icon={<BookOpen size={18} />} label="Manage SOPs" collapsed={collapsed} />
+                        {isAdmin ? (
+                            <NavItem href="/admin/sops" icon={<BookOpen size={18} />} label="Manage SOPs" collapsed={collapsed} />
+                        ) : (
+                            <NavItem href="/sops" icon={<BookOpen size={18} />} label="SOPs" collapsed={collapsed} />
+                        )}
+                        <NavItem href="/sms" icon={<MessageSquare size={18} />} label="SMS" collapsed={collapsed} />
                     </NavSection>
 
-                    <NavSection title="Reports & Analytics" collapsed={collapsed}>
-                        <NavItem href="/admin/reports" icon={<FileText size={18} />} label="Shift Reports" collapsed={collapsed} />
-                        <NavItem href="/admin/analytics" icon={<BarChart3 size={18} />} label="Analytics" collapsed={collapsed} />
-                        <NavItem href="/accounting" icon={<Calculator size={18} />} label="Accounting" collapsed={collapsed} />
-                    </NavSection>
+                    {/* Reports & Analytics - Admin or Accounting */}
+                    {(isAdmin || hasAccountingAccess) && (
+                        <NavSection title="Reports & Analytics" collapsed={collapsed}>
+                            {isAdmin && (
+                                <>
+                                    <NavItem href="/admin/reports" icon={<FileText size={18} />} label="Shift Reports" collapsed={collapsed} />
+                                    <NavItem href="/admin/analytics" icon={<BarChart3 size={18} />} label="Analytics" collapsed={collapsed} />
+                                </>
+                            )}
+                            {hasAccountingAccess && (
+                                <NavItem href="/accounting" icon={<Calculator size={18} />} label="Accounting" collapsed={collapsed} />
+                            )}
+                        </NavSection>
+                    )}
 
+                    {/* System - Super Admin only for Audit Log */}
                     <NavSection title="System" collapsed={collapsed}>
-                        <NavItem href="/admin/audit" icon={<History size={18} />} label="Audit Log" collapsed={collapsed} />
+                        {isSuperAdmin && (
+                            <NavItem href="/admin/audit" icon={<History size={18} />} label="Audit Log" collapsed={collapsed} />
+                        )}
                         <NavItem href="/settings" icon={<Settings size={18} />} label="Settings" collapsed={collapsed} />
                     </NavSection>
                 </nav>

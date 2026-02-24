@@ -72,35 +72,18 @@ export default function AppLayout({ children }: Props) {
         );
     }
 
-    const isSuperAdmin = session.user.role === "SUPER_ADMIN";
-
-    // Super Admin gets sidebar layout
-    if (isSuperAdmin) {
-        return (
-            <>
-                <SuperAdminSidebar user={session.user} />
-                <div className="sa-main-wrapper">
-                    <main className="sa-main-content animate-fade-in">
-                        {children}
-                    </main>
-                    <footer className="sa-footer">
-                        &copy; {new Date().getFullYear()} Nebo Rides. All rights reserved.
-                    </footer>
-                </div>
-            </>
-        );
-    }
-
-    // Regular users get top navbar layout
+    // All authenticated users get sidebar layout
     return (
         <>
-            <Navbar />
-            <main className="container animate-fade-in" style={{ padding: "2rem 0", flex: 1 }}>
-                {children}
-            </main>
-            <footer className="container" style={{ padding: "2rem 0", textAlign: "center", color: "var(--text-secondary)", fontSize: "0.875rem" }}>
-                &copy; {new Date().getFullYear()} Nebo Rides. All rights reserved.
-            </footer>
+            <SuperAdminSidebar user={session.user} />
+            <div className="sa-main-wrapper">
+                <main className="sa-main-content animate-fade-in">
+                    {children}
+                </main>
+                <footer className="sa-footer">
+                    &copy; {new Date().getFullYear()} Nebo Rides. All rights reserved.
+                </footer>
+            </div>
         </>
     );
 }
