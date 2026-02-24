@@ -48,6 +48,12 @@ enum ReportStatus {
   FLAGGED
 }
 
+enum ApprovalStatus {
+  PENDING    // Awaiting admin approval
+  APPROVED   // Can access the system
+  REJECTED   // Rejected by admin
+}
+
 enum RetailLeadOutcome {
   WON
   NEEDS_FOLLOW_UP
@@ -89,18 +95,24 @@ enum VehicleStatus {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  password      String?
-  role          Role      @default(DISPATCHER)
-  isActive      Boolean   @default(true)
-  lastLogin     DateTime?
-  loginAttempts Int       @default(0)
-  lockedUntil   DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id             String          @id @default(cuid())
+  name           String?
+  email          String?         @unique
+  emailVerified  DateTime?
+  password       String?
+  role           Role            @default(DISPATCHER)
+  isActive       Boolean         @default(true)
+  approvalStatus ApprovalStatus  @default(PENDING)
+  approvedById   String?
+  approvedBy     User?           @relation("ApprovedBy", fields: [approvedById], references: [id])
+  approvedUsers  User[]          @relation("ApprovedBy")
+  approvedAt     DateTime?
+  rejectionReason String?
+  lastLogin      DateTime?
+  loginAttempts  Int             @default(0)
+  lockedUntil    DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   // Self-referential relation for user creation tracking
   createdById  String?

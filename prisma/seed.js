@@ -10,8 +10,15 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-    // Default password for all users (should be changed on first login)
-    const defaultPassword = await bcrypt.hash('nebo2024', 10);
+    // SECURITY: Use environment variable for default password
+    // Set SEED_DEFAULT_PASSWORD in your .env file
+    const rawPassword = process.env.SEED_DEFAULT_PASSWORD;
+    if (!rawPassword) {
+        console.error('ERROR: SEED_DEFAULT_PASSWORD environment variable is required');
+        console.error('Set it in your .env file before running the seed');
+        process.exit(1);
+    }
+    const defaultPassword = await bcrypt.hash(rawPassword, 12);
 
     // Admin users
     const admins = [
@@ -60,7 +67,7 @@ async function main() {
     }
 
     console.log('\n✅ All users created successfully!');
-    console.log('Default password for all users: nebo2024');
+    console.log('IMPORTANT: Have users change their passwords after first login!');
 }
 
 main()

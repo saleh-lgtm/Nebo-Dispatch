@@ -1,21 +1,48 @@
 import { z } from "zod";
+import { PASSWORD_POLICY } from "./passwordPolicy";
+
+// ===== SECURITY HELPERS =====
+
+// Sanitize string input (prevent XSS)
+const sanitizeString = (val: string) =>
+    val.replace(/[<>]/g, "").trim();
+
+// Strong password schema based on password policy
+const strongPasswordSchema = z
+    .string()
+    .min(PASSWORD_POLICY.minLength, `Password must be at least ${PASSWORD_POLICY.minLength} characters`)
+    .max(PASSWORD_POLICY.maxLength, `Password must be less than ${PASSWORD_POLICY.maxLength} characters`)
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number")
+    .regex(/[!@#$%^&*(),.?":{}|<>_\-+=[\]\\\/`~]/, "Password must contain at least one special character")
+    .refine((val) => !/(.)\1{2,}/.test(val), "Password cannot contain more than 2 repeated characters");
+
+// Safe email schema (lowercase, trimmed)
+const safeEmailSchema = z
+    .string()
+    .email("Invalid email address")
+    .transform((val) => val.toLowerCase().trim());
+
+// Safe name schema (sanitized, proper length)
+const safeNameSchema = z
+    .string()
+    .min(2, "Name must be at least 2 characters")
+    .max(100, "Name is too long")
+    .transform(sanitizeString);
 
 // ===== USER SCHEMAS =====
 
 export const loginSchema = z.object({
-    email: z.string().email("Invalid email address"),
+    email: safeEmailSchema,
     password: z.string().min(1, "Password is required"),
 });
 
 export const createUserSchema = z.object({
-    name: z.string().min(2, "Name must be at least 2 characters"),
-    email: z.string().email("Invalid email address"),
-    password: z
-        .string()
-        .min(6, "Password must be at least 6 characters")
-        .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-        .regex(/[0-9]/, "Password must contain at least one number"),
-    role: z.enum(["ADMIN", "DISPATCHER"], {
+    name: safeNameSchema,
+    email: safeEmailSchema,
+    password: strongPasswordSchema,
+    role: z.enum(["ADMIN", "DISPATCHER", "ACCOUNTING"], {
         error: "Invalid role selected",
     }),
 });
@@ -29,24 +56,20 @@ export const updateUserSchema = z.object({
 export const changePasswordSchema = z
     .object({
         currentPassword: z.string().min(1, "Current password is required"),
-        newPassword: z
-            .string()
-            .min(6, "Password must be at least 6 characters")
-            .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-            .regex(/[0-9]/, "Password must contain at least one number"),
+        newPassword: strongPasswordSchema,
         confirmPassword: z.string().min(1, "Please confirm your password"),
     })
     .refine((data) => data.newPassword === data.confirmPassword, {
         message: "Passwords do not match",
         path: ["confirmPassword"],
+    })
+    .refine((data) => data.currentPassword !== data.newPassword, {
+        message: "New password must be different from current password",
+        path: ["newPassword"],
     });
 
 export const resetPasswordSchema = z.object({
-    password: z
-        .string()
-        .min(6, "Password must be at least 6 characters")
-        .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-        .regex(/[0-9]/, "Password must contain at least one number"),
+    password: strongPasswordSchema,
 });
 
 // ===== SCHEDULING SCHEMAS =====

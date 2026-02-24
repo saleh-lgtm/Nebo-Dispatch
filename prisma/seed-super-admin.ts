@@ -11,7 +11,13 @@ const prisma = new PrismaClient({ adapter });
 
 async function main() {
     const email = "Saleh@nebo.com";
-    const password = process.env.SUPER_ADMIN_PASSWORD || "NeboAdmin2024!";
+    // SECURITY: Require password from environment variable
+    const password = process.env.SUPER_ADMIN_PASSWORD;
+    if (!password) {
+        console.error('ERROR: SUPER_ADMIN_PASSWORD environment variable is required');
+        console.error('Set it in your .env file before running the seed');
+        process.exit(1);
+    }
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -47,8 +53,7 @@ async function main() {
     });
 
     console.log(`Created SUPER_ADMIN user: ${user.email}`);
-    console.log(`Password: ${password}`);
-    console.log("\nIMPORTANT: Change this password after first login!");
+    console.log("\nIMPORTANT: Change your password after first login!");
 }
 
 main()
