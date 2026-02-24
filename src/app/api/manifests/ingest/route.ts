@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    // Verify secret API key (header or URL param for services that don't support headers)
+    // Verify authentication (supports multiple methods)
     const manifestSecret = process.env.MANIFEST_INGEST_SECRET;
     if (!manifestSecret) {
         console.error("MANIFEST_INGEST_SECRET not configured");
@@ -87,11 +87,41 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    const providedSecret =
-        request.headers.get("x-manifest-secret") ||
-        request.nextUrl.searchParams.get("secret");
+    let isAuthenticated = false;
 
-    if (!providedSecret || providedSecret !== manifestSecret) {
+    // Method 1: Basic Auth (CloudMailin recommended)
+    const authHeader = request.headers.get("authorization");
+    if (authHeader?.startsWith("Basic ")) {
+        try {
+            const base64 = authHeader.slice(6);
+            const decoded = atob(base64);
+            const [username, password] = decoded.split(":");
+            // Username: "manifest", Password: the secret
+            if (username === "manifest" && password === manifestSecret) {
+                isAuthenticated = true;
+            }
+        } catch {
+            // Invalid base64, continue to other methods
+        }
+    }
+
+    // Method 2: x-manifest-secret header
+    if (!isAuthenticated) {
+        const headerSecret = request.headers.get("x-manifest-secret");
+        if (headerSecret === manifestSecret) {
+            isAuthenticated = true;
+        }
+    }
+
+    // Method 3: URL param (fallback)
+    if (!isAuthenticated) {
+        const paramSecret = request.nextUrl.searchParams.get("secret");
+        if (paramSecret === manifestSecret) {
+            isAuthenticated = true;
+        }
+    }
+
+    if (!isAuthenticated) {
         console.warn(`Unauthorized manifest ingest attempt from IP: ${ip}`);
         return NextResponse.json(
             { error: "Unauthorized" },
