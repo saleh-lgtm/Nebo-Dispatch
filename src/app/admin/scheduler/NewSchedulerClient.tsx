@@ -560,6 +560,7 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
                     display: flex;
                     flex-direction: column;
                     gap: 1.5rem;
+                    min-height: calc(100vh - 100px);
                 }
 
                 .scheduler-header {
@@ -568,6 +569,7 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
                     align-items: center;
                     flex-wrap: wrap;
                     gap: 1rem;
+                    padding: 1.25rem;
                 }
 
                 .scheduler-header__left {
@@ -579,28 +581,41 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
                 .scheduler-header__actions {
                     display: flex;
                     gap: 0.5rem;
+                    flex-wrap: wrap;
                 }
 
                 .scheduler-layout {
-                    display: grid;
-                    grid-template-columns: 280px 1fr;
+                    display: flex;
                     gap: 1.5rem;
+                    flex: 1;
                 }
 
-                @media (max-width: 1024px) {
+                @media (max-width: 1200px) {
                     .scheduler-layout {
-                        grid-template-columns: 1fr;
+                        flex-direction: column;
                     }
                 }
 
                 /* Sidebar */
                 .scheduler-sidebar {
+                    width: 260px;
+                    flex-shrink: 0;
                     display: flex;
                     flex-direction: column;
-                    gap: 1.5rem;
-                    height: fit-content;
-                    position: sticky;
-                    top: 1rem;
+                    gap: 1.25rem;
+                    padding: 1.25rem;
+                }
+
+                @media (max-width: 1200px) {
+                    .scheduler-sidebar {
+                        width: 100%;
+                        flex-direction: row;
+                        flex-wrap: wrap;
+                    }
+                    .sidebar-section {
+                        flex: 1;
+                        min-width: 200px;
+                    }
                 }
 
                 .sidebar-section {
@@ -610,27 +625,15 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
                 }
 
                 .sidebar-title {
-                    font-size: 0.75rem;
+                    font-family: var(--font-display);
+                    font-size: 0.8125rem;
                     font-weight: 600;
-                    color: var(--text-secondary);
-                    text-transform: uppercase;
-                    letter-spacing: 0.05em;
+                    color: var(--text-primary);
                     display: flex;
                     align-items: center;
                     gap: 0.5rem;
-                }
-
-                .week-nav {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    gap: 0.5rem;
-                }
-
-                .week-display {
-                    font-weight: 600;
-                    font-size: 0.875rem;
-                    text-align: center;
+                    padding-bottom: 0.5rem;
+                    border-bottom: 1px solid var(--border);
                 }
 
                 .stat-row {
@@ -638,24 +641,26 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
                     justify-content: space-between;
                     align-items: center;
                     font-size: 0.8125rem;
+                    color: var(--text-secondary);
                 }
 
                 .stat-value {
+                    font-family: var(--font-mono);
                     font-weight: 600;
                     color: var(--text-primary);
                 }
 
                 .progress-bar {
-                    height: 6px;
-                    background: var(--bg-secondary);
-                    border-radius: 3px;
+                    height: 8px;
+                    background: var(--bg-muted);
+                    border-radius: 4px;
                     overflow: hidden;
                 }
 
                 .progress-fill {
                     height: 100%;
-                    background: linear-gradient(90deg, var(--primary), var(--accent));
-                    border-radius: 3px;
+                    background: var(--success);
+                    border-radius: 4px;
                     transition: width 0.3s ease;
                 }
 
@@ -668,40 +673,56 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
                 .dispatcher-item {
                     display: flex;
                     align-items: center;
-                    gap: 0.5rem;
+                    gap: 0.625rem;
+                    padding: 0.5rem 0.625rem;
+                    background: var(--bg-hover);
+                    border-radius: var(--radius-md);
                     font-size: 0.8125rem;
+                    transition: var(--transition-fast);
+                }
+
+                .dispatcher-item:hover {
+                    background: var(--bg-active);
                 }
 
                 .dispatcher-color {
-                    width: 12px;
-                    height: 12px;
-                    border-radius: 3px;
+                    width: 10px;
+                    height: 10px;
+                    border-radius: 50%;
                     flex-shrink: 0;
                 }
 
                 .dispatcher-name {
                     flex: 1;
                     color: var(--text-primary);
+                    font-weight: 500;
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
                 }
 
                 .dispatcher-hours {
+                    font-family: var(--font-mono);
+                    font-size: 0.75rem;
                     color: var(--text-secondary);
-                    font-weight: 500;
+                    background: var(--bg-secondary);
+                    padding: 0.125rem 0.375rem;
+                    border-radius: var(--radius-sm);
                 }
 
                 /* Main Grid */
                 .scheduler-main {
+                    flex: 1;
                     overflow-x: auto;
+                    padding-bottom: 1rem;
                 }
 
                 .schedule-grid {
                     display: grid;
-                    grid-template-columns: repeat(7, minmax(140px, 1fr));
-                    gap: 0.75rem;
-                    min-width: 900px;
+                    grid-template-columns: repeat(7, 1fr);
+                    gap: 1rem;
+                    min-width: 1100px;
+                    padding: 0.5rem;
                 }
 
                 .day-column {
@@ -711,67 +732,84 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
                     border: 1px solid var(--border);
                     border-radius: var(--radius-lg);
                     overflow: hidden;
+                    min-width: 150px;
+                    box-shadow: var(--shadow-sm);
+                    transition: var(--transition-normal);
+                }
+
+                .day-column:hover {
+                    box-shadow: var(--shadow-md);
                 }
 
                 .day-column.today {
-                    border-color: var(--primary);
-                    box-shadow: 0 0 0 1px var(--primary-soft);
+                    border-color: var(--accent);
+                    box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow-md);
                 }
 
                 .day-header {
                     display: flex;
+                    flex-direction: column;
                     align-items: center;
                     justify-content: center;
-                    padding: 1rem 0.75rem;
-                    background: var(--bg-secondary);
+                    padding: 1rem;
+                    background: var(--bg-muted);
                     border-bottom: 1px solid var(--border);
+                    gap: 0.25rem;
                 }
 
                 .day-column.today .day-header {
-                    background: var(--primary-soft);
+                    background: var(--accent-soft);
                 }
 
                 .day-name {
-                    font-size: 0.875rem;
+                    font-family: var(--font-display);
+                    font-size: 0.9375rem;
                     font-weight: 700;
                     color: var(--text-primary);
-                    text-transform: uppercase;
-                    letter-spacing: 0.05em;
+                    letter-spacing: 0.02em;
                 }
 
                 .day-column.today .day-name {
-                    color: var(--primary);
+                    color: var(--accent);
                 }
 
                 .day-shifts {
                     display: flex;
                     flex-direction: column;
-                    gap: 0.5rem;
-                    padding: 0.75rem;
-                    min-height: 200px;
+                    gap: 0.625rem;
+                    padding: 0.875rem;
+                    min-height: 280px;
+                    flex: 1;
                 }
 
                 .shift-card {
-                    background: var(--bg-secondary);
+                    background: var(--bg-hover);
                     border-radius: var(--radius-md);
-                    padding: 0.5rem 0.625rem;
-                    border-left: 3px solid var(--primary);
+                    padding: 0.75rem;
+                    border-left: 4px solid var(--accent);
+                    transition: var(--transition-fast);
+                }
+
+                .shift-card:hover {
+                    background: var(--bg-active);
+                    transform: translateX(2px);
                 }
 
                 .shift-card__header {
                     display: flex;
                     justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 0.25rem;
+                    align-items: flex-start;
+                    margin-bottom: 0.5rem;
+                    gap: 0.5rem;
                 }
 
                 .shift-card__name {
-                    font-size: 0.8125rem;
+                    font-family: var(--font-display);
+                    font-size: 0.875rem;
                     font-weight: 600;
                     color: var(--text-primary);
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
+                    line-height: 1.3;
+                    word-break: break-word;
                 }
 
                 .shift-card__actions {
@@ -779,6 +817,7 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
                     gap: 0.25rem;
                     opacity: 0;
                     transition: opacity 0.15s ease;
+                    flex-shrink: 0;
                 }
 
                 .shift-card:hover .shift-card__actions {
@@ -786,9 +825,9 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
                 }
 
                 .shift-action-btn {
-                    background: var(--bg-hover);
-                    border: none;
-                    border-radius: 4px;
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-sm);
                     padding: 0.25rem;
                     cursor: pointer;
                     color: var(--text-secondary);
@@ -799,28 +838,34 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
                 }
 
                 .shift-action-btn:hover {
-                    background: var(--bg-primary);
+                    background: var(--bg-card);
                     color: var(--text-primary);
+                    border-color: var(--border-hover);
                 }
 
                 .shift-action-btn.delete:hover {
-                    background: var(--danger-bg);
+                    background: var(--danger-soft);
+                    border-color: var(--danger-border);
                     color: var(--danger);
                 }
 
                 .shift-card__time {
+                    font-family: var(--font-mono);
                     font-size: 0.75rem;
                     color: var(--text-secondary);
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
+                    gap: 0.5rem;
                 }
 
                 .shift-card__duration {
-                    background: var(--bg-hover);
-                    padding: 0.125rem 0.375rem;
-                    border-radius: 4px;
-                    font-weight: 500;
+                    background: var(--bg-secondary);
+                    padding: 0.25rem 0.5rem;
+                    border-radius: var(--radius-sm);
+                    font-weight: 600;
+                    color: var(--text-primary);
+                    font-size: 0.6875rem;
                 }
 
                 .add-shift-btn {
@@ -828,12 +873,13 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
                     align-items: center;
                     justify-content: center;
                     gap: 0.375rem;
-                    padding: 0.5rem;
-                    background: none;
-                    border: 1px dashed var(--border);
+                    padding: 0.75rem;
+                    background: var(--bg-hover);
+                    border: 2px dashed var(--border);
                     border-radius: var(--radius-md);
-                    color: var(--text-secondary);
-                    font-size: 0.75rem;
+                    color: var(--text-muted);
+                    font-family: var(--font-sans);
+                    font-size: 0.8125rem;
                     font-weight: 500;
                     cursor: pointer;
                     transition: all 0.15s ease;
@@ -841,9 +887,10 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
                 }
 
                 .add-shift-btn:hover {
-                    border-color: var(--primary);
-                    color: var(--primary);
-                    background: var(--primary-soft);
+                    border-color: var(--accent);
+                    border-style: solid;
+                    color: var(--accent);
+                    background: var(--accent-soft);
                 }
 
                 /* Form Styles */

@@ -4,21 +4,6 @@ import prisma from "@/lib/prisma";
 import { requireAdmin, requireAccounting } from "./auth-helpers";
 import { revalidatePath } from "next/cache";
 
-// Standard service types for pricing grid
-export const SERVICE_TYPES = [
-    "Airport Transfer",
-    "Hourly Service",
-    "Point to Point",
-    "City Tour",
-    "Long Distance",
-    "Event Service",
-    "Corporate Account",
-    "Wedding",
-    "Custom",
-] as const;
-
-export type ServiceType = (typeof SERVICE_TYPES)[number];
-
 interface PricingInput {
     affiliateId: string;
     serviceType: string;
@@ -206,5 +191,167 @@ export async function copyPricingFromAffiliate(sourceAffiliateId: string, target
     );
 
     revalidatePath("/affiliates");
+    return results;
+}
+
+// ============================================
+// ROUTE-BASED PRICING
+// ============================================
+
+interface RoutePriceInput {
+    affiliateId: string;
+    pickupLocation: string;
+    dropoffLocation: string;
+    vehicleType?: string;
+    price: number;
+    notes?: string;
+}
+
+// Get all route prices for an affiliate
+export async function getAffiliateRoutePricing(affiliateId: string) {
+    await requireAccounting();
+
+    const routePricing = await prisma.affiliateRoutePrice.findMany({
+        where: { affiliateId },
+        orderBy: [{ pickupLocation: "asc" }, { dropoffLocation: "asc" }],
+    });
+
+    return routePricing;
+}
+
+// Add or update a route price entry (ADMIN/SUPER_ADMIN only)
+export async function upsertAffiliateRoutePrice(data: RoutePriceInput) {
+    await requireAdmin();
+
+    // Verify affiliate exists and is FARM_IN
+    const affiliate = await prisma.affiliate.findUnique({
+        where: { id: data.affiliateId },
+        select: { type: true },
+    });
+
+    if (!affiliate) {
+        throw new Error("Affiliate not found");
+    }
+
+    if (affiliate.type !== "FARM_IN") {
+        throw new Error("Route pricing is only available for FARM_IN affiliates");
+    }
+
+    // Use empty string for vehicleType when not specified (required for unique constraint)
+    const vehicleTypeValue = data.vehicleType || "";
+
+    const routePrice = await prisma.affiliateRoutePrice.upsert({
+        where: {
+            affiliateId_pickupLocation_dropoffLocation_vehicleType: {
+                affiliateId: data.affiliateId,
+                pickupLocation: data.pickupLocation,
+                dropoffLocation: data.dropoffLocation,
+                vehicleType: vehicleTypeValue,
+            },
+        },
+        update: {
+            price: data.price,
+            notes: data.notes,
+        },
+        create: {
+            affiliateId: data.affiliateId,
+            pickupLocation: data.pickupLocation,
+            dropoffLocation: data.dropoffLocation,
+            vehicleType: vehicleTypeValue || null,
+            price: data.price,
+            notes: data.notes,
+        },
+    });
+
+    revalidatePath("/affiliates");
+    revalidatePath("/accounting");
+    return routePrice;
+}
+
+// Delete a route price entry (ADMIN/SUPER_ADMIN only)
+export async function deleteAffiliateRoutePrice(routePriceId: string) {
+    await requireAdmin();
+
+    await prisma.affiliateRoutePrice.delete({
+        where: { id: routePriceId },
+    });
+
+    revalidatePath("/affiliates");
+    revalidatePath("/accounting");
+    return { success: true };
+}
+
+// Get all FARM_IN affiliates with both flat rates AND route pricing
+export async function getFarmInAffiliatesWithAllPricing() {
+    await requireAccounting();
+
+    const affiliates = await prisma.affiliate.findMany({
+        where: { type: "FARM_IN", isActive: true },
+        include: {
+            pricingGrid: {
+                orderBy: { serviceType: "asc" },
+            },
+            routePricing: {
+                orderBy: [{ pickupLocation: "asc" }, { dropoffLocation: "asc" }],
+            },
+        },
+        orderBy: { name: "asc" },
+    });
+
+    return affiliates;
+}
+
+// Bulk add route prices (ADMIN/SUPER_ADMIN only)
+export async function bulkAddRoutePrices(
+    affiliateId: string,
+    routes: Array<{ pickupLocation: string; dropoffLocation: string; vehicleType?: string; price: number; notes?: string }>
+) {
+    await requireAdmin();
+
+    // Verify affiliate exists and is FARM_IN
+    const affiliate = await prisma.affiliate.findUnique({
+        where: { id: affiliateId },
+        select: { type: true },
+    });
+
+    if (!affiliate) {
+        throw new Error("Affiliate not found");
+    }
+
+    if (affiliate.type !== "FARM_IN") {
+        throw new Error("Route pricing is only available for FARM_IN affiliates");
+    }
+
+    // Use a transaction to add all entries
+    const results = await prisma.$transaction(
+        routes.map((route) => {
+            const vehicleTypeValue = route.vehicleType || "";
+            return prisma.affiliateRoutePrice.upsert({
+                where: {
+                    affiliateId_pickupLocation_dropoffLocation_vehicleType: {
+                        affiliateId,
+                        pickupLocation: route.pickupLocation,
+                        dropoffLocation: route.dropoffLocation,
+                        vehicleType: vehicleTypeValue,
+                    },
+                },
+                update: {
+                    price: route.price,
+                    notes: route.notes,
+                },
+                create: {
+                    affiliateId,
+                    pickupLocation: route.pickupLocation,
+                    dropoffLocation: route.dropoffLocation,
+                    vehicleType: vehicleTypeValue || null,
+                    price: route.price,
+                    notes: route.notes,
+                },
+            });
+        })
+    );
+
+    revalidatePath("/affiliates");
+    revalidatePath("/accounting");
     return results;
 }

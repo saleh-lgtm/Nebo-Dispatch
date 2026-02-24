@@ -5,8 +5,8 @@ import { DollarSign, Plus, Trash2, Save, X, FileText, Copy } from "lucide-react"
 import {
     upsertAffiliatePricing,
     deleteAffiliatePricing,
-    SERVICE_TYPES,
 } from "@/lib/affiliatePricingActions";
+import { SERVICE_TYPES } from "@/lib/affiliatePricingTypes";
 import { useRouter } from "next/navigation";
 
 interface PricingEntry {

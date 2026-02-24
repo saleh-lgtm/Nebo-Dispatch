@@ -85,15 +85,15 @@ const ENTITIES = [
 const ACTION_COLORS: Record<string, string> = {
     CREATE: "var(--success)",
     UPDATE: "var(--accent)",
-    DELETE: "#ef4444",
-    LOGIN: "#3b82f6",
-    LOGOUT: "#6b7280",
+    DELETE: "var(--danger)",
+    LOGIN: "var(--info)",
+    LOGOUT: "var(--text-secondary)",
     APPROVE: "var(--success)",
-    REJECT: "#ef4444",
+    REJECT: "var(--danger)",
     CLOCK_IN: "var(--success)",
-    CLOCK_OUT: "#f59e0b",
-    PASSWORD_CHANGE: "#8b5cf6",
-    ROLE_CHANGE: "#ec4899",
+    CLOCK_OUT: "var(--warning)",
+    PASSWORD_CHANGE: "var(--info)",
+    ROLE_CHANGE: "var(--warning)",
 };
 
 export default function AuditClient({ initialLogs, totalLogs, stats, users }: Props) {
@@ -442,7 +442,7 @@ export default function AuditClient({ initialLogs, totalLogs, stats, users }: Pr
                                     <td style={{ padding: "1rem" }}>
                                         {getEntityBadge(log.entity)}
                                     </td>
-                                    <td style={{ padding: "1rem", fontSize: "0.875rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>
+                                    <td style={{ padding: "1rem", fontSize: "0.875rem", fontFamily: "var(--font-mono)", color: "var(--text-secondary)" }}>
                                         {log.entityId ? log.entityId.slice(0, 8) + "..." : "-"}
                                     </td>
                                     <td style={{ padding: "1rem", textAlign: "center" }}>
@@ -541,7 +541,7 @@ export default function AuditClient({ initialLogs, totalLogs, stats, users }: Pr
                                 <label style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "uppercase" }}>
                                     Entity ID
                                 </label>
-                                <p style={{ fontFamily: "monospace", fontSize: "0.875rem" }}>
+                                <p style={{ fontFamily: "var(--font-mono)", fontSize: "0.875rem" }}>
                                     {selectedLog.entityId || "-"}
                                 </p>
                             </div>
@@ -565,7 +565,7 @@ export default function AuditClient({ initialLogs, totalLogs, stats, users }: Pr
                                     <label style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "uppercase" }}>
                                         IP Address
                                     </label>
-                                    <p style={{ fontFamily: "monospace" }}>{selectedLog.ipAddress}</p>
+                                    <p style={{ fontFamily: "var(--font-mono)" }}>{selectedLog.ipAddress}</p>
                                 </div>
                             )}
 

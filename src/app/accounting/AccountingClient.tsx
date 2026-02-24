@@ -14,6 +14,8 @@ import {
     X,
     Search,
     Filter,
+    DollarSign,
+    Building2,
 } from "lucide-react";
 import {
     startAccountingReview,
@@ -21,6 +23,7 @@ import {
     getFlaggedReservations,
 } from "@/lib/accountingActions";
 import { useRouter } from "next/navigation";
+import AffiliatePricingTab from "./AffiliatePricingTab";
 
 interface AccountingFlag {
     id: string;
@@ -50,11 +53,39 @@ interface Stats {
     total: number;
 }
 
+interface PricingEntry {
+    id: string;
+    serviceType: string;
+    flatRate: number;
+    notes: string | null;
+}
+
+interface RoutePrice {
+    id: string;
+    pickupLocation: string;
+    dropoffLocation: string;
+    vehicleType: string | null;
+    price: number;
+    notes: string | null;
+}
+
+interface Affiliate {
+    id: string;
+    name: string;
+    email: string;
+    state: string | null;
+    cities: string[];
+    pricingGrid: PricingEntry[];
+    routePricing: RoutePrice[];
+}
+
 interface Props {
     initialStats: Stats;
     initialFlags: AccountingFlag[];
     totalFlags: number;
     userRole: string;
+    isAdmin: boolean;
+    affiliates: Affiliate[];
 }
 
 export default function AccountingClient({
@@ -62,8 +93,11 @@ export default function AccountingClient({
     initialFlags,
     totalFlags,
     userRole,
+    isAdmin,
+    affiliates,
 }: Props) {
     const router = useRouter();
+    const [mainSection, setMainSection] = useState<"flags" | "pricing">("flags");
     const [stats, setStats] = useState(initialStats);
     const [flags, setFlags] = useState(initialFlags);
     const [total, setTotal] = useState(totalFlags);
@@ -153,26 +187,26 @@ export default function AccountingClient({
     const getStatusColor = (status: string) => {
         switch (status) {
             case "PENDING":
-                return { bg: "rgba(245, 158, 11, 0.15)", text: "#fbbf24", border: "rgba(245, 158, 11, 0.3)" };
+                return { bg: "var(--warning-soft)", text: "var(--warning)", border: "var(--warning-border)" };
             case "IN_REVIEW":
-                return { bg: "rgba(59, 130, 246, 0.15)", text: "#60a5fa", border: "rgba(59, 130, 246, 0.3)" };
+                return { bg: "var(--info-soft)", text: "var(--info)", border: "var(--info-border)" };
             case "RESOLVED":
-                return { bg: "rgba(34, 197, 94, 0.15)", text: "#4ade80", border: "rgba(34, 197, 94, 0.3)" };
+                return { bg: "var(--success-soft)", text: "var(--success)", border: "var(--success-border)" };
             default:
-                return { bg: "rgba(255, 255, 255, 0.05)", text: "#9ca3af", border: "rgba(255, 255, 255, 0.1)" };
+                return { bg: "var(--bg-muted)", text: "var(--text-secondary)", border: "var(--border)" };
         }
     };
 
     const getTypeColor = (type: string) => {
         switch (type) {
             case "accepted":
-                return "#4ade80";
+                return "var(--success)";
             case "modified":
-                return "#60a5fa";
+                return "var(--info)";
             case "cancelled":
-                return "#f87171";
+                return "var(--danger)";
             default:
-                return "#9ca3af";
+                return "var(--text-secondary)";
         }
     };
 
@@ -187,12 +221,36 @@ export default function AccountingClient({
                     <div>
                         <h1 className="header-title">Accounting Dashboard</h1>
                         <p className="header-subtitle">
-                            Review flagged reservations and manage accounting tasks
+                            Review flagged reservations and manage affiliate pricing
                         </p>
                     </div>
                 </div>
             </header>
 
+            {/* Main Section Tabs */}
+            <div className="main-tabs">
+                <button
+                    className={`main-tab ${mainSection === "flags" ? "main-tab-active" : ""}`}
+                    onClick={() => setMainSection("flags")}
+                >
+                    <Flag size={18} />
+                    <span>Reservation Flags</span>
+                    {stats.pending > 0 && (
+                        <span className="main-tab-badge">{stats.pending}</span>
+                    )}
+                </button>
+                <button
+                    className={`main-tab ${mainSection === "pricing" ? "main-tab-active" : ""}`}
+                    onClick={() => setMainSection("pricing")}
+                >
+                    <DollarSign size={18} />
+                    <span>Affiliate Pricing</span>
+                    <span className="main-tab-count">{affiliates.length}</span>
+                </button>
+            </div>
+
+            {mainSection === "flags" ? (
+                <>
             {/* Stats Cards */}
             <div className="stats-grid">
                 <div className="stat-card stat-pending">
@@ -558,6 +616,10 @@ export default function AccountingClient({
                     </div>
                 </div>
             )}
+            </>
+            ) : (
+                <AffiliatePricingTab affiliates={affiliates} isAdmin={isAdmin} />
+            )}
 
             <style jsx>{`
                 .accounting-page {
@@ -599,6 +661,68 @@ export default function AccountingClient({
                     color: var(--text-secondary);
                 }
 
+                /* Main Section Tabs */
+                .main-tabs {
+                    display: flex;
+                    gap: 0.5rem;
+                    margin-bottom: 1.5rem;
+                    padding: 0.25rem;
+                    background: rgba(255, 255, 255, 0.02);
+                    border: 1px solid rgba(255, 255, 255, 0.06);
+                    border-radius: 12px;
+                    width: fit-content;
+                }
+
+                .main-tab {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.75rem 1.25rem;
+                    background: transparent;
+                    border: none;
+                    border-radius: 10px;
+                    color: var(--text-secondary);
+                    font-size: 0.9rem;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+
+                .main-tab:hover {
+                    background: rgba(255, 255, 255, 0.05);
+                    color: var(--text-primary);
+                }
+
+                .main-tab-active {
+                    background: linear-gradient(135deg, var(--accent) 0%, #d4a853 100%);
+                    color: #1a1a2e;
+                }
+
+                .main-tab-badge {
+                    background: rgba(239, 68, 68, 0.9);
+                    color: white;
+                    padding: 0.125rem 0.5rem;
+                    border-radius: 9999px;
+                    font-size: 0.7rem;
+                    font-weight: 600;
+                }
+
+                .main-tab-active .main-tab-badge {
+                    background: rgba(0, 0, 0, 0.2);
+                    color: #1a1a2e;
+                }
+
+                .main-tab-count {
+                    padding: 0.125rem 0.5rem;
+                    background: rgba(255, 255, 255, 0.1);
+                    border-radius: 9999px;
+                    font-size: 0.7rem;
+                }
+
+                .main-tab-active .main-tab-count {
+                    background: rgba(0, 0, 0, 0.15);
+                }
+
                 /* Stats Grid */
                 .stats-grid {
                     display: grid;
@@ -627,23 +751,23 @@ export default function AccountingClient({
                 }
 
                 .stat-pending .stat-icon {
-                    background: rgba(245, 158, 11, 0.15);
-                    color: #fbbf24;
+                    background: var(--warning-soft);
+                    color: var(--warning);
                 }
 
                 .stat-review .stat-icon {
-                    background: rgba(59, 130, 246, 0.15);
-                    color: #60a5fa;
+                    background: var(--info-soft);
+                    color: var(--info);
                 }
 
                 .stat-resolved .stat-icon {
-                    background: rgba(34, 197, 94, 0.15);
-                    color: #4ade80;
+                    background: var(--success-soft);
+                    color: var(--success);
                 }
 
                 .stat-total .stat-icon {
-                    background: rgba(168, 85, 247, 0.15);
-                    color: #c084fc;
+                    background: var(--accent-soft);
+                    color: var(--accent);
                 }
 
                 .stat-content {
@@ -858,23 +982,25 @@ export default function AccountingClient({
                 }
 
                 .action-review {
-                    background: rgba(59, 130, 246, 0.15);
-                    border: 1px solid rgba(59, 130, 246, 0.3);
-                    color: #60a5fa;
+                    background: var(--info-soft);
+                    border: 1px solid var(--info-border);
+                    color: var(--info);
                 }
 
                 .action-review:hover {
-                    background: rgba(59, 130, 246, 0.25);
+                    background: var(--info-soft);
+                    filter: brightness(1.1);
                 }
 
                 .action-resolve {
-                    background: rgba(34, 197, 94, 0.15);
-                    border: 1px solid rgba(34, 197, 94, 0.3);
-                    color: #4ade80;
+                    background: var(--success-soft);
+                    border: 1px solid var(--success-border);
+                    color: var(--success);
                 }
 
                 .action-resolve:hover {
-                    background: rgba(34, 197, 94, 0.25);
+                    background: var(--success-soft);
+                    filter: brightness(1.1);
                 }
 
                 .action-view {
@@ -913,10 +1039,10 @@ export default function AccountingClient({
                     align-items: flex-start;
                     gap: 0.5rem;
                     padding: 0.75rem;
-                    background: rgba(245, 158, 11, 0.08);
-                    border: 1px solid rgba(245, 158, 11, 0.15);
+                    background: var(--warning-soft);
+                    border: 1px solid var(--warning-border);
                     border-radius: 8px;
-                    color: #fbbf24;
+                    color: var(--warning);
                     font-size: 0.8rem;
                 }
 
@@ -931,7 +1057,7 @@ export default function AccountingClient({
                     align-items: center;
                     gap: 0.5rem;
                     font-size: 0.8rem;
-                    color: #4ade80;
+                    color: var(--success);
                 }
 
                 /* Modal */
@@ -1105,13 +1231,13 @@ export default function AccountingClient({
                 }
 
                 .btn-primary {
-                    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+                    background: var(--info);
                     border: none;
                     color: white;
                 }
 
                 .btn-success {
-                    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+                    background: var(--success);
                     border: none;
                     color: white;
                 }

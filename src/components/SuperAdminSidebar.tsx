@@ -153,56 +153,56 @@ export default function SuperAdminSidebar({ user }: Props) {
                 {/* Navigation */}
                 <nav className="sa-nav">
                     {/* Overview - All users */}
-                    <NavSection title="Overview" collapsed={collapsed}>
+                    <NavSection title="Home" collapsed={collapsed}>
                         <NavItem href="/dashboard" icon={<LayoutDashboard size={18} />} label="Dashboard" collapsed={collapsed} />
                     </NavSection>
 
                     {/* Dispatcher-specific */}
                     {isDispatcher && (
-                        <NavSection title="My Work" collapsed={collapsed}>
+                        <NavSection title="My Shift" collapsed={collapsed}>
                             <NavItem href="/schedule" icon={<Calendar size={18} />} label="My Schedule" collapsed={collapsed} />
-                            <NavItem href="/reports/shift" icon={<ClipboardList size={18} />} label="Shift Report" collapsed={collapsed} />
+                            <NavItem href="/reports/shift" icon={<ClipboardList size={18} />} label="End of Shift Report" collapsed={collapsed} />
                         </NavSection>
                     )}
 
                     {/* Admin Scheduling */}
                     {isAdmin && (
                         <NavSection title="Scheduling" collapsed={collapsed}>
-                            <NavItem href="/admin/scheduler" icon={<CalendarClock size={18} />} label="Dispatcher Scheduler" collapsed={collapsed} />
-                            <NavItem href="/admin/requests" icon={<FileEdit size={18} />} label="Pending Requests" collapsed={collapsed} />
+                            <NavItem href="/admin/scheduler" icon={<CalendarClock size={18} />} label="Schedule Builder" collapsed={collapsed} />
+                            <NavItem href="/admin/requests" icon={<FileEdit size={18} />} label="Time Off & Swaps" collapsed={collapsed} />
                         </NavSection>
                     )}
 
                     {/* Team Management - Admin only */}
                     {isAdmin && (
-                        <NavSection title="Team Management" collapsed={collapsed}>
+                        <NavSection title="Team" collapsed={collapsed}>
                             {isSuperAdmin && (
-                                <NavItem href="/admin/users" icon={<UserCog size={18} />} label="User Management" collapsed={collapsed} />
+                                <NavItem href="/admin/users" icon={<UserCog size={18} />} label="Manage Users" collapsed={collapsed} />
                             )}
-                            <NavItem href="/admin/approvals" icon={<UserPlus size={18} />} label="User Approvals" collapsed={collapsed} />
-                            <NavItem href="/admin/hours" icon={<Clock size={18} />} label="Hours Tracking" collapsed={collapsed} />
-                            <NavItem href="/admin/confirmations" icon={<Phone size={18} />} label="Confirmations" collapsed={collapsed} />
-                            <NavItem href="/admin/tasks" icon={<CheckSquare size={18} />} label="Admin Tasks" collapsed={collapsed} />
-                            <NavItem href="/admin/notes" icon={<StickyNote size={18} />} label="Global Notes" collapsed={collapsed} />
-                            <NavItem href="/admin/sms" icon={<MessageSquare size={18} />} label="SMS Dashboard" collapsed={collapsed} />
+                            <NavItem href="/admin/approvals" icon={<UserPlus size={18} />} label="New User Approvals" collapsed={collapsed} />
+                            <NavItem href="/admin/hours" icon={<Clock size={18} />} label="Work Hours" collapsed={collapsed} />
+                            <NavItem href="/admin/confirmations" icon={<Phone size={18} />} label="Trip Confirmations" collapsed={collapsed} />
+                            <NavItem href="/admin/tasks" icon={<CheckSquare size={18} />} label="Tasks" collapsed={collapsed} />
+                            <NavItem href="/admin/notes" icon={<StickyNote size={18} />} label="Shift Notes" collapsed={collapsed} />
+                            <NavItem href="/admin/sms" icon={<MessageSquare size={18} />} label="Team Messaging" collapsed={collapsed} />
                         </NavSection>
                     )}
 
                     {/* Content - All users */}
-                    <NavSection title="Content" collapsed={collapsed}>
-                        <NavItem href="/fleet" icon={<Car size={18} />} label="Fleet Management" collapsed={collapsed} />
-                        <NavItem href="/network" icon={<Network size={18} />} label="Network" collapsed={collapsed} />
+                    <NavSection title="Operations" collapsed={collapsed}>
+                        <NavItem href="/fleet" icon={<Car size={18} />} label="Fleet" collapsed={collapsed} />
+                        <NavItem href="/network" icon={<Network size={18} />} label="Affiliates" collapsed={collapsed} />
                         {isAdmin ? (
-                            <NavItem href="/admin/sops" icon={<BookOpen size={18} />} label="Manage SOPs" collapsed={collapsed} />
+                            <NavItem href="/admin/sops" icon={<BookOpen size={18} />} label="SOPs" collapsed={collapsed} />
                         ) : (
                             <NavItem href="/sops" icon={<BookOpen size={18} />} label="SOPs" collapsed={collapsed} />
                         )}
-                        <NavItem href="/sms" icon={<MessageSquare size={18} />} label="SMS" collapsed={collapsed} />
+                        <NavItem href="/sms" icon={<MessageSquare size={18} />} label="SMS Center" collapsed={collapsed} />
                     </NavSection>
 
                     {/* Reports & Analytics - Admin or Accounting */}
                     {(isAdmin || hasAccountingAccess) && (
-                        <NavSection title="Reports & Analytics" collapsed={collapsed}>
+                        <NavSection title="Reports" collapsed={collapsed}>
                             {isAdmin && (
                                 <>
                                     <NavItem href="/admin/reports" icon={<FileText size={18} />} label="Shift Reports" collapsed={collapsed} />

@@ -57,9 +57,10 @@ export default function UsersClient({ users, stats, currentUserId }: Props) {
 
     const getRoleBadge = (role: string) => {
         const badges: Record<string, { bg: string; text: string; icon: React.ReactNode }> = {
-            SUPER_ADMIN: { bg: "rgba(239, 68, 68, 0.15)", text: "#ef4444", icon: <ShieldCheck size={12} /> },
-            ADMIN: { bg: "rgba(183, 175, 163, 0.15)", text: "var(--accent)", icon: <Shield size={12} /> },
-            DISPATCHER: { bg: "rgba(16, 185, 129, 0.15)", text: "var(--success)", icon: <User size={12} /> },
+            SUPER_ADMIN: { bg: "var(--danger-soft)", text: "var(--danger)", icon: <ShieldCheck size={12} /> },
+            ADMIN: { bg: "var(--accent-soft)", text: "var(--accent)", icon: <Shield size={12} /> },
+            ACCOUNTING: { bg: "var(--warning-soft)", text: "var(--warning)", icon: <Shield size={12} /> },
+            DISPATCHER: { bg: "var(--success-soft)", text: "var(--success)", icon: <User size={12} /> },
         };
         const badge = badges[role] || badges.DISPATCHER;
         return (
@@ -206,12 +207,12 @@ export default function UsersClient({ users, stats, currentUserId }: Props) {
 
             {/* Alerts */}
             {error && (
-                <div style={{ padding: "1rem", background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: "0.5rem", marginBottom: "1rem", color: "#ef4444" }}>
+                <div style={{ padding: "1rem", background: "var(--danger-soft)", border: "1px solid var(--danger-border)", borderRadius: "0.5rem", marginBottom: "1rem", color: "var(--danger)" }}>
                     {error}
                 </div>
             )}
             {success && (
-                <div style={{ padding: "1rem", background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.3)", borderRadius: "0.5rem", marginBottom: "1rem", color: "var(--success)" }}>
+                <div style={{ padding: "1rem", background: "var(--success-soft)", border: "1px solid var(--success-border)", borderRadius: "0.5rem", marginBottom: "1rem", color: "var(--success)" }}>
                     {success}
                 </div>
             )}
@@ -223,7 +224,7 @@ export default function UsersClient({ users, stats, currentUserId }: Props) {
                     <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>Total Users</p>
                 </div>
                 <div className="glass-card" style={{ padding: "1rem", textAlign: "center" }}>
-                    <p style={{ fontSize: "2rem", fontWeight: 600, color: "#ef4444" }}>{stats.byRole.superAdmins}</p>
+                    <p style={{ fontSize: "2rem", fontWeight: 600, color: "var(--danger)" }}>{stats.byRole.superAdmins}</p>
                     <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>Super Admins</p>
                 </div>
                 <div className="glass-card" style={{ padding: "1rem", textAlign: "center" }}>
@@ -287,8 +288,8 @@ export default function UsersClient({ users, stats, currentUserId }: Props) {
                                             borderRadius: "9999px",
                                             fontSize: "0.75rem",
                                             fontWeight: 500,
-                                            background: user.isActive ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
-                                            color: user.isActive ? "var(--success)" : "#ef4444",
+                                            background: user.isActive ? "var(--success-soft)" : "var(--danger-soft)",
+                                            color: user.isActive ? "var(--success)" : "var(--danger)",
                                         }}
                                     >
                                         {user.isActive ? "Active" : "Inactive"}
@@ -341,7 +342,7 @@ export default function UsersClient({ users, stats, currentUserId }: Props) {
                                                     </button>
                                                     <button
                                                         onClick={() => openDeleteModal(user)}
-                                                        style={{ display: "block", width: "100%", padding: "0.75rem 1rem", textAlign: "left", background: "none", border: "none", cursor: "pointer", color: "#ef4444" }}
+                                                        style={{ display: "block", width: "100%", padding: "0.75rem 1rem", textAlign: "left", background: "none", border: "none", cursor: "pointer", color: "var(--danger)" }}
                                                     >
                                                         Deactivate User
                                                     </button>
@@ -543,7 +544,7 @@ export default function UsersClient({ users, stats, currentUserId }: Props) {
                                 onClick={handleDelete}
                                 disabled={loading}
                                 className="btn"
-                                style={{ flex: 1, background: "#ef4444", color: "white" }}
+                                style={{ flex: 1, background: "var(--danger)", color: "white" }}
                             >
                                 {loading ? "Deactivating..." : "Deactivate"}
                             </button>

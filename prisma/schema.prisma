@@ -395,6 +395,7 @@ model Affiliate {
 
   // Pricing grid for FARM_IN affiliates
   pricingGrid   AffiliatePricing[]
+  routePricing  AffiliateRoutePrice[]
 
   // File attachments
   attachments   AffiliateAttachment[]
@@ -946,7 +947,7 @@ model AccountingFlag {
   @@index([flaggedById])
 }
 
-// Pricing grid for FARM_IN affiliates
+// Pricing grid for FARM_IN affiliates - flat rates by service type
 model AffiliatePricing {
   id           String    @id @default(cuid())
   affiliateId  String
@@ -960,6 +961,27 @@ model AffiliatePricing {
 
   @@unique([affiliateId, serviceType])
   @@index([affiliateId])
+}
+
+// Route-based pricing for FARM_IN affiliates - specific pickup/dropoff rates
+model AffiliateRoutePrice {
+  id              String    @id @default(cuid())
+  affiliateId     String
+  affiliate       Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  pickupLocation  String    // City, airport code, or area (e.g., "LAX", "Downtown LA")
+  dropoffLocation String    // City, airport code, or area
+  vehicleType     String?   // Optional: "Sedan", "SUV", "Van" for vehicle-specific rates
+
+  price           Float     // Price for this specific route
+  notes           String?   @db.Text
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([affiliateId, pickupLocation, dropoffLocation, vehicleType])
+  @@index([affiliateId])
+  @@index([pickupLocation, dropoffLocation])
 }
 
 // Notification types

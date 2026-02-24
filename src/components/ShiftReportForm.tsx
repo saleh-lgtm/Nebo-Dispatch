@@ -1749,6 +1749,21 @@ const MetricCard = memo(function MetricCard({ label, value, onChange, icon, colo
     );
 });
 
+// Predefined flag reasons for accounting review
+const FLAG_REASONS = [
+    "Price discrepancy",
+    "Missing payment info",
+    "Affiliate billing issue",
+    "Rate adjustment needed",
+    "Discount applied",
+    "Gratuity issue",
+    "Cancellation fee",
+    "No-show charge",
+    "Extra charges",
+    "Refund request",
+    "Other",
+] as const;
+
 // Reservation Section Component
 function ReservationSection({ title, data, setter, add, update, remove, color }: any) {
     const colors: Record<string, { bg: string; border: string; text: string }> = {
@@ -1788,7 +1803,16 @@ function ReservationSection({ title, data, setter, add, update, remove, color }:
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 {data.map((item: any, index: number) => (
-                    <div key={index} style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
+                    <div key={index} style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.5rem",
+                        padding: item.flaggedForAccounting ? "0.75rem" : "0",
+                        background: item.flaggedForAccounting ? "rgba(245, 158, 11, 0.08)" : "transparent",
+                        border: item.flaggedForAccounting ? "1px solid rgba(245, 158, 11, 0.25)" : "none",
+                        borderRadius: "8px",
+                        transition: "all 0.2s",
+                    }}>
                         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
                             <input
                                 placeholder="Res #"
@@ -1819,19 +1843,36 @@ function ReservationSection({ title, data, setter, add, update, remove, color }:
                                 }}
                             />
                             <button
-                                onClick={() => update(setter, index, "flaggedForAccounting", !item.flaggedForAccounting)}
-                                title={item.flaggedForAccounting ? "Remove accounting flag" : "Flag for accounting review"}
+                                onClick={() => {
+                                    if (item.flaggedForAccounting) {
+                                        update(setter, index, "flaggedForAccounting", false);
+                                        update(setter, index, "flagReason", "");
+                                    } else {
+                                        update(setter, index, "flaggedForAccounting", true);
+                                    }
+                                }}
                                 style={{
-                                    padding: "0.375rem",
-                                    background: item.flaggedForAccounting ? "rgba(245, 158, 11, 0.2)" : "none",
-                                    border: item.flaggedForAccounting ? "1px solid rgba(245, 158, 11, 0.4)" : "none",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "0.375rem",
+                                    padding: "0.375rem 0.625rem",
+                                    background: item.flaggedForAccounting
+                                        ? "rgba(245, 158, 11, 0.25)"
+                                        : "rgba(255, 255, 255, 0.05)",
+                                    border: item.flaggedForAccounting
+                                        ? "1px solid rgba(245, 158, 11, 0.5)"
+                                        : "1px solid rgba(255, 255, 255, 0.1)",
                                     borderRadius: "6px",
                                     color: item.flaggedForAccounting ? "#fbbf24" : "var(--text-secondary)",
                                     cursor: "pointer",
                                     transition: "all 0.2s",
+                                    fontSize: "0.7rem",
+                                    fontWeight: 500,
+                                    whiteSpace: "nowrap",
                                 }}
                             >
-                                <Flag size={14} />
+                                <Flag size={12} />
+                                {item.flaggedForAccounting ? "Flagged" : "Flag"}
                             </button>
                             <button
                                 onClick={() => remove(setter, index)}
@@ -1847,20 +1888,69 @@ function ReservationSection({ title, data, setter, add, update, remove, color }:
                             </button>
                         </div>
                         {item.flaggedForAccounting && (
-                            <input
-                                placeholder="Reason for accounting review..."
-                                value={item.flagReason || ""}
-                                onChange={(e) => update(setter, index, "flagReason", e.target.value)}
-                                style={{
-                                    padding: "0.5rem",
-                                    background: "rgba(245, 158, 11, 0.1)",
-                                    border: "1px solid rgba(245, 158, 11, 0.2)",
-                                    borderRadius: "6px",
-                                    color: "var(--text-primary)",
-                                    fontSize: "0.75rem",
-                                    marginLeft: "0",
-                                }}
-                            />
+                            <div style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "0.5rem",
+                                paddingTop: "0.25rem",
+                            }}>
+                                <div style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "0.5rem",
+                                    fontSize: "0.7rem",
+                                    color: "#fbbf24",
+                                    fontWeight: 500,
+                                }}>
+                                    <AlertOctagon size={12} />
+                                    <span>Flagged for Accounting Review</span>
+                                </div>
+                                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                                    <select
+                                        value={FLAG_REASONS.includes(item.flagReason as any) ? item.flagReason : (item.flagReason ? "Other" : "")}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            if (value === "Other") {
+                                                update(setter, index, "flagReason", "");
+                                            } else {
+                                                update(setter, index, "flagReason", value);
+                                            }
+                                        }}
+                                        style={{
+                                            flex: 1,
+                                            minWidth: "150px",
+                                            padding: "0.5rem",
+                                            background: "rgba(0, 0, 0, 0.3)",
+                                            border: "1px solid rgba(245, 158, 11, 0.3)",
+                                            borderRadius: "6px",
+                                            color: "var(--text-primary)",
+                                            fontSize: "0.75rem",
+                                        }}
+                                    >
+                                        <option value="">Select reason...</option>
+                                        {FLAG_REASONS.map((reason) => (
+                                            <option key={reason} value={reason}>{reason}</option>
+                                        ))}
+                                    </select>
+                                    {(!FLAG_REASONS.includes(item.flagReason as any) || item.flagReason === "Other" || !item.flagReason) && (
+                                        <input
+                                            placeholder="Specify reason..."
+                                            value={FLAG_REASONS.includes(item.flagReason as any) ? "" : (item.flagReason || "")}
+                                            onChange={(e) => update(setter, index, "flagReason", e.target.value)}
+                                            style={{
+                                                flex: 2,
+                                                minWidth: "150px",
+                                                padding: "0.5rem",
+                                                background: "rgba(0, 0, 0, 0.3)",
+                                                border: "1px solid rgba(245, 158, 11, 0.3)",
+                                                borderRadius: "6px",
+                                                color: "var(--text-primary)",
+                                                fontSize: "0.75rem",
+                                            }}
+                                        />
+                                    )}
+                                </div>
+                            </div>
                         )}
                     </div>
                 ))}

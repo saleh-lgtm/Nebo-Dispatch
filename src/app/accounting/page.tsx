@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getAccountingStats, getFlaggedReservations } from "@/lib/accountingActions";
+import { getFarmInAffiliatesWithAllPricing } from "@/lib/affiliatePricingActions";
 import dynamic from "next/dynamic";
 
 const AccountingClient = dynamic(() => import("./AccountingClient"), {
@@ -40,10 +41,13 @@ export default async function AccountingPage() {
         redirect("/dashboard");
     }
 
+    const isAdmin = session.user.role === "ADMIN" || session.user.role === "SUPER_ADMIN";
+
     // Fetch initial data
-    const [stats, flaggedData] = await Promise.all([
+    const [stats, flaggedData, affiliatesData] = await Promise.all([
         getAccountingStats(),
         getFlaggedReservations({ limit: 20 }),
+        getFarmInAffiliatesWithAllPricing(),
     ]);
 
     return (
@@ -52,6 +56,8 @@ export default async function AccountingPage() {
             initialFlags={flaggedData.flags as any}
             totalFlags={flaggedData.total}
             userRole={session.user.role}
+            isAdmin={isAdmin}
+            affiliates={affiliatesData as any}
         />
     );
 }
