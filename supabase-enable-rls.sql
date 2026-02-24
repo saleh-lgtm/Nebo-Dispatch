@@ -1,0 +1,73 @@
+-- ============================================
+-- ENABLE ROW LEVEL SECURITY ON ALL TABLES
+-- This blocks public API access while allowing
+-- Prisma (with service role) to work normally
+-- ============================================
+
+-- Enable RLS on all tables
+ALTER TABLE "TaskTemplate" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "TaskItem" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Affiliate" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Schedule" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "CourtReport" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "SchedulingRequest" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "ShiftTask" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Task" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "GlobalNote" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "User" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "AuditLog" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "SOPRead" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "SOPFavorite" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "SOPVersion" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "SOPRelated" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "SOPQuiz" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "ShiftReport" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "SOPQuizQuestion" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "PasswordResetToken" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "UserPresence" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "SOPQuizAttempt" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "FleetVehicle" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Event" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "TimeOffRequest" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "ShiftSwapRequest" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "AffiliatePricing" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "AdminTask" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "AccountingFlag" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "VehiclePermit" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "VehicleDocument" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "AffiliateAttachment" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Notification" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "VehicleRegistration" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Quote" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "SOP" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "QuoteAction" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "VehicleInsurance" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "SMSOptOut" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "AdminTaskCompletion" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Shift" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "SMSLog" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "RetailLead" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "SMSContact" ENABLE ROW LEVEL SECURITY;
+
+-- ============================================
+-- IMPORTANT: Your Prisma app uses SUPABASE_SERVICE_ROLE_KEY
+-- which BYPASSES RLS automatically - no policies needed!
+-- ============================================
+
+-- For SMS Realtime to work, we need a read policy for authenticated users
+-- (Realtime uses the anon/authenticated context)
+CREATE POLICY "Allow realtime read for SMSLog"
+ON "SMSLog"
+FOR SELECT
+TO authenticated, anon
+USING (true);
+
+-- Allow realtime inserts for the webhook (via service role, this is redundant but explicit)
+CREATE POLICY "Allow service role full access to SMSLog"
+ON "SMSLog"
+FOR ALL
+TO service_role
+USING (true)
+WITH CHECK (true);
+
+-- Done! Run this in Supabase SQL Editor
