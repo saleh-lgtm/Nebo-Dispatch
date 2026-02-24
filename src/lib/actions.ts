@@ -191,6 +191,101 @@ export async function saveShiftReport(data: Record<string, unknown> & {
     revalidatePath("/reports/shift");
 }
 
+/**
+ * Save shift report draft (auto-save to server)
+ * This allows users to save their progress without clocking out
+ */
+export interface ShiftReportDraft {
+    shiftId: string;
+    accepted: Array<{ id: string; notes: string; flaggedForAccounting?: boolean; flagReason?: string }>;
+    modified: Array<{ id: string; notes: string; flaggedForAccounting?: boolean; flagReason?: string }>;
+    cancelled: Array<{ id: string; notes: string; flaggedForAccounting?: boolean; flagReason?: string }>;
+    retailLeads: Array<{
+        serviceRequested: string;
+        outcome: "WON" | "NEEDS_FOLLOW_UP" | "LOST";
+        lostReason?: "VEHICLE_TYPE" | "AVAILABILITY" | "PRICING" | "OTHER";
+        lostReasonOther?: string;
+        notes?: string;
+    }>;
+    handoffNotes: string;
+    metrics: {
+        calls: number;
+        emails: number;
+        totalReservationsHandled: number;
+    };
+    narrative: {
+        comments: string;
+        incidents: string;
+        ideas: string;
+    };
+}
+
+export async function saveShiftReportDraft(draft: ShiftReportDraft) {
+    const session = await requireAuth();
+
+    // Find or create draft record
+    const existingDraft = await prisma.shiftReportDraft.findFirst({
+        where: {
+            shiftId: draft.shiftId,
+            userId: session.user.id,
+        },
+    });
+
+    const draftData = {
+        userId: session.user.id,
+        shiftId: draft.shiftId,
+        draftData: draft as unknown as object,
+        lastSavedAt: new Date(),
+    };
+
+    if (existingDraft) {
+        await prisma.shiftReportDraft.update({
+            where: { id: existingDraft.id },
+            data: draftData,
+        });
+    } else {
+        await prisma.shiftReportDraft.create({
+            data: draftData,
+        });
+    }
+
+    return { success: true, savedAt: new Date() };
+}
+
+/**
+ * Get existing draft for a shift
+ */
+export async function getShiftReportDraft(shiftId: string): Promise<ShiftReportDraft | null> {
+    const session = await requireAuth();
+
+    const draft = await prisma.shiftReportDraft.findFirst({
+        where: {
+            shiftId,
+            userId: session.user.id,
+        },
+    });
+
+    if (!draft) return null;
+
+    return draft.draftData as unknown as ShiftReportDraft;
+}
+
+/**
+ * Delete draft after successful submit
+ */
+export async function deleteShiftReportDraft(shiftId: string) {
+    const session = await requireAuth();
+
+    await prisma.shiftReportDraft.deleteMany({
+        where: {
+            shiftId,
+            userId: session.user.id,
+        },
+    });
+
+    return { success: true };
+}
+
 export async function createActiveShift(userId: string) {
     const session = await requireAuth();
 

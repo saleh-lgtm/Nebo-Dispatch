@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, memo } from "react";
-import { Plus, Trash2, ClipboardCheck, Send, AlertCircle, Bookmark, Phone, Mail, FileText, TrendingUp, MessageSquare, Lightbulb, Clock, CheckCircle, Minus, X, DollarSign, User, Flag, PhoneCall, ThumbsUp, ThumbsDown, AlertOctagon } from "lucide-react";
-import { toggleTask, saveShiftReport } from "@/lib/actions";
+import { useState, memo, useEffect, useMemo, useCallback } from "react";
+import { Plus, Trash2, ClipboardCheck, Send, AlertCircle, Bookmark, Phone, Mail, FileText, TrendingUp, MessageSquare, Lightbulb, Clock, CheckCircle, Minus, X, DollarSign, User, Flag, PhoneCall, ThumbsUp, ThumbsDown, AlertOctagon, Cloud, CloudOff, Save, RefreshCw } from "lucide-react";
+import { toggleTask, saveShiftReport, saveShiftReportDraft, deleteShiftReportDraft, type ShiftReportDraft } from "@/lib/actions";
 import { createQuote } from "@/lib/quoteActions";
+import { useAutoSave } from "@/hooks/useAutoSave";
 
 interface ReservationEntry {
     id: string;
@@ -47,18 +48,18 @@ interface Narrative {
     ideas: string;
 }
 
-export default function ShiftReportPage({ session, activeShift, initialTasks, initialQuotes = [] }: any) {
-    const [accepted, setAccepted] = useState<ReservationEntry[]>([]);
-    const [modified, setModified] = useState<ReservationEntry[]>([]);
-    const [cancelled, setCancelled] = useState<ReservationEntry[]>([]);
-    const [retailLeads, setRetailLeads] = useState<RetailLeadEntry[]>([]);
-    const [handoffNotes, setHandoffNotes] = useState("");
-    const [metrics, setMetrics] = useState<Metrics>({
+export default function ShiftReportPage({ session, activeShift, initialTasks, initialQuotes = [], initialDraft }: any) {
+    const [accepted, setAccepted] = useState<ReservationEntry[]>(initialDraft?.accepted || []);
+    const [modified, setModified] = useState<ReservationEntry[]>(initialDraft?.modified || []);
+    const [cancelled, setCancelled] = useState<ReservationEntry[]>(initialDraft?.cancelled || []);
+    const [retailLeads, setRetailLeads] = useState<RetailLeadEntry[]>(initialDraft?.retailLeads || []);
+    const [handoffNotes, setHandoffNotes] = useState(initialDraft?.handoffNotes || "");
+    const [metrics, setMetrics] = useState<Metrics>(initialDraft?.metrics || {
         calls: 0,
         emails: 0,
         totalReservationsHandled: 0
     });
-    const [narrative, setNarrative] = useState<Narrative>({
+    const [narrative, setNarrative] = useState<Narrative>(initialDraft?.narrative || {
         comments: "",
         incidents: "",
         ideas: ""
@@ -67,6 +68,66 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
     const [quotes, setQuotes] = useState<Quote[]>(initialQuotes);
     const [showQuoteModal, setShowQuoteModal] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showDraftRecovery, setShowDraftRecovery] = useState(false);
+
+    // Combine all form data for auto-save
+    const formData = useMemo<ShiftReportDraft>(() => ({
+        shiftId: activeShift?.id || "",
+        accepted,
+        modified,
+        cancelled,
+        retailLeads,
+        handoffNotes,
+        metrics,
+        narrative,
+    }), [activeShift?.id, accepted, modified, cancelled, retailLeads, handoffNotes, metrics, narrative]);
+
+    // Server save handler
+    const handleServerSave = useCallback(async (data: ShiftReportDraft) => {
+        if (!activeShift?.id) return;
+        try {
+            await saveShiftReportDraft(data);
+        } catch (error) {
+            console.error("Failed to save draft to server:", error);
+        }
+    }, [activeShift?.id]);
+
+    // Auto-save hook
+    const { state: saveState, restoreDraft, clearDraft } = useAutoSave({
+        storageKey: `shift-report-draft-${activeShift?.id || "unknown"}`,
+        data: formData,
+        debounceMs: 1500,
+        serverSaveIntervalMs: 30000,
+        onServerSave: handleServerSave,
+        enabled: !!activeShift?.id,
+    });
+
+    // Check for draft on mount
+    useEffect(() => {
+        if (saveState.hasDraft && !initialDraft) {
+            setShowDraftRecovery(true);
+        }
+    }, [saveState.hasDraft, initialDraft]);
+
+    // Handle draft restoration
+    const handleRestoreDraft = useCallback(() => {
+        const draft = restoreDraft();
+        if (draft) {
+            setAccepted(draft.accepted || []);
+            setModified(draft.modified || []);
+            setCancelled(draft.cancelled || []);
+            setRetailLeads(draft.retailLeads || []);
+            setHandoffNotes(draft.handoffNotes || "");
+            setMetrics(draft.metrics || { calls: 0, emails: 0, totalReservationsHandled: 0 });
+            setNarrative(draft.narrative || { comments: "", incidents: "", ideas: "" });
+        }
+        setShowDraftRecovery(false);
+    }, [restoreDraft]);
+
+    const handleDiscardDraft = useCallback(() => {
+        clearDraft();
+        setShowDraftRecovery(false);
+    }, [clearDraft]);
 
     const addReservation = (setter: any) => {
         setter((prev: any) => [...prev, { id: "", notes: "" }]);
@@ -175,6 +236,15 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
             };
 
             await saveShiftReport(data);
+
+            // Clear draft after successful submission
+            clearDraft();
+            try {
+                await deleteShiftReportDraft(activeShift.id);
+            } catch {
+                // Ignore draft deletion errors
+            }
+
             window.location.href = "/dashboard";
         } catch (error) {
             console.error("Failed to save shift report:", error);
@@ -186,8 +256,35 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
     const completedTasks = tasks.filter((t: any) => t.isCompleted).length;
     const taskProgress = tasks.length > 0 ? (completedTasks / tasks.length) * 100 : 0;
 
+    // Format the last saved time
+    const formatLastSaved = (date: Date | null) => {
+        if (!date) return "";
+        return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    };
+
     return (
         <div className="report-page">
+            {/* Draft Recovery Modal */}
+            {showDraftRecovery && (
+                <div className="draft-recovery-overlay">
+                    <div className="draft-recovery-modal">
+                        <div className="draft-recovery-icon">
+                            <RefreshCw size={32} />
+                        </div>
+                        <h3>Unsaved Work Found</h3>
+                        <p>We found a previous draft of your shift report. Would you like to restore it?</p>
+                        <div className="draft-recovery-actions">
+                            <button onClick={handleDiscardDraft} className="discard-btn">
+                                Start Fresh
+                            </button>
+                            <button onClick={handleRestoreDraft} className="restore-btn">
+                                Restore Draft
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <header className="report-header">
                 <div className="header-content">
@@ -202,18 +299,47 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
                         </p>
                     </div>
                 </div>
-                <button
-                    onClick={handleSubmit}
-                    className="submit-btn"
-                    disabled={isSubmitting}
-                >
-                    {isSubmitting ? (
-                        <span className="spinner" />
-                    ) : (
-                        <Send size={18} />
-                    )}
-                    <span>{isSubmitting ? "Submitting..." : "Finalize & Clock Out"}</span>
-                </button>
+                <div className="header-actions">
+                    {/* Save Status Indicator */}
+                    <div className={`save-status ${saveState.status}`}>
+                        {saveState.status === "saving" && (
+                            <>
+                                <Cloud size={16} className="pulse" />
+                                <span>Saving...</span>
+                            </>
+                        )}
+                        {saveState.status === "saved" && (
+                            <>
+                                <Cloud size={16} />
+                                <span>Saved {formatLastSaved(saveState.lastSaved)}</span>
+                            </>
+                        )}
+                        {saveState.status === "error" && (
+                            <>
+                                <CloudOff size={16} />
+                                <span>Save failed</span>
+                            </>
+                        )}
+                        {saveState.status === "idle" && saveState.hasUnsavedChanges && (
+                            <>
+                                <Save size={16} />
+                                <span>Unsaved changes</span>
+                            </>
+                        )}
+                    </div>
+                    <button
+                        onClick={handleSubmit}
+                        className="submit-btn"
+                        disabled={isSubmitting}
+                    >
+                        {isSubmitting ? (
+                            <span className="spinner" />
+                        ) : (
+                            <Send size={18} />
+                        )}
+                        <span>{isSubmitting ? "Submitting..." : "Finalize & Clock Out"}</span>
+                    </button>
+                </div>
             </header>
 
             <div className="report-layout">
@@ -696,6 +822,144 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
                     gap: 0.5rem;
                     font-size: 0.875rem;
                     color: var(--text-secondary);
+                }
+
+                .header-actions {
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                }
+
+                /* Save Status Indicator */
+                .save-status {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.5rem 0.875rem;
+                    border-radius: 8px;
+                    font-size: 0.8rem;
+                    font-weight: 500;
+                    background: rgba(255, 255, 255, 0.05);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    color: var(--text-secondary);
+                    transition: all 0.2s;
+                }
+
+                .save-status.saving {
+                    color: #60a5fa;
+                    background: rgba(59, 130, 246, 0.1);
+                    border-color: rgba(59, 130, 246, 0.2);
+                }
+
+                .save-status.saved {
+                    color: #4ade80;
+                    background: rgba(34, 197, 94, 0.1);
+                    border-color: rgba(34, 197, 94, 0.2);
+                }
+
+                .save-status.error {
+                    color: #f87171;
+                    background: rgba(239, 68, 68, 0.1);
+                    border-color: rgba(239, 68, 68, 0.2);
+                }
+
+                .save-status .pulse {
+                    animation: pulse 1.5s ease-in-out infinite;
+                }
+
+                @keyframes pulse {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.5; }
+                }
+
+                /* Draft Recovery Modal */
+                .draft-recovery-overlay {
+                    position: fixed;
+                    inset: 0;
+                    background: rgba(0, 0, 0, 0.85);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 100;
+                    padding: 1rem;
+                    backdrop-filter: blur(4px);
+                }
+
+                .draft-recovery-modal {
+                    background: linear-gradient(135deg, rgba(30, 30, 50, 0.98) 0%, rgba(25, 25, 45, 1) 100%);
+                    border: 1px solid rgba(255, 255, 255, 0.15);
+                    border-radius: 20px;
+                    padding: 2rem;
+                    text-align: center;
+                    max-width: 400px;
+                    width: 100%;
+                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+                }
+
+                .draft-recovery-icon {
+                    width: 64px;
+                    height: 64px;
+                    border-radius: 16px;
+                    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.1) 100%);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #60a5fa;
+                    margin: 0 auto 1.5rem;
+                }
+
+                .draft-recovery-modal h3 {
+                    font-size: 1.25rem;
+                    font-weight: 700;
+                    color: var(--text-primary);
+                    margin-bottom: 0.75rem;
+                }
+
+                .draft-recovery-modal p {
+                    font-size: 0.9rem;
+                    color: var(--text-secondary);
+                    margin-bottom: 1.5rem;
+                    line-height: 1.5;
+                }
+
+                .draft-recovery-actions {
+                    display: flex;
+                    gap: 0.75rem;
+                }
+
+                .discard-btn {
+                    flex: 1;
+                    padding: 0.875rem 1rem;
+                    background: transparent;
+                    border: 1px solid rgba(255, 255, 255, 0.15);
+                    border-radius: 10px;
+                    color: var(--text-secondary);
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+
+                .discard-btn:hover {
+                    background: rgba(255, 255, 255, 0.05);
+                    color: var(--text-primary);
+                }
+
+                .restore-btn {
+                    flex: 1;
+                    padding: 0.875rem 1rem;
+                    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+                    border: none;
+                    border-radius: 10px;
+                    color: white;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+                }
+
+                .restore-btn:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
                 }
 
                 .submit-btn {

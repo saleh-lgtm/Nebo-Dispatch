@@ -174,6 +174,12 @@ model User {
   vehiclesCreated        FleetVehicle[]         @relation("VehicleCreator")
   vehicleDocumentsUploaded VehicleDocument[]    @relation("DocumentUploader")
   affiliateAttachmentsUploaded AffiliateAttachment[] @relation("AffiliateAttachmentUploader")
+
+  // Shift Report Drafts
+  shiftReportDrafts      ShiftReportDraft[]     @relation("UserDrafts")
+
+  // Trip Confirmations completed
+  confirmationsCompleted TripConfirmation[]     @relation("ConfirmationCompletedBy")
 }
 
 model Shift {
@@ -197,6 +203,7 @@ model Shift {
   tasks      ShiftTask[]
   requests   SchedulingRequest[]
   quotes     Quote[]
+  drafts     ShiftReportDraft[]
 }
 
 model ShiftReport {
@@ -261,6 +268,22 @@ model ShiftReport {
   @@index([userId, createdAt])
   @@index([status])
   @@index([createdAt])
+}
+
+// Draft storage for auto-save functionality
+model ShiftReportDraft {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation("UserDrafts", fields: [userId], references: [id], onDelete: Cascade)
+  shiftId     String
+  shift       Shift    @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  draftData   Json     // Stores all form data as JSON
+  lastSavedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, shiftId])
+  @@index([userId])
+  @@index([shiftId])
 }
 
 // Retail lead tracking for shift reports
@@ -951,6 +974,7 @@ enum NotificationType {
   TASK_DUE_SOON          // Task is due soon
   SCHEDULE_PUBLISHED     // New schedule was published
   SOP_REQUIRES_ACK       // SOP requires your acknowledgment
+  CONFIRMATION_DUE       // 2-hour confirmation is due for a trip
   GENERAL                // General notification
 }
 
@@ -1296,4 +1320,73 @@ model VehicleAssignment {
   @@index([affiliateId])
   @@index([vehicleId])
   @@index([startDate, endDate])
+}
+
+// ============================================
+// TRIP CONFIRMATION REMINDERS (2-Hour Confirmation)
+// ============================================
+
+enum ConfirmationStatus {
+  PENDING        // Waiting for dispatcher to confirm
+  CONFIRMED      // Driver confirmed
+  NO_ANSWER      // Driver didn't answer
+  CANCELLED      // Trip was cancelled
+  RESCHEDULED    // Pickup time changed
+  EXPIRED        // Confirmation window passed without action
+}
+
+// Trip confirmation tasks generated from manifest emails
+model TripConfirmation {
+  id              String             @id @default(cuid())
+  tripNumber      String             // e.g., "43273"
+  pickupAt        DateTime           // Actual pickup date/time
+  dueAt           DateTime           // 2 hours before pickup (when confirmation is due)
+  passengerName   String
+  driverName      String
+
+  // Status tracking
+  status          ConfirmationStatus @default(PENDING)
+
+  // Completion tracking
+  completedAt     DateTime?          // When dispatcher marked it complete
+  completedById   String?
+  completedBy     User?              @relation("ConfirmationCompletedBy", fields: [completedById], references: [id])
+
+  // How early/late was it completed relative to dueAt
+  minutesBeforeDue Int?              // Positive = early, Negative = late
+
+  // Notes
+  notes           String?            @db.Text
+
+  // Source email metadata
+  sourceEmail     String?            @db.Text  // Original email for reference
+  manifestDate    DateTime           // Date of the manifest email
+
+  // Archival
+  archivedAt      DateTime?
+
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@unique([tripNumber, manifestDate])  // Prevent duplicates from same manifest
+  @@index([status, dueAt])
+  @@index([dueAt])
+  @@index([completedById])
+  @@index([manifestDate])
+  @@index([archivedAt])
+}
+
+// Manifest ingestion log - track incoming manifests
+model ManifestLog {
+  id              String   @id @default(cuid())
+  receivedAt      DateTime @default(now())
+  fromEmail       String?  // Who sent the manifest
+  subject         String?
+  tripsExtracted  Int      @default(0)
+  tripsCreated    Int      @default(0)  // New trips added
+  tripsDuplicate  Int      @default(0)  // Already existed
+  rawContent      String?  @db.Text     // Store raw email for debugging
+  parseErrors     String?  @db.Text     // Any parsing errors
+
+  @@index([receivedAt])
 }
