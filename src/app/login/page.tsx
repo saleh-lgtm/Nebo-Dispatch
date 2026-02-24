@@ -132,6 +132,11 @@ export default function LoginPage() {
                                 </>
                             )}
                         </button>
+
+                        <div className="signup-link">
+                            <span>New dispatcher?</span>
+                            <Link href="/signup">Request access</Link>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -370,6 +375,26 @@ export default function LoginPage() {
                 .login-button:disabled {
                     opacity: 0.6;
                     cursor: not-allowed;
+                }
+
+                .signup-link {
+                    text-align: center;
+                    font-size: 0.875rem;
+                    color: var(--text-secondary);
+                    display: flex;
+                    justify-content: center;
+                    gap: 0.5rem;
+                    margin-top: 0.5rem;
+                }
+
+                .signup-link a {
+                    color: var(--primary);
+                    text-decoration: none;
+                    font-weight: 500;
+                }
+
+                .signup-link a:hover {
+                    text-decoration: underline;
                 }
 
                 @media (max-width: 900px) {

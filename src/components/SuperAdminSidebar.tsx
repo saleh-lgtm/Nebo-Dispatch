@@ -9,6 +9,7 @@ import {
     LayoutDashboard,
     CalendarClock,
     UserCog,
+    UserPlus,
     FileText,
     BarChart3,
     History,
@@ -177,6 +178,7 @@ export default function SuperAdminSidebar({ user }: Props) {
                             {isSuperAdmin && (
                                 <NavItem href="/admin/users" icon={<UserCog size={18} />} label="User Management" collapsed={collapsed} />
                             )}
+                            <NavItem href="/admin/approvals" icon={<UserPlus size={18} />} label="User Approvals" collapsed={collapsed} />
                             <NavItem href="/admin/hours" icon={<Clock size={18} />} label="Hours Tracking" collapsed={collapsed} />
                             <NavItem href="/admin/tasks" icon={<CheckSquare size={18} />} label="Admin Tasks" collapsed={collapsed} />
                             <NavItem href="/admin/notes" icon={<StickyNote size={18} />} label="Global Notes" collapsed={collapsed} />
