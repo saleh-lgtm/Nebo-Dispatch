@@ -263,7 +263,7 @@ export default function DashboardClient({
 
             {/* Stats Grid */}
             <div className="stats-grid">
-                {/* Clock In/Out */}
+                {/* Clock In/Out - dispatchers only */}
                 {!isSuperAdmin && (
                     <div className={`stat-card ${hasActiveShift ? 'stat-active' : ''}`}>
                         <div className="stat-content">
@@ -287,6 +287,25 @@ export default function DashboardClient({
                     </div>
                 )}
 
+                {/* Team Members - admin only */}
+                {isAdmin && (
+                    <div className="stat-card">
+                        <div className="stat-content">
+                            <div className="stat-icon icon-info">
+                                <Shield size={22} />
+                            </div>
+                            <div className="stat-text">
+                                <span className="stat-label">Team Members</span>
+                                <span className="stat-value">{initialStats.userCount} total</span>
+                            </div>
+                        </div>
+                        <div className="stat-footer">
+                            <PlayCircle size={14} />
+                            <span>{activeShiftUsers.length} on shift</span>
+                        </div>
+                    </div>
+                )}
+
                 {/* Pending Quotes - priority for all */}
                 <div className="stat-card">
                     <div className="stat-content">
@@ -305,7 +324,43 @@ export default function DashboardClient({
                     </div>
                 </div>
 
-                {/* Next Shift */}
+                {/* Upcoming Events - admin only */}
+                {isAdmin && (
+                    <div className="stat-card">
+                        <div className="stat-content">
+                            <div className="stat-icon icon-primary">
+                                <Calendar size={22} />
+                            </div>
+                            <div className="stat-text">
+                                <span className="stat-label">Upcoming Events</span>
+                                <span className="stat-value">{upcomingEvents.length} events</span>
+                            </div>
+                        </div>
+                        <div className="stat-footer">
+                            <span>Next 30 days</span>
+                        </div>
+                    </div>
+                )}
+
+                {/* Pending Confirmations - admin only */}
+                {isAdmin && (
+                    <div className="stat-card">
+                        <div className="stat-content">
+                            <div className="stat-icon icon-success">
+                                <Clock size={22} />
+                            </div>
+                            <div className="stat-text">
+                                <span className="stat-label">Confirmations Due</span>
+                                <span className="stat-value">{upcomingConfirmations.length} pending</span>
+                            </div>
+                        </div>
+                        <div className="stat-footer">
+                            <span>Next 3 hours</span>
+                        </div>
+                    </div>
+                )}
+
+                {/* Next Shift - dispatchers only */}
                 {!isSuperAdmin && (
                     <div className="stat-card">
                         <div className="stat-content">
@@ -343,25 +398,6 @@ export default function DashboardClient({
                             ) : (
                                 <span>Check schedule</span>
                             )}
-                        </div>
-                    </div>
-                )}
-
-                {/* Team Members - admin only */}
-                {isAdmin && (
-                    <div className="stat-card">
-                        <div className="stat-content">
-                            <div className="stat-icon icon-info">
-                                <Shield size={22} />
-                            </div>
-                            <div className="stat-text">
-                                <span className="stat-label">Team Members</span>
-                                <span className="stat-value">{initialStats.userCount} total</span>
-                            </div>
-                        </div>
-                        <div className="stat-footer">
-                            <PlayCircle size={14} />
-                            <span>{activeShiftUsers.length} on shift</span>
                         </div>
                     </div>
                 )}
