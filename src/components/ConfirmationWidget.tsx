@@ -14,8 +14,9 @@ import {
     ChevronRight,
 } from "lucide-react";
 import { completeConfirmation } from "@/lib/tripConfirmationActions";
-import type { ConfirmationStatus } from "@prisma/client";
 import { useRouter } from "next/navigation";
+
+type ConfirmationStatus = "PENDING" | "CONFIRMED" | "NO_ANSWER" | "CANCELLED" | "RESCHEDULED" | "EXPIRED";
 
 interface Confirmation {
     id: string;
@@ -38,36 +39,31 @@ const STATUS_OPTIONS: Array<{
     value: ConfirmationStatus;
     label: string;
     icon: typeof CheckCircle;
-    color: string;
-    bgColor: string;
+    className: string;
 }> = [
     {
         value: "CONFIRMED",
         label: "Confirmed",
         icon: CheckCircle,
-        color: "#4ade80",
-        bgColor: "rgba(34, 197, 94, 0.15)",
+        className: "status-confirmed",
     },
     {
         value: "NO_ANSWER",
         label: "No Answer",
         icon: PhoneOff,
-        color: "#fbbf24",
-        bgColor: "rgba(245, 158, 11, 0.15)",
+        className: "status-no-answer",
     },
     {
         value: "CANCELLED",
         label: "Cancelled",
         icon: XCircle,
-        color: "#f87171",
-        bgColor: "rgba(239, 68, 68, 0.15)",
+        className: "status-cancelled",
     },
     {
         value: "RESCHEDULED",
         label: "Rescheduled",
         icon: RotateCcw,
-        color: "#60a5fa",
-        bgColor: "rgba(59, 130, 246, 0.15)",
+        className: "status-rescheduled",
     },
 ];
 
@@ -240,12 +236,7 @@ export default function ConfirmationWidget({ confirmations, onRefresh }: Props) 
                                         return (
                                             <button
                                                 key={option.value}
-                                                className="status-btn"
-                                                style={{
-                                                    borderColor: option.color,
-                                                    background: option.bgColor,
-                                                    color: option.color,
-                                                }}
+                                                className={`status-btn ${option.className}`}
                                                 onClick={() => handleComplete(option.value)}
                                                 disabled={completing !== null}
                                             >
@@ -360,11 +351,11 @@ const styles = `
     }
 
     .confirmation-item.overdue {
-        background: rgba(239, 68, 68, 0.08);
+        background: var(--danger-bg);
     }
 
     .confirmation-item.urgent {
-        background: rgba(245, 158, 11, 0.08);
+        background: var(--warning-bg);
     }
 
     .conf-main {
@@ -419,18 +410,18 @@ const styles = `
         border-radius: 6px;
         font-size: 0.75rem;
         font-weight: 600;
-        background: rgba(34, 197, 94, 0.15);
-        color: #4ade80;
+        background: var(--success-bg);
+        color: var(--success);
     }
 
     .time-badge.urgent {
-        background: rgba(245, 158, 11, 0.15);
-        color: #fbbf24;
+        background: var(--warning-bg);
+        color: var(--warning);
     }
 
     .time-badge.overdue {
-        background: rgba(239, 68, 68, 0.15);
-        color: #f87171;
+        background: var(--danger-bg);
+        color: var(--danger);
     }
 
     .chevron {
@@ -474,7 +465,7 @@ const styles = `
 
     .trip-badge {
         background: var(--accent);
-        color: #1a1a2e;
+        color: var(--text-inverse);
         padding: 0.25rem 0.625rem;
         border-radius: 6px;
         font-size: 0.875rem;
@@ -547,6 +538,30 @@ const styles = `
     .status-btn:disabled {
         opacity: 0.5;
         cursor: not-allowed;
+    }
+
+    .status-btn.status-confirmed {
+        background: var(--success-bg);
+        border-color: var(--success);
+        color: var(--success);
+    }
+
+    .status-btn.status-no-answer {
+        background: var(--warning-bg);
+        border-color: var(--warning);
+        color: var(--warning);
+    }
+
+    .status-btn.status-cancelled {
+        background: var(--danger-bg);
+        border-color: var(--danger);
+        color: var(--danger);
+    }
+
+    .status-btn.status-rescheduled {
+        background: var(--info-bg);
+        border-color: var(--info);
+        color: var(--info);
     }
 
     .notes-field label {
