@@ -90,8 +90,9 @@ const ROLE_CONFIG: Record<string, { label: string; icon: typeof ShieldCheck; col
 export default function SuperAdminSidebar({ user }: Props) {
     const role = user.role || "DISPATCHER";
     const isSuperAdmin = role === "SUPER_ADMIN";
-    const isAdmin = role === "ADMIN" || isSuperAdmin;
     const isAccounting = role === "ACCOUNTING";
+    // Accounting users get same access as Admin
+    const isAdmin = role === "ADMIN" || isSuperAdmin || isAccounting;
     const isDispatcher = role === "DISPATCHER";
     const hasAccountingAccess = isAccounting || isAdmin;
     const roleConfig = ROLE_CONFIG[role] || ROLE_CONFIG.DISPATCHER;

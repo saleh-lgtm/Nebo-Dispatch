@@ -51,6 +51,15 @@ export const authOptions: NextAuthOptions = {
                     throw new Error("Account has been deactivated. Contact an administrator.");
                 }
 
+                // Check approval status
+                if (user.approvalStatus === "PENDING") {
+                    throw new Error("Your account is pending approval. Please wait for an administrator to review your registration.");
+                }
+
+                if (user.approvalStatus === "REJECTED") {
+                    throw new Error("Your registration has been rejected. Contact an administrator for more information.");
+                }
+
                 const isPasswordValid = await compare(
                     credentials.password,
                     user.password
