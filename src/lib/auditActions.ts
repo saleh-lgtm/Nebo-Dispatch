@@ -55,7 +55,8 @@ export type AuditEntity =
     | "PartnerAttachment"
     | "DriverVehicle"
     | "SchedulePreferences"
-    | "VehicleAssignment";
+    | "VehicleAssignment"
+    | "TripConfirmation";
 
 /**
  * Create an audit log entry

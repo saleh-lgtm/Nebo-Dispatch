@@ -21,6 +21,7 @@ import RecentReportsPanel from "@/components/RecentReportsPanel";
 import EventsPanel from "@/components/EventsPanel";
 import TasksPanel from "@/components/TasksPanel";
 import AdminTaskProgressPanel from "@/components/AdminTaskProgressPanel";
+import ConfirmationWidget from "@/components/ConfirmationWidget";
 
 interface GlobalNote {
     id: string;
@@ -158,6 +159,18 @@ interface TaskWithProgress {
     isOverdue: boolean;
 }
 
+interface Confirmation {
+    id: string;
+    tripNumber: string;
+    pickupAt: Date | string;
+    dueAt: Date | string;
+    passengerName: string;
+    driverName: string;
+    status: string;
+    completedAt: Date | string | null;
+    completedBy: { id: string; name: string | null } | null;
+}
+
 interface Props {
     initialStats: {
         userCount: number;
@@ -173,6 +186,7 @@ interface Props {
     nextShift: NextShift | null;
     myTasks: Task[];
     taskProgress: TaskWithProgress[];
+    upcomingConfirmations: Confirmation[];
     userId: string;
     isAdmin: boolean;
     isSuperAdmin: boolean;
@@ -189,6 +203,7 @@ export default function DashboardClient({
     nextShift,
     myTasks,
     taskProgress,
+    upcomingConfirmations,
     userId,
     isAdmin,
     isSuperAdmin,
@@ -355,6 +370,9 @@ export default function DashboardClient({
             {/* Main Content */}
             <div className="content-grid">
                 <div className="content-col">
+                    {/* 2-Hour Confirmations - Top Priority */}
+                    <ConfirmationWidget confirmations={upcomingConfirmations} />
+
                     {/* My Tasks - Priority */}
                     {myTasks.length > 0 && <TasksPanel tasks={myTasks} />}
 

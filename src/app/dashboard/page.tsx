@@ -8,6 +8,7 @@ import { getOnlineUsers, getActiveShiftUsers } from "@/lib/presenceActions";
 import { getUpcomingEvents } from "@/lib/eventActions";
 import { getUserNextShift } from "@/lib/schedulerActions";
 import { getMyTasks, getTaskProgress } from "@/lib/taskActions";
+import { getUpcomingConfirmations } from "@/lib/tripConfirmationActions";
 import dynamic from "next/dynamic";
 
 // Dynamic import with loading skeleton for better initial load
@@ -105,6 +106,7 @@ export default async function DashboardPage() {
         nextShift,
         myTasks,
         taskProgress,
+        upcomingConfirmations,
     ] = await Promise.all([
         // User count for admins
         isAdmin ? prisma.user.count({ where: { isActive: true } }) : Promise.resolve(0),
@@ -150,6 +152,9 @@ export default async function DashboardPage() {
 
         // Task progress for admins
         isAdmin ? getTaskProgress() : Promise.resolve([]),
+
+        // Upcoming 2-hour confirmations
+        getUpcomingConfirmations(10),
     ]);
 
     const stats = {
@@ -170,6 +175,7 @@ export default async function DashboardPage() {
             nextShift={nextShift}
             myTasks={myTasks}
             taskProgress={taskProgress}
+            upcomingConfirmations={upcomingConfirmations as never}
             userId={session.user.id}
             isAdmin={isAdmin}
             isSuperAdmin={isSuperAdmin}
