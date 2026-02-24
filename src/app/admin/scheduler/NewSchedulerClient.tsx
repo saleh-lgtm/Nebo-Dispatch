@@ -2,8 +2,6 @@
 
 import { useState, useMemo } from "react";
 import {
-    ChevronLeft,
-    ChevronRight,
     Calendar,
     Plus,
     Trash2,
@@ -12,9 +10,8 @@ import {
     Download,
     Users,
     Clock,
-    X,
     Edit2,
-    Copy,
+    RotateCcw,
 } from "lucide-react";
 import {
     createScheduleBlock,
@@ -43,9 +40,8 @@ interface ScheduleData {
     user: { id: string; name: string | null };
 }
 
-// Constants
+// Constants - Fixed 7-day week template
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const SHORT_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const COLORS = ["#4ECDC4", "#FF6B6B", "#FFE66D", "#45B7D1", "#96CEB4", "#C3A6FF", "#FF8A5C", "#EA6FC4", "#6BCB77", "#4D96FF"];
 
 function getWeekStart(date: Date): Date {
@@ -130,13 +126,16 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
 
     const totalHours = Array.from(dispatcherHours.values()).reduce((a, b) => a + b, 0);
 
-    // Navigation
-    const loadWeekSchedules = async (newWeekStart: Date) => {
+    // Reload current week schedules
+    const reloadSchedules = async () => {
         setLoading(true);
         try {
-            const data = await getWeekSchedules(newWeekStart);
+            const currentWeek = getWeekStart(new Date());
+            setWeekStart(currentWeek);
+            const data = await getWeekSchedules(currentWeek);
             setSchedules(data);
             setIsPublished(data.some((s) => s.isPublished));
+            addToast("Schedule refreshed", "success");
         } catch {
             addToast("Failed to load schedules", "error");
         } finally {
@@ -144,39 +143,14 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
         }
     };
 
-    const goToPrevWeek = async () => {
-        const newWeek = new Date(weekStart);
-        newWeek.setUTCDate(newWeek.getUTCDate() - 7);
-        setWeekStart(newWeek);
-        await loadWeekSchedules(newWeek);
-    };
-
-    const goToNextWeek = async () => {
-        const newWeek = new Date(weekStart);
-        newWeek.setUTCDate(newWeek.getUTCDate() + 7);
-        setWeekStart(newWeek);
-        await loadWeekSchedules(newWeek);
-    };
-
-    const goToToday = async () => {
-        const newWeek = getWeekStart(new Date());
-        setWeekStart(newWeek);
-        await loadWeekSchedules(newWeek);
-    };
-
-    const formatWeekRange = () => {
-        const start = new Date(weekStart);
-        const end = new Date(weekStart);
-        end.setUTCDate(end.getUTCDate() + 6);
-        const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", timeZone: "UTC" };
-        return `${start.toLocaleDateString(undefined, opts)} - ${end.toLocaleDateString(undefined, opts)}, ${start.getUTCFullYear()}`;
-    };
-
     const getDateForDay = (dayIndex: number): Date => {
         const date = new Date(weekStart);
         date.setUTCDate(date.getUTCDate() + dayIndex);
         return date;
     };
+
+    // Get current day of week (0-6, Sunday = 0)
+    const currentDayOfWeek = new Date().getDay();
 
     // CRUD Operations
     const handleAddShift = async () => {
@@ -359,14 +333,17 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
                     <Calendar size={24} className="text-accent" />
                     <div>
                         <h1 className="font-display" style={{ fontSize: "1.5rem", marginBottom: "0.25rem" }}>
-                            Dispatcher Scheduler
+                            Weekly Schedule
                         </h1>
                         <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>
-                            Manage weekly shift schedules for your team
+                            Fixed 7-day dispatcher rotation
                         </p>
                     </div>
                 </div>
                 <div className="scheduler-header__actions">
+                    <button onClick={reloadSchedules} className="btn btn-ghost" disabled={loading}>
+                        <RotateCcw size={16} /> Refresh
+                    </button>
                     <button onClick={handleExport} className="btn btn-ghost" disabled={loading}>
                         <Download size={16} /> Export
                     </button>
@@ -376,7 +353,7 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
                         </button>
                     ) : (
                         <button onClick={handlePublish} className="btn btn-primary" disabled={loading || schedules.length === 0}>
-                            <Send size={16} /> Publish Week
+                            <Send size={16} /> Publish
                         </button>
                     )}
                 </div>
@@ -385,22 +362,6 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
             <div className="scheduler-layout">
                 {/* Sidebar */}
                 <aside className="scheduler-sidebar glass-card">
-                    {/* Week Navigation */}
-                    <div className="sidebar-section">
-                        <div className="week-nav">
-                            <button onClick={goToPrevWeek} className="btn btn-icon" disabled={loading}>
-                                <ChevronLeft size={18} />
-                            </button>
-                            <span className="week-display">{formatWeekRange()}</span>
-                            <button onClick={goToNextWeek} className="btn btn-icon" disabled={loading}>
-                                <ChevronRight size={18} />
-                            </button>
-                        </div>
-                        <button onClick={goToToday} className="btn btn-outline" style={{ width: "100%", marginTop: "0.5rem" }} disabled={loading}>
-                            Jump to This Week
-                        </button>
-                    </div>
-
                     {/* Stats */}
                     <div className="sidebar-section">
                         <h3 className="sidebar-title">
@@ -442,15 +403,13 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
                 <main className="scheduler-main">
                     <div className="schedule-grid">
                         {DAYS.map((day, dayIndex) => {
-                            const dateForDay = getDateForDay(dayIndex);
                             const daySchedules = schedulesByDay.get(dayIndex) || [];
-                            const isToday = new Date().toDateString() === dateForDay.toDateString();
+                            const isToday = dayIndex === currentDayOfWeek;
 
                             return (
                                 <div key={day} className={`day-column ${isToday ? "today" : ""}`}>
                                     <div className="day-header">
-                                        <span className="day-name">{SHORT_DAYS[dayIndex]}</span>
-                                        <span className="day-date">{dateForDay.getUTCDate()}</span>
+                                        <span className="day-name">{day}</span>
                                     </div>
 
                                     <div className="day-shifts">
