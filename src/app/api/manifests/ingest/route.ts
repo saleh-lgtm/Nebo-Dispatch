@@ -26,6 +26,42 @@ function checkRateLimit(ip: string): boolean {
     return true;
 }
 
+// Normalize different email webhook formats to our standard format
+function normalizeEmailPayload(data: Record<string, unknown>): {
+    body: string;
+    from?: string;
+    subject?: string;
+} | null {
+    // CloudMailin format: { plain, html, from, to, subject, headers, ... }
+    if (data.plain || data.html) {
+        return {
+            body: (data.plain as string) || (data.html as string) || "",
+            from: data.from as string | undefined,
+            subject: data.subject as string | undefined,
+        };
+    }
+
+    // Zapier/standard format: { body, from, subject }
+    if (data.body && typeof data.body === "string") {
+        return {
+            body: data.body,
+            from: data.from as string | undefined,
+            subject: data.subject as string | undefined,
+        };
+    }
+
+    // SendGrid Inbound Parse format
+    if (data.text || data.Text) {
+        return {
+            body: (data.text as string) || (data.Text as string) || "",
+            from: (data.from as string) || (data.From as string) || undefined,
+            subject: (data.subject as string) || (data.Subject as string) || undefined,
+        };
+    }
+
+    return null;
+}
+
 export async function POST(request: NextRequest) {
     // Get client IP for rate limiting
     const ip =
@@ -41,7 +77,7 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    // Verify secret API key
+    // Verify secret API key (header or URL param for services that don't support headers)
     const manifestSecret = process.env.MANIFEST_INGEST_SECRET;
     if (!manifestSecret) {
         console.error("MANIFEST_INGEST_SECRET not configured");
@@ -51,9 +87,11 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    const providedSecret = request.headers.get("x-manifest-secret");
+    const providedSecret =
+        request.headers.get("x-manifest-secret") ||
+        request.nextUrl.searchParams.get("secret");
+
     if (!providedSecret || providedSecret !== manifestSecret) {
-        // Log unauthorized attempt
         console.warn(`Unauthorized manifest ingest attempt from IP: ${ip}`);
         return NextResponse.json(
             { error: "Unauthorized" },
@@ -61,27 +99,39 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    // Validate request body
-    let body: { from?: string; subject?: string; body: string };
+    // Parse request body (supports JSON and form-data)
+    let rawData: Record<string, unknown>;
+    const contentType = request.headers.get("content-type") || "";
+
     try {
-        body = await request.json();
+        if (contentType.includes("multipart/form-data")) {
+            const formData = await request.formData();
+            rawData = Object.fromEntries(formData.entries());
+        } else if (contentType.includes("application/x-www-form-urlencoded")) {
+            const text = await request.text();
+            rawData = Object.fromEntries(new URLSearchParams(text));
+        } else {
+            rawData = await request.json();
+        }
     } catch {
         return NextResponse.json(
-            { error: "Invalid JSON body" },
+            { error: "Invalid request body" },
             { status: 400 }
         );
     }
 
-    if (!body.body || typeof body.body !== "string") {
+    // Normalize to standard format
+    const payload = normalizeEmailPayload(rawData);
+    if (!payload || !payload.body) {
         return NextResponse.json(
-            { error: "Missing or invalid 'body' field" },
+            { error: "Missing email body content" },
             { status: 400 }
         );
     }
 
     try {
         // Parse the manifest email
-        const trips = await parseManifestEmail(body.body);
+        const trips = await parseManifestEmail(payload.body);
 
         if (trips.length === 0) {
             return NextResponse.json(
@@ -99,9 +149,9 @@ export async function POST(request: NextRequest) {
         // Ingest the trips
         const result = await ingestManifestTrips(
             trips,
-            body.body,
-            body.from,
-            body.subject
+            payload.body,
+            payload.from,
+            payload.subject
         );
 
         console.log(
