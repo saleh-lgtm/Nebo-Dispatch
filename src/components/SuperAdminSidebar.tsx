@@ -27,6 +27,7 @@ import {
     Calculator,
     MessageSquare,
     Car,
+    Network,
 } from "lucide-react";
 import NotificationBell from "./NotificationBell";
 
@@ -149,7 +150,7 @@ export default function SuperAdminSidebar({ user }: Props) {
 
                     <NavSection title="Content" collapsed={collapsed}>
                         <NavItem href="/fleet" icon={<Car size={18} />} label="Fleet Management" collapsed={collapsed} />
-                        <NavItem href="/affiliates" icon={<Users size={18} />} label="Affiliates" collapsed={collapsed} />
+                        <NavItem href="/network" icon={<Network size={18} />} label="Network" collapsed={collapsed} />
                         <NavItem href="/admin/sops" icon={<BookOpen size={18} />} label="Manage SOPs" collapsed={collapsed} />
                     </NavSection>
 

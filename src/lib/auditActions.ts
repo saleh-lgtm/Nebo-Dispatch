@@ -22,7 +22,9 @@ export type AuditAction =
     | "UPDATE_STATUS"
     | "ASSIGN"
     | "CANCEL"
-    | "ACCEPT";
+    | "ACCEPT"
+    | "ACTIVATE"
+    | "DEACTIVATE";
 
 export type AuditEntity =
     | "User"
@@ -48,7 +50,12 @@ export type AuditEntity =
     | "VehicleInsurance"
     | "VehicleRegistration"
     | "VehicleDocument"
-    | "AffiliateAttachment";
+    | "AffiliateAttachment"
+    | "NetworkPartner"
+    | "PartnerAttachment"
+    | "DriverVehicle"
+    | "SchedulePreferences"
+    | "VehicleAssignment";
 
 /**
  * Create an audit log entry

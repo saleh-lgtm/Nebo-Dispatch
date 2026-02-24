@@ -37,8 +37,10 @@ enum RequestStatus {
 }
 
 enum AffiliateType {
-  FARM_IN   // Partners that send work to us
-  FARM_OUT  // Partners we send work to
+  FARM_IN         // Partners that send work to us
+  FARM_OUT        // Partners we send work to
+  IOS             // Independent Operators (self-employed drivers)
+  HOUSE_CHAUFFEUR // In-house company drivers
 }
 
 enum ReportStatus {
@@ -351,12 +353,19 @@ model Affiliate {
   name             String
   email            String
   phone            String?       // Contact phone number
-  state            String        // State (e.g., "TX", "CA")
+  state            String?       // State (e.g., "TX", "CA") - optional for IOS/Chauffeurs
   cities           String[]      // Cities served in that state
   notes            String?       @db.Text
   cityTransferRate String?       // Pricing/Rate info
   isApproved       Boolean       @default(false)
   type             AffiliateType @default(FARM_OUT)
+  isActive         Boolean       @default(true)
+
+  // Fields for IOS (Independent Operators)
+  market           String?       // Market/region they operate in
+
+  // Fields for House Chauffeurs
+  employeeId       String?       // Internal employee ID
 
   submittedById String
   submittedBy   User   @relation(fields: [submittedById], references: [id])
@@ -370,8 +379,21 @@ model Affiliate {
   // SMS contacts linked to this affiliate
   smsContacts   SMSContact[]
 
+  // IOS driver's personal vehicle info
+  vehicleInfo   DriverVehicle?
+
+  // House Chauffeur schedule preferences
+  schedulePrefs SchedulePreferences?
+
+  // House Chauffeur fleet vehicle assignments
+  vehicleAssignments VehicleAssignment[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([type])
+  @@index([isActive])
+  @@index([market])
 }
 
 model SchedulingRequest {
@@ -1067,6 +1089,9 @@ model FleetVehicle {
   registration    VehicleRegistration[]
   documents       VehicleDocument[]
 
+  // House Chauffeur assignments
+  chauffeurAssignments VehicleAssignment[]
+
   // Tracking
   createdById     String
   createdBy       User          @relation("VehicleCreator", fields: [createdById], references: [id])
@@ -1205,4 +1230,70 @@ model AffiliateAttachment {
 
   @@index([affiliateId])
   @@index([documentType])
+}
+
+// ============================================
+// NETWORK PARTNER EXTENSIONS (IOS & House Chauffeurs)
+// ============================================
+
+// Vehicle info for IOS drivers (their own personal vehicles)
+model DriverVehicle {
+  id              String    @id @default(cuid())
+  affiliateId     String    @unique
+  affiliate       Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  vehicleType     String?   // Sedan, SUV, Van, etc.
+  make            String?
+  model           String?
+  year            Int?
+  color           String?
+  licensePlate    String?
+
+  // Additional info
+  passengerCapacity Int?
+  insuranceExpiry   DateTime?
+  notes             String?   @db.Text
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([affiliateId])
+}
+
+// Schedule preferences for House Chauffeurs
+model SchedulePreferences {
+  id              String    @id @default(cuid())
+  affiliateId     String    @unique
+  affiliate       Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  preferredDays   String[]  // ["Monday", "Tuesday", etc.]
+  preferredShifts String[]  // ["Morning", "Evening", "Night"]
+  maxHoursWeek    Int?
+  timezone        String?   // e.g., "America/Chicago"
+  notes           String?   @db.Text
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([affiliateId])
+}
+
+// Vehicle assignments - links House Chauffeurs to FleetVehicles
+model VehicleAssignment {
+  id              String       @id @default(cuid())
+  affiliateId     String
+  affiliate       Affiliate    @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  vehicleId       String
+  vehicle         FleetVehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  startDate       DateTime
+  endDate         DateTime?
+  isPrimary       Boolean      @default(false)
+  notes           String?      @db.Text
+
+  createdAt       DateTime     @default(now())
+
+  @@index([affiliateId])
+  @@index([vehicleId])
+  @@index([startDate, endDate])
 }
