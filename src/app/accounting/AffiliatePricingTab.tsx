@@ -961,8 +961,8 @@ export default function AffiliatePricingTab({ affiliates: initialAffiliates, isA
                     align-items: center;
                     gap: 0.5rem;
                     padding: 0.625rem 1rem;
-                    background: rgba(255, 255, 255, 0.03);
-                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border);
                     border-radius: 8px;
                     color: var(--text-secondary);
                     min-width: 300px;
@@ -1009,8 +1009,8 @@ export default function AffiliatePricingTab({ affiliates: initialAffiliates, isA
                     padding: 4rem 2rem;
                     color: var(--text-secondary);
                     gap: 1rem;
-                    background: linear-gradient(135deg, rgba(30, 30, 50, 0.9) 0%, rgba(25, 25, 45, 0.95) 100%);
-                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
                     border-radius: 12px;
                 }
 
@@ -1026,8 +1026,8 @@ export default function AffiliatePricingTab({ affiliates: initialAffiliates, isA
                 }
 
                 .affiliate-card {
-                    background: linear-gradient(135deg, rgba(30, 30, 50, 0.9) 0%, rgba(25, 25, 45, 0.95) 100%);
-                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
                     border-radius: 12px;
                     overflow: hidden;
                 }
@@ -1045,7 +1045,7 @@ export default function AffiliatePricingTab({ affiliates: initialAffiliates, isA
                 }
 
                 .affiliate-header:hover {
-                    background: rgba(255, 255, 255, 0.02);
+                    background: var(--bg-hover);
                 }
 
                 .affiliate-info {
@@ -1071,7 +1071,7 @@ export default function AffiliatePricingTab({ affiliates: initialAffiliates, isA
                     font-size: 0.75rem;
                     color: var(--text-secondary);
                     padding: 0.25rem 0.5rem;
-                    background: rgba(255, 255, 255, 0.05);
+                    background: var(--bg-hover);
                     border-radius: 4px;
                 }
 
@@ -1090,17 +1090,17 @@ export default function AffiliatePricingTab({ affiliates: initialAffiliates, isA
                 }
 
                 .badge-flat {
-                    background: rgba(34, 197, 94, 0.15);
-                    color: #4ade80;
+                    background: var(--success-soft);
+                    color: var(--success);
                 }
 
                 .badge-route {
-                    background: rgba(59, 130, 246, 0.15);
-                    color: #60a5fa;
+                    background: var(--info-soft);
+                    color: var(--info);
                 }
 
                 .affiliate-content {
-                    border-top: 1px solid rgba(255, 255, 255, 0.06);
+                    border-top: 1px solid var(--border);
                     padding: 1.25rem;
                     display: flex;
                     flex-direction: column;
@@ -1134,17 +1134,17 @@ export default function AffiliatePricingTab({ affiliates: initialAffiliates, isA
                     align-items: center;
                     gap: 0.25rem;
                     padding: 0.375rem 0.75rem;
-                    background: rgba(34, 197, 94, 0.15);
-                    border: 1px solid rgba(34, 197, 94, 0.3);
+                    background: var(--success-soft);
+                    border: 1px solid var(--success-border);
                     border-radius: 6px;
-                    color: #4ade80;
+                    color: var(--success);
                     font-size: 0.75rem;
                     cursor: pointer;
                     transition: all 0.2s;
                 }
 
                 .add-btn:hover {
-                    background: rgba(34, 197, 94, 0.25);
+                    filter: brightness(1.1);
                 }
 
                 .pricing-table {
@@ -1160,12 +1160,12 @@ export default function AffiliatePricingTab({ affiliates: initialAffiliates, isA
                     text-transform: uppercase;
                     letter-spacing: 0.5px;
                     padding: 0.5rem 0.75rem;
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+                    border-bottom: 1px solid var(--border);
                 }
 
                 .pricing-table td {
                     padding: 0.625rem 0.75rem;
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+                    border-bottom: 1px solid var(--border);
                     font-size: 0.8rem;
                 }
 
@@ -1186,7 +1186,7 @@ export default function AffiliatePricingTab({ affiliates: initialAffiliates, isA
 
                 .rate-value {
                     font-weight: 600;
-                    color: #4ade80;
+                    color: var(--success);
                 }
 
                 .location-value {
@@ -1218,39 +1218,39 @@ export default function AffiliatePricingTab({ affiliates: initialAffiliates, isA
                 }
 
                 .icon-btn.edit {
-                    background: rgba(59, 130, 246, 0.15);
-                    color: #60a5fa;
+                    background: var(--info-soft);
+                    color: var(--info);
                 }
 
                 .icon-btn.edit:hover {
-                    background: rgba(59, 130, 246, 0.25);
+                    filter: brightness(1.1);
                 }
 
                 .icon-btn.delete {
-                    background: rgba(239, 68, 68, 0.15);
-                    color: #f87171;
+                    background: var(--danger-soft);
+                    color: var(--danger);
                 }
 
                 .icon-btn.delete:hover {
-                    background: rgba(239, 68, 68, 0.25);
+                    filter: brightness(1.1);
                 }
 
                 .icon-btn.save {
-                    background: rgba(34, 197, 94, 0.15);
-                    color: #4ade80;
+                    background: var(--success-soft);
+                    color: var(--success);
                 }
 
                 .icon-btn.save:hover {
-                    background: rgba(34, 197, 94, 0.25);
+                    filter: brightness(1.1);
                 }
 
                 .icon-btn.cancel {
-                    background: rgba(255, 255, 255, 0.05);
+                    background: var(--bg-hover);
                     color: var(--text-secondary);
                 }
 
                 .icon-btn.cancel:hover {
-                    background: rgba(255, 255, 255, 0.1);
+                    background: var(--bg-active);
                 }
 
                 .icon-btn:disabled {
@@ -1261,8 +1261,8 @@ export default function AffiliatePricingTab({ affiliates: initialAffiliates, isA
                 .edit-input {
                     width: 100%;
                     padding: 0.375rem 0.5rem;
-                    background: rgba(0, 0, 0, 0.2);
-                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border);
                     border-radius: 4px;
                     color: var(--text-primary);
                     font-size: 0.75rem;
@@ -1274,7 +1274,7 @@ export default function AffiliatePricingTab({ affiliates: initialAffiliates, isA
                 }
 
                 .new-row {
-                    background: rgba(34, 197, 94, 0.05);
+                    background: var(--success-soft);
                 }
 
                 @media (max-width: 768px) {

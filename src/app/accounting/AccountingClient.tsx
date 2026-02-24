@@ -642,11 +642,11 @@ export default function AccountingClient({
                     width: 48px;
                     height: 48px;
                     border-radius: 12px;
-                    background: linear-gradient(135deg, var(--accent) 0%, #d4a853 100%);
+                    background: var(--accent);
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    color: #1a1a2e;
+                    color: white;
                 }
 
                 .header-title {
@@ -667,8 +667,8 @@ export default function AccountingClient({
                     gap: 0.5rem;
                     margin-bottom: 1.5rem;
                     padding: 0.25rem;
-                    background: rgba(255, 255, 255, 0.02);
-                    border: 1px solid rgba(255, 255, 255, 0.06);
+                    background: var(--bg-muted);
+                    border: 1px solid var(--border);
                     border-radius: 12px;
                     width: fit-content;
                 }
@@ -689,17 +689,17 @@ export default function AccountingClient({
                 }
 
                 .main-tab:hover {
-                    background: rgba(255, 255, 255, 0.05);
+                    background: var(--bg-hover);
                     color: var(--text-primary);
                 }
 
                 .main-tab-active {
-                    background: linear-gradient(135deg, var(--accent) 0%, #d4a853 100%);
-                    color: #1a1a2e;
+                    background: var(--accent);
+                    color: white;
                 }
 
                 .main-tab-badge {
-                    background: rgba(239, 68, 68, 0.9);
+                    background: var(--danger);
                     color: white;
                     padding: 0.125rem 0.5rem;
                     border-radius: 9999px;
@@ -708,19 +708,19 @@ export default function AccountingClient({
                 }
 
                 .main-tab-active .main-tab-badge {
-                    background: rgba(0, 0, 0, 0.2);
-                    color: #1a1a2e;
+                    background: rgba(255, 255, 255, 0.3);
+                    color: white;
                 }
 
                 .main-tab-count {
                     padding: 0.125rem 0.5rem;
-                    background: rgba(255, 255, 255, 0.1);
+                    background: var(--bg-hover);
                     border-radius: 9999px;
                     font-size: 0.7rem;
                 }
 
                 .main-tab-active .main-tab-count {
-                    background: rgba(0, 0, 0, 0.15);
+                    background: rgba(255, 255, 255, 0.2);
                 }
 
                 /* Stats Grid */
@@ -736,8 +736,8 @@ export default function AccountingClient({
                     align-items: center;
                     gap: 1rem;
                     padding: 1.25rem;
-                    background: linear-gradient(135deg, rgba(30, 30, 50, 0.9) 0%, rgba(25, 25, 45, 0.95) 100%);
-                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
                     border-radius: 12px;
                 }
 
@@ -807,7 +807,7 @@ export default function AccountingClient({
                     gap: 0.5rem;
                     padding: 0.625rem 1rem;
                     background: transparent;
-                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border: 1px solid var(--border);
                     border-radius: 8px;
                     color: var(--text-secondary);
                     font-size: 0.875rem;
@@ -816,17 +816,17 @@ export default function AccountingClient({
                 }
 
                 .tab:hover {
-                    background: rgba(255, 255, 255, 0.05);
+                    background: var(--bg-hover);
                 }
 
                 .tab-active {
                     background: var(--accent);
-                    color: #1a1a2e;
+                    color: white;
                     border-color: var(--accent);
                 }
 
                 .tab-badge {
-                    background: rgba(239, 68, 68, 0.9);
+                    background: var(--danger);
                     color: white;
                     padding: 0.125rem 0.5rem;
                     border-radius: 9999px;
@@ -835,8 +835,8 @@ export default function AccountingClient({
                 }
 
                 .tab-active .tab-badge {
-                    background: rgba(0, 0, 0, 0.2);
-                    color: inherit;
+                    background: rgba(255, 255, 255, 0.3);
+                    color: white;
                 }
 
                 .search-box {
@@ -844,8 +844,8 @@ export default function AccountingClient({
                     align-items: center;
                     gap: 0.5rem;
                     padding: 0.625rem 1rem;
-                    background: rgba(255, 255, 255, 0.03);
-                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border);
                     border-radius: 8px;
                     color: var(--text-secondary);
                     min-width: 300px;
@@ -867,8 +867,8 @@ export default function AccountingClient({
 
                 /* Flags Card */
                 .flags-card {
-                    background: linear-gradient(135deg, rgba(30, 30, 50, 0.9) 0%, rgba(25, 25, 45, 0.95) 100%);
-                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
                     border-radius: 16px;
                     overflow: hidden;
                 }
@@ -898,7 +898,7 @@ export default function AccountingClient({
                 .spinner {
                     width: 32px;
                     height: 32px;
-                    border: 3px solid rgba(255, 255, 255, 0.1);
+                    border: 3px solid var(--border);
                     border-top-color: var(--accent);
                     border-radius: 50%;
                     animation: spin 0.8s linear infinite;
@@ -918,12 +918,12 @@ export default function AccountingClient({
 
                 .flag-item {
                     padding: 1.25rem 1.5rem;
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+                    border-bottom: 1px solid var(--border);
                     transition: background 0.2s;
                 }
 
                 .flag-item:hover {
-                    background: rgba(255, 255, 255, 0.02);
+                    background: var(--bg-hover);
                 }
 
                 .flag-item:last-child {
@@ -1004,13 +1004,13 @@ export default function AccountingClient({
                 }
 
                 .action-view {
-                    background: rgba(255, 255, 255, 0.05);
-                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    background: var(--bg-hover);
+                    border: 1px solid var(--border);
                     color: var(--text-secondary);
                 }
 
                 .action-view:hover {
-                    background: rgba(255, 255, 255, 0.1);
+                    background: var(--bg-active);
                     color: var(--text-primary);
                 }
 
@@ -1073,8 +1073,8 @@ export default function AccountingClient({
                 }
 
                 .modal {
-                    background: linear-gradient(135deg, rgba(30, 30, 50, 0.98) 0%, rgba(25, 25, 45, 1) 100%);
-                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
                     border-radius: 16px;
                     width: 100%;
                     max-width: 500px;
@@ -1087,7 +1087,7 @@ export default function AccountingClient({
                     justify-content: space-between;
                     align-items: center;
                     padding: 1.25rem 1.5rem;
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+                    border-bottom: 1px solid var(--border);
                 }
 
                 .modal-header h3 {
@@ -1118,7 +1118,7 @@ export default function AccountingClient({
                     justify-content: flex-end;
                     gap: 0.75rem;
                     padding: 1rem 1.5rem;
-                    border-top: 1px solid rgba(255, 255, 255, 0.08);
+                    border-top: 1px solid var(--border);
                 }
 
                 .detail-grid {
@@ -1171,7 +1171,7 @@ export default function AccountingClient({
                     color: var(--text-primary);
                     margin: 0;
                     padding: 0.75rem;
-                    background: rgba(255, 255, 255, 0.03);
+                    background: var(--bg-muted);
                     border-radius: 8px;
                 }
 
@@ -1200,8 +1200,8 @@ export default function AccountingClient({
                 .form-group textarea {
                     width: 100%;
                     padding: 0.75rem;
-                    background: rgba(0, 0, 0, 0.3);
-                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border);
                     border-radius: 8px;
                     color: var(--text-primary);
                     font-size: 0.9rem;
@@ -1244,7 +1244,7 @@ export default function AccountingClient({
 
                 .btn-secondary {
                     background: transparent;
-                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border: 1px solid var(--border);
                     color: var(--text-secondary);
                 }
 
