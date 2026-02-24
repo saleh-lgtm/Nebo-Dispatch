@@ -34,12 +34,19 @@ export async function POST(req: NextRequest) {
     try {
         const body = await req.text();
 
+        console.warn("[Status] Received status callback");
+
         // Validate the request is from Twilio
         const validation = validateTwilioRequest(req, body);
         if (!validation.valid) {
-            console.error("Status webhook validation failed:", validation.error);
+            console.error("[Status] Validation failed:", validation.error, {
+                hasSignature: !!req.headers.get("x-twilio-signature"),
+                statusCallbackUrl: process.env.TWILIO_STATUS_CALLBACK_URL || "not set",
+            });
             return new NextResponse("Forbidden", { status: 403 });
         }
+
+        console.warn("[Status] Validation passed, processing status update");
 
         const formData = new URLSearchParams(body);
 

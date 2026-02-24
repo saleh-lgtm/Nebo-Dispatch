@@ -66,12 +66,19 @@ export async function POST(req: NextRequest) {
         // Get the raw body for validation
         const body = await req.text();
 
+        console.warn("[Webhook] Received inbound SMS request");
+
         // Validate the request is from Twilio
         const validation = validateTwilioRequest(req, body);
         if (!validation.valid) {
-            console.error("Twilio webhook validation failed:", validation.error);
+            console.error("[Webhook] Validation failed:", validation.error, {
+                hasSignature: !!req.headers.get("x-twilio-signature"),
+                webhookUrl: process.env.TWILIO_WEBHOOK_URL || "not set",
+            });
             return new NextResponse("Forbidden", { status: 403 });
         }
+
+        console.warn("[Webhook] Validation passed, processing message");
 
         // Parse the form data
         const formData = new URLSearchParams(body);
