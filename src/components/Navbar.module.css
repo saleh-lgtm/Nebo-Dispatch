@@ -1,0 +1,537 @@
+/**
+ * Navbar CSS Module
+ *
+ * Styles for the main navigation component including:
+ * - Desktop navigation with dropdowns
+ * - Mobile navigation drawer
+ * - Role badges and user section
+ * - Toast notifications
+ */
+
+/* ============================================
+   Logout Error Toast
+   ============================================ */
+
+.logoutErrorToast {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--danger-soft);
+    border: 1px solid var(--danger-border);
+    color: var(--danger);
+    padding: 0.875rem 1.25rem;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.875rem;
+    z-index: 1000;
+    box-shadow: var(--shadow-lg);
+    animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    max-width: 90%;
+    backdrop-filter: blur(12px);
+}
+
+.logoutErrorToast button {
+    background: none;
+    border: none;
+    color: var(--danger);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.7;
+    transition: opacity 0.15s ease;
+}
+
+.logoutErrorToast button:hover {
+    opacity: 1;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* ============================================
+   Navbar Base - Glass Effect
+   ============================================ */
+
+.navbar {
+    background: rgba(14, 9, 24, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.navbar::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(238, 79, 39, 0.3), transparent);
+}
+
+.navbarInner {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.navbarLeft {
+    display: flex;
+    align-items: center;
+}
+
+.navbarBrand {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+}
+
+.brandName {
+    font-family: var(--font-display);
+    font-size: 1.375rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), #ff7a50);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.navbarRight {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+/* ============================================
+   User Section
+   ============================================ */
+
+.userSection {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.5rem 0.875rem;
+    background: var(--bg-hover);
+    border-radius: var(--radius-md);
+    margin-left: 0.5rem;
+}
+
+.userName {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.systemClock {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--accent);
+    padding: 0.5rem 0.75rem;
+    background: var(--accent-soft);
+    border-radius: var(--radius-sm);
+}
+
+/* ============================================
+   Desktop Navigation
+   ============================================ */
+
+.navLinks {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.desktopNav {
+    composes: navLinks;
+}
+
+.navDivider {
+    width: 1px;
+    height: 24px;
+    background: var(--border);
+    margin: 0 0.75rem;
+}
+
+/* ============================================
+   Nav Link Styles
+   ============================================ */
+
+.navLink {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.875rem;
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-family: var(--font-sans);
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: all 0.15s ease;
+    text-decoration: none;
+    background: none;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+    position: relative;
+}
+
+.navLink:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+.navLinkActive {
+    composes: navLink;
+    color: var(--accent);
+    background: var(--accent-soft);
+}
+
+.navLinkActive::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    transform: translateX(-50%);
+    width: 20px;
+    height: 2px;
+    background: var(--accent);
+    border-radius: 1px;
+}
+
+.navLinkActive:hover {
+    background: var(--accent-soft);
+}
+
+.logoutBtn {
+    composes: navLink;
+}
+
+.logoutBtn:hover {
+    color: var(--danger) !important;
+    background: var(--danger-soft) !important;
+}
+
+/* ============================================
+   Dropdown
+   ============================================ */
+
+.navDropdown {
+    position: relative;
+}
+
+.navDropdownTrigger {
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+}
+
+.dropdownArrow {
+    transition: transform 0.2s ease;
+    opacity: 0.6;
+}
+
+.dropdownArrowOpen {
+    composes: dropdownArrow;
+    transform: rotate(180deg);
+}
+
+.navBadge {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+    color: white;
+    padding: 0.125rem 0.375rem;
+    border-radius: var(--radius-sm);
+    margin-left: 0.25rem;
+    box-shadow: 0 0 10px rgba(238, 79, 39, 0.4);
+}
+
+.navDropdownMenu {
+    position: absolute;
+    top: calc(100% + 0.75rem);
+    right: 0;
+    min-width: 260px;
+    background: var(--bg-surface);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 0.75rem;
+    box-shadow: var(--shadow-xl);
+    animation: dropdownFade 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 50;
+}
+
+.navDropdownMenu::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+}
+
+@keyframes dropdownFade {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.dropdownSection {
+    padding: 0.5rem 0;
+}
+
+.dropdownSection:not(:last-child) {
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0.5rem;
+}
+
+.dropdownSectionLabel {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 0.375rem 0.75rem;
+    display: block;
+}
+
+/* ============================================
+   Role Badge
+   ============================================ */
+
+.roleBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    padding: 0.25rem 0.625rem;
+    border-radius: var(--radius-sm);
+}
+
+.badgeSuperAdmin {
+    composes: roleBadge;
+    background: linear-gradient(135deg, var(--danger-soft), rgba(239, 83, 80, 0.25));
+    color: var(--danger);
+    border: 1px solid var(--danger-border);
+}
+
+.badgeAdmin {
+    composes: roleBadge;
+    background: linear-gradient(135deg, var(--warning-soft), rgba(245, 166, 35, 0.25));
+    color: var(--warning);
+    border: 1px solid var(--warning-border);
+}
+
+.badgeDispatcher {
+    composes: roleBadge;
+    background: linear-gradient(135deg, var(--success-soft), rgba(53, 166, 112, 0.25));
+    color: var(--success);
+    border: 1px solid var(--success-border);
+}
+
+.badgeAccounting {
+    composes: roleBadge;
+    background: linear-gradient(135deg, var(--info-soft), rgba(92, 156, 230, 0.25));
+    color: var(--info);
+    border: 1px solid var(--info-border);
+}
+
+/* ============================================
+   Mobile Menu Button
+   ============================================ */
+
+.mobileMenuBtn {
+    display: none;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: var(--radius-md);
+    transition: all 0.15s ease;
+}
+
+.mobileMenuBtn:hover {
+    background: var(--bg-active);
+    border-color: var(--border-hover);
+}
+
+/* ============================================
+   Mobile Overlay
+   ============================================ */
+
+.mobileNavOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(14, 9, 24, 0.8);
+    backdrop-filter: blur(8px);
+    z-index: 150;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* ============================================
+   Mobile Drawer
+   ============================================ */
+
+.mobileNavDrawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 320px;
+    max-width: 85vw;
+    height: 100vh;
+    background: var(--bg-surface);
+    border-left: 1px solid var(--border);
+    z-index: 200;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-xl);
+}
+
+.mobileNavDrawerOpen {
+    composes: mobileNavDrawer;
+    transform: translateX(0);
+}
+
+.mobileNavHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-elevated);
+}
+
+.mobileUserInfo {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+}
+
+.mobileAvatar {
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, var(--accent-soft), var(--secondary-soft));
+    color: var(--accent);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.125rem;
+}
+
+.mobileUserDetails {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+.mobileUserName {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+.mobileCloseBtn {
+    background: var(--bg-hover);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: var(--radius-md);
+    transition: all 0.15s ease;
+}
+
+.mobileCloseBtn:hover {
+    background: var(--bg-active);
+    color: var(--text-primary);
+}
+
+.mobileNavContent {
+    flex: 1;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.mobileNavSection {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding-bottom: 1rem;
+}
+
+.mobileNavSection:not(:last-child) {
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0.75rem;
+}
+
+.mobileSectionLabel {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 0.5rem 0.625rem;
+}
+
+/* ============================================
+   Responsive
+   ============================================ */
+
+@media (max-width: 1100px) {
+    .desktopNav {
+        display: none !important;
+    }
+
+    .userSection {
+        display: none;
+    }
+
+    .systemClock {
+        display: none;
+    }
+
+    .mobileMenuBtn {
+        display: flex;
+    }
+}

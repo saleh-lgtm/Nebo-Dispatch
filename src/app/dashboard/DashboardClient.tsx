@@ -22,6 +22,7 @@ import EventsPanel from "@/components/EventsPanel";
 import TasksPanel from "@/components/TasksPanel";
 import AdminTaskProgressPanel from "@/components/AdminTaskProgressPanel";
 import ConfirmationWidget from "@/components/ConfirmationWidget";
+import styles from "./Dashboard.module.css";
 
 interface GlobalNote {
     id: string;
@@ -237,20 +238,20 @@ export default function DashboardClient({
     };
 
     return (
-        <div className="dashboard">
+        <div className={styles.dashboard}>
             {/* Header */}
-            <header className="dashboard-header">
+            <header className={styles.header}>
                 <div>
-                    <div className="header-top">
-                        <h1>Welcome back, {session.user.name}</h1>
+                    <div className={styles.headerTop}>
+                        <h1 className={styles.title}>Welcome back, {session.user.name}</h1>
                         {isSuperAdmin && (
-                            <span className="admin-badge">
+                            <span className={styles.adminBadge}>
                                 <Crown size={12} />
                                 Super Admin
                             </span>
                         )}
                     </div>
-                    <p className="header-subtitle">
+                    <p className={styles.subtitle}>
                         {new Date().toLocaleDateString("en-US", {
                             weekday: "long",
                             year: "numeric",
@@ -262,44 +263,44 @@ export default function DashboardClient({
             </header>
 
             {/* Stats Grid */}
-            <div className="stats-grid">
+            <div className={styles.statsGrid}>
                 {/* Clock In/Out - dispatchers only */}
                 {!isSuperAdmin && (
-                    <div className={`stat-card ${hasActiveShift ? 'stat-active' : ''}`}>
-                        <div className="stat-content">
-                            <div className={`stat-icon ${hasActiveShift ? 'icon-success' : 'icon-primary'}`}>
+                    <div className={`${styles.statCard} ${hasActiveShift ? styles.statCardActive : ''}`}>
+                        <div className={styles.statContent}>
+                            <div className={`${styles.statIcon} ${hasActiveShift ? styles.iconSuccess : styles.iconPrimary}`}>
                                 <Clock size={22} />
                             </div>
-                            <div className="stat-text">
-                                <span className="stat-label">Status</span>
-                                <span className="stat-value">{hasActiveShift ? "On Shift" : "Off Duty"}</span>
+                            <div className={styles.statText}>
+                                <span className={styles.statLabel}>Status</span>
+                                <span className={styles.statValue}>{hasActiveShift ? "On Shift" : "Off Duty"}</span>
                             </div>
                         </div>
                         <button
                             onClick={handleClockToggle}
-                            className={`stat-btn ${hasActiveShift ? 'btn-success' : 'btn-primary'}`}
+                            className={`${styles.statBtn} ${hasActiveShift ? styles.statBtnSuccess : styles.statBtnPrimary}`}
                             disabled={loading}
                         >
                             {hasActiveShift ? "Submit Report" : "Clock In"}
                             <ArrowRight size={16} />
                         </button>
-                        {hasActiveShift && <div className="live-dot" />}
+                        {hasActiveShift && <div className={styles.liveDot} />}
                     </div>
                 )}
 
                 {/* Team Members - admin only */}
                 {isAdmin && (
-                    <div className="stat-card">
-                        <div className="stat-content">
-                            <div className="stat-icon icon-info">
+                    <div className={styles.statCard}>
+                        <div className={styles.statContent}>
+                            <div className={`${styles.statIcon} ${styles.iconInfo}`}>
                                 <Shield size={22} />
                             </div>
-                            <div className="stat-text">
-                                <span className="stat-label">Team Members</span>
-                                <span className="stat-value">{initialStats.userCount} total</span>
+                            <div className={styles.statText}>
+                                <span className={styles.statLabel}>Team Members</span>
+                                <span className={styles.statValue}>{initialStats.userCount} total</span>
                             </div>
                         </div>
-                        <div className="stat-footer">
+                        <div className={styles.statFooter}>
                             <PlayCircle size={14} />
                             <span>{activeShiftUsers.length} on shift</span>
                         </div>
@@ -307,36 +308,36 @@ export default function DashboardClient({
                 )}
 
                 {/* Pending Quotes - priority for all */}
-                <div className="stat-card">
-                    <div className="stat-content">
-                        <div className="stat-icon icon-warning">
+                <div className={styles.statCard}>
+                    <div className={styles.statContent}>
+                        <div className={`${styles.statIcon} ${styles.iconWarning}`}>
                             <TrendingUp size={22} />
                         </div>
-                        <div className="stat-text">
-                            <span className="stat-label">Pending Quotes</span>
-                            <span className="stat-value">
+                        <div className={styles.statText}>
+                            <span className={styles.statLabel}>Pending Quotes</span>
+                            <span className={styles.statValue}>
                                 {pendingQuotes.filter((q) => q.status === "PENDING" || q.status === "FOLLOWING_UP").length} leads
                             </span>
                         </div>
                     </div>
-                    <div className="stat-footer">
+                    <div className={styles.statFooter}>
                         <span>Track & convert leads</span>
                     </div>
                 </div>
 
                 {/* Upcoming Events - admin only */}
                 {isAdmin && (
-                    <div className="stat-card">
-                        <div className="stat-content">
-                            <div className="stat-icon icon-primary">
+                    <div className={styles.statCard}>
+                        <div className={styles.statContent}>
+                            <div className={`${styles.statIcon} ${styles.iconPrimary}`}>
                                 <Calendar size={22} />
                             </div>
-                            <div className="stat-text">
-                                <span className="stat-label">Upcoming Events</span>
-                                <span className="stat-value">{upcomingEvents.length} events</span>
+                            <div className={styles.statText}>
+                                <span className={styles.statLabel}>Upcoming Events</span>
+                                <span className={styles.statValue}>{upcomingEvents.length} events</span>
                             </div>
                         </div>
-                        <div className="stat-footer">
+                        <div className={styles.statFooter}>
                             <span>Next 30 days</span>
                         </div>
                     </div>
@@ -344,17 +345,17 @@ export default function DashboardClient({
 
                 {/* Pending Confirmations - admin only */}
                 {isAdmin && (
-                    <div className="stat-card">
-                        <div className="stat-content">
-                            <div className="stat-icon icon-success">
+                    <div className={styles.statCard}>
+                        <div className={styles.statContent}>
+                            <div className={`${styles.statIcon} ${styles.iconSuccess}`}>
                                 <Clock size={22} />
                             </div>
-                            <div className="stat-text">
-                                <span className="stat-label">Confirmations Due</span>
-                                <span className="stat-value">{upcomingConfirmations.length} pending</span>
+                            <div className={styles.statText}>
+                                <span className={styles.statLabel}>Confirmations Due</span>
+                                <span className={styles.statValue}>{upcomingConfirmations.length} pending</span>
                             </div>
                         </div>
-                        <div className="stat-footer">
+                        <div className={styles.statFooter}>
                             <span>Next 3 hours</span>
                         </div>
                     </div>
@@ -362,14 +363,14 @@ export default function DashboardClient({
 
                 {/* Next Shift - dispatchers only */}
                 {!isSuperAdmin && (
-                    <div className="stat-card">
-                        <div className="stat-content">
-                            <div className="stat-icon icon-info">
+                    <div className={styles.statCard}>
+                        <div className={styles.statContent}>
+                            <div className={`${styles.statIcon} ${styles.iconInfo}`}>
                                 <Calendar size={22} />
                             </div>
-                            <div className="stat-text">
-                                <span className="stat-label">Next Shift</span>
-                                <span className="stat-value">
+                            <div className={styles.statText}>
+                                <span className={styles.statLabel}>Next Shift</span>
+                                <span className={styles.statValue}>
                                     {nextShift ? (
                                         new Date(nextShift.shiftStart).toLocaleDateString(undefined, {
                                             weekday: 'short',
@@ -382,7 +383,7 @@ export default function DashboardClient({
                                 </span>
                             </div>
                         </div>
-                        <div className="stat-footer">
+                        <div className={styles.statFooter}>
                             {nextShift ? (
                                 <span>
                                     {new Date(nextShift.shiftStart).toLocaleTimeString(undefined, {
@@ -404,8 +405,8 @@ export default function DashboardClient({
             </div>
 
             {/* Main Content */}
-            <div className="content-grid">
-                <div className="content-col">
+            <div className={styles.contentGrid}>
+                <div className={styles.contentCol}>
                     {/* 2-Hour Confirmations - Top Priority */}
                     <ConfirmationWidget confirmations={upcomingConfirmations} />
 
@@ -413,29 +414,29 @@ export default function DashboardClient({
                     {myTasks.length > 0 && <TasksPanel tasks={myTasks} />}
 
                     {/* Global Notes - Important announcements */}
-                    <div className="card notes-card">
-                        <div className="card-header">
-                            <StickyNote size={18} className="header-icon" />
-                            <h3>Global Notes</h3>
+                    <div className={styles.notesCard}>
+                        <div className={styles.cardHeader}>
+                            <StickyNote size={18} className={styles.headerIcon} />
+                            <h3 className={styles.cardTitle}>Global Notes</h3>
                         </div>
-                        <div className="notes-list">
+                        <div className={styles.notesList}>
                             {globalNotes.length > 0 ? (
                                 globalNotes.slice(0, 5).map((note) => (
-                                    <div key={note.id} className="note-item">
-                                        <h4>{note.title}</h4>
-                                        <p>
+                                    <div key={note.id} className={styles.noteItem}>
+                                        <h4 className={styles.noteTitle}>{note.title}</h4>
+                                        <p className={styles.noteContent}>
                                             {note.content.length > 120
                                                 ? `${note.content.slice(0, 120)}...`
                                                 : note.content}
                                         </p>
-                                        <div className="note-meta">
+                                        <div className={styles.noteMeta}>
                                             <span><User size={10} /> {note.author.name || "Admin"}</span>
                                             <span>{formatDate(note.createdAt)}</span>
                                         </div>
                                     </div>
                                 ))
                             ) : (
-                                <div className="empty-state">
+                                <div className={styles.emptyState}>
                                     <StickyNote size={32} />
                                     <p>No announcements</p>
                                 </div>
@@ -446,7 +447,7 @@ export default function DashboardClient({
                     <QuotesPanel quotes={pendingQuotes} />
                 </div>
 
-                <div className="content-col">
+                <div className={styles.contentCol}>
                     <EventsPanel events={upcomingEvents} isAdmin={isAdmin} />
 
                     {/* Admin Task Progress */}
@@ -464,7 +465,7 @@ export default function DashboardClient({
 
             {/* Admin Only: Team Activity (Lower Priority) */}
             {isAdmin && (
-                <div className="admin-section">
+                <div className={styles.adminSection}>
                     <ActiveUsersPanel
                         initialOnlineUsers={onlineUsers}
                         initialActiveShiftUsers={activeShiftUsers}
@@ -472,320 +473,6 @@ export default function DashboardClient({
                     />
                 </div>
             )}
-
-            <style jsx>{`
-                .dashboard {
-                    padding: 1.5rem;
-                    max-width: 1500px;
-                    margin: 0 auto;
-                }
-
-                .dashboard-header {
-                    margin-bottom: 1.5rem;
-                }
-
-                .header-top {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.75rem;
-                    flex-wrap: wrap;
-                }
-
-                .dashboard-header h1 {
-                    font-size: 1.5rem;
-                    font-weight: 600;
-                    color: var(--text-primary);
-                }
-
-                .admin-badge {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 0.25rem;
-                    padding: 0.25rem 0.625rem;
-                    background: var(--danger-bg);
-                    border: 1px solid var(--danger-border);
-                    border-radius: 9999px;
-                    font-size: 0.625rem;
-                    font-weight: 600;
-                    color: var(--danger);
-                    text-transform: uppercase;
-                    letter-spacing: 0.05em;
-                }
-
-                .header-subtitle {
-                    color: var(--text-secondary);
-                    font-size: 0.875rem;
-                    margin-top: 0.25rem;
-                }
-
-                /* Stats Grid */
-                .stats-grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-                    gap: 1rem;
-                    margin-bottom: 1.5rem;
-                }
-
-                .stat-card {
-                    position: relative;
-                    background: var(--bg-card);
-                    border: 1px solid var(--border);
-                    border-radius: var(--radius-lg);
-                    padding: 1.25rem;
-                    transition: all 0.2s ease;
-                }
-
-                .stat-card:hover {
-                    border-color: var(--border-hover);
-                }
-
-                .stat-card.stat-active {
-                    border-color: var(--success-border);
-                    background: linear-gradient(135deg, var(--success-bg) 0%, var(--bg-card) 100%);
-                }
-
-                .stat-content {
-                    display: flex;
-                    align-items: center;
-                    gap: 1rem;
-                    margin-bottom: 1rem;
-                }
-
-                .stat-icon {
-                    width: 44px;
-                    height: 44px;
-                    border-radius: var(--radius-md);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    flex-shrink: 0;
-                }
-
-                .icon-primary {
-                    background: var(--primary-soft);
-                    color: var(--primary);
-                }
-
-                .icon-success {
-                    background: var(--success-bg);
-                    color: var(--success);
-                }
-
-                .icon-warning {
-                    background: var(--warning-bg);
-                    color: var(--warning);
-                }
-
-                .icon-info {
-                    background: var(--info-bg);
-                    color: var(--info);
-                }
-
-                .stat-text {
-                    display: flex;
-                    flex-direction: column;
-                }
-
-                .stat-label {
-                    font-size: 0.75rem;
-                    color: var(--text-muted);
-                    text-transform: uppercase;
-                    letter-spacing: 0.05em;
-                }
-
-                .stat-value {
-                    font-size: 1.125rem;
-                    font-weight: 600;
-                    color: var(--text-primary);
-                }
-
-                .stat-btn {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 0.5rem;
-                    width: 100%;
-                    padding: 0.625rem 1rem;
-                    border: none;
-                    border-radius: var(--radius-md);
-                    font-size: 0.875rem;
-                    font-weight: 500;
-                    font-family: inherit;
-                    cursor: pointer;
-                    transition: all 0.15s ease;
-                }
-
-                .stat-btn.btn-primary {
-                    background: var(--primary);
-                    color: white;
-                }
-
-                .stat-btn.btn-primary:hover:not(:disabled) {
-                    background: var(--primary-hover);
-                }
-
-                .stat-btn.btn-success {
-                    background: var(--success);
-                    color: var(--text-inverse);
-                }
-
-                .stat-btn.btn-success:hover:not(:disabled) {
-                    background: #16A34A;
-                }
-
-                .stat-btn:disabled {
-                    opacity: 0.5;
-                    cursor: not-allowed;
-                }
-
-                .stat-footer {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.375rem;
-                    font-size: 0.8125rem;
-                    color: var(--text-secondary);
-                }
-
-                .live-dot {
-                    position: absolute;
-                    top: 1rem;
-                    right: 1rem;
-                    width: 8px;
-                    height: 8px;
-                    background: var(--success);
-                    border-radius: 50%;
-                    animation: pulse 2s infinite;
-                }
-
-                @keyframes pulse {
-                    0%, 100% { opacity: 1; }
-                    50% { opacity: 0.4; }
-                }
-
-                /* Content Grid */
-                .content-grid {
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 1.5rem;
-                }
-
-                .content-col {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 1.5rem;
-                }
-
-                /* Notes Card */
-                .notes-card {
-                    background: var(--bg-card);
-                    border: 1px solid var(--border);
-                    border-radius: var(--radius-lg);
-                    padding: 1.25rem;
-                }
-
-                .card-header {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                    margin-bottom: 1rem;
-                }
-
-                .card-header :global(.header-icon) {
-                    color: var(--primary);
-                }
-
-                .card-header h3 {
-                    font-size: 1rem;
-                    font-weight: 600;
-                }
-
-                .notes-list {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 0.75rem;
-                }
-
-                .note-item {
-                    padding: 0.875rem;
-                    background: var(--bg-secondary);
-                    border-left: 3px solid var(--primary);
-                    border-radius: 0 var(--radius-md) var(--radius-md) 0;
-                    transition: background 0.15s;
-                }
-
-                .note-item:hover {
-                    background: var(--bg-hover);
-                }
-
-                .note-item h4 {
-                    font-size: 0.875rem;
-                    font-weight: 600;
-                    color: var(--primary);
-                    margin-bottom: 0.375rem;
-                }
-
-                .note-item p {
-                    font-size: 0.8125rem;
-                    color: var(--text-secondary);
-                    line-height: 1.5;
-                    margin-bottom: 0.5rem;
-                }
-
-                .note-meta {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.75rem;
-                    font-size: 0.6875rem;
-                    color: var(--text-muted);
-                }
-
-                .note-meta span {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.25rem;
-                }
-
-                .empty-state {
-                    text-align: center;
-                    padding: 2rem 0;
-                    color: var(--text-muted);
-                }
-
-                .empty-state :global(svg) {
-                    opacity: 0.3;
-                    margin-bottom: 0.5rem;
-                }
-
-                .empty-state p {
-                    font-size: 0.875rem;
-                }
-
-                /* Admin Section - Lower Priority */
-                .admin-section {
-                    margin-top: 1.5rem;
-                }
-
-                /* Responsive */
-                @media (max-width: 1024px) {
-                    .content-grid {
-                        grid-template-columns: 1fr;
-                    }
-                }
-
-                @media (max-width: 768px) {
-                    .dashboard {
-                        padding: 1rem;
-                    }
-
-                    .dashboard-header h1 {
-                        font-size: 1.25rem;
-                    }
-
-                    .stats-grid {
-                        grid-template-columns: 1fr;
-                    }
-                }
-            `}</style>
         </div>
     );
 }

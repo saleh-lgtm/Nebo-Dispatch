@@ -110,7 +110,7 @@ export function getRateLimitHeaders(result: RateLimitResult): HeadersInit {
 /**
  * Rate limit middleware wrapper for API routes
  */
-export function withRateLimit<T>(
+export function withRateLimit(
     handler: (request: Request) => Promise<Response>,
     type: RateLimitType = "default"
 ): (request: Request) => Promise<Response> {

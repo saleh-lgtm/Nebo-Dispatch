@@ -34,6 +34,7 @@ import {
 import NotificationBell from "./NotificationBell";
 import ClockButton from "./ClockButton";
 import { canLogout } from "@/lib/clockActions";
+import styles from "./Navbar.module.css";
 
 interface NavLinkProps {
     href: string;
@@ -50,7 +51,7 @@ function NavLink({ href, icon, label, onClick }: NavLinkProps) {
         <Link
             href={href}
             onClick={onClick}
-            className={`nav-link ${isActive ? "nav-link-active" : ""}`}
+            className={isActive ? styles.navLinkActive : styles.navLink}
             aria-current={isActive ? "page" : undefined}
         >
             {icon}
@@ -90,20 +91,20 @@ function NavDropdown({ label, icon, children, badge, activePrefix = "/admin" }: 
     }, [pathname]);
 
     return (
-        <div className="nav-dropdown" ref={dropdownRef}>
+        <div className={styles.navDropdown} ref={dropdownRef}>
             <button
-                className={`nav-link nav-dropdown-trigger ${isActive ? "nav-link-active" : ""}`}
+                className={`${isActive ? styles.navLinkActive : styles.navLink} ${styles.navDropdownTrigger}`}
                 onClick={() => setOpen(!open)}
                 aria-expanded={open}
                 aria-haspopup="true"
             >
                 {icon}
                 <span>{label}</span>
-                {badge && <span className="nav-badge">{badge}</span>}
-                <ChevronDown size={14} className={`dropdown-arrow ${open ? "open" : ""}`} />
+                {badge && <span className={styles.navBadge}>{badge}</span>}
+                <ChevronDown size={14} className={open ? styles.dropdownArrowOpen : styles.dropdownArrow} />
             </button>
             {open && (
-                <div className="nav-dropdown-menu">
+                <div className={styles.navDropdownMenu}>
                     {children}
                 </div>
             )}
@@ -113,14 +114,14 @@ function NavDropdown({ label, icon, children, badge, activePrefix = "/admin" }: 
 
 function RoleBadge({ role }: { role: string }) {
     const config = {
-        SUPER_ADMIN: { label: "Admin", icon: <ShieldCheck size={10} />, className: "badge-super-admin" },
-        ADMIN: { label: "Admin", icon: <Shield size={10} />, className: "badge-admin" },
-        ACCOUNTING: { label: "Accounting", icon: <Calculator size={10} />, className: "badge-accounting" },
-        DISPATCHER: { label: "Dispatcher", icon: <Briefcase size={10} />, className: "badge-dispatcher" },
-    }[role] || { label: role, icon: null, className: "" };
+        SUPER_ADMIN: { label: "Admin", icon: <ShieldCheck size={10} />, className: styles.badgeSuperAdmin },
+        ADMIN: { label: "Admin", icon: <Shield size={10} />, className: styles.badgeAdmin },
+        ACCOUNTING: { label: "Accounting", icon: <Calculator size={10} />, className: styles.badgeAccounting },
+        DISPATCHER: { label: "Dispatcher", icon: <Briefcase size={10} />, className: styles.badgeDispatcher },
+    }[role] || { label: role, icon: null, className: styles.roleBadge };
 
     return (
-        <span className={`role-badge ${config.className}`}>
+        <span className={config.className}>
             {config.icon}
             <span>{config.label}</span>
         </span>
@@ -147,7 +148,7 @@ function LiveClock() {
     }, []);
 
     return (
-        <span className="system-clock">{time || "--:--"}</span>
+        <span className={styles.systemClock}>{time || "--:--"}</span>
     );
 }
 
@@ -225,7 +226,7 @@ export default function Navbar() {
         <>
             {/* Logout Error Toast */}
             {logoutError && (
-                <div className="logout-error-toast" role="alert">
+                <div className={styles.logoutErrorToast} role="alert">
                     <AlertCircle size={18} />
                     <span>{logoutError}</span>
                     <button onClick={() => setLogoutError(null)} aria-label="Dismiss">
@@ -234,16 +235,16 @@ export default function Navbar() {
                 </div>
             )}
 
-            <nav className="navbar" role="navigation" aria-label="Main navigation">
-                <div className="navbar-inner">
-                    <div className="navbar-left">
-                        <Link href="/dashboard" className="navbar-brand" aria-label="NeboOps Dashboard">
-                            <span className="brand-name">NeboOps</span>
+            <nav className={styles.navbar} role="navigation" aria-label="Main navigation">
+                <div className={styles.navbarInner}>
+                    <div className={styles.navbarLeft}>
+                        <Link href="/dashboard" className={styles.navbarBrand} aria-label="NeboOps Dashboard">
+                            <span className={styles.brandName}>NeboOps</span>
                         </Link>
                     </div>
 
                     {/* Desktop Navigation */}
-                    <div className="nav-links desktop-nav">
+                    <div className={styles.desktopNav}>
                         <NavLink href="/dashboard" icon={<LayoutDashboard size={16} />} label="Dashboard" />
 
                         {!isSuperAdmin && (
@@ -268,19 +269,19 @@ export default function Navbar() {
 
                         {isAdmin && (
                             <>
-                                <div className="nav-divider" />
+                                <div className={styles.navDivider} />
                                 <NavDropdown
                                     label="Admin"
                                     icon={<Shield size={16} />}
                                     badge={isSuperAdmin ? "SA" : undefined}
                                 >
-                                    <div className="dropdown-section">
-                                        <span className="dropdown-section-label">Scheduling</span>
+                                    <div className={styles.dropdownSection}>
+                                        <span className={styles.dropdownSectionLabel}>Scheduling</span>
                                         <NavLink href="/admin/scheduler" icon={<CalendarClock size={14} />} label="Dispatcher Scheduler" />
                                         <NavLink href="/admin/requests" icon={<FileEdit size={14} />} label="Pending Requests" />
                                     </div>
-                                    <div className="dropdown-section">
-                                        <span className="dropdown-section-label">Team Management</span>
+                                    <div className={styles.dropdownSection}>
+                                        <span className={styles.dropdownSectionLabel}>Team Management</span>
                                         <NavLink href="/admin/tasks" icon={<CheckSquare size={14} />} label="Admin Tasks" />
                                         <NavLink href="/admin/notes" icon={<StickyNote size={14} />} label="Global Notes" />
                                         <NavLink href="/admin/sops" icon={<BookOpen size={14} />} label="Manage SOPs" />
@@ -290,8 +291,8 @@ export default function Navbar() {
                                         <NavLink href="/admin/analytics" icon={<BarChart3 size={14} />} label="Analytics" />
                                     </div>
                                     {isSuperAdmin && (
-                                        <div className="dropdown-section">
-                                            <span className="dropdown-section-label">System</span>
+                                        <div className={styles.dropdownSection}>
+                                            <span className={styles.dropdownSectionLabel}>System</span>
                                             <NavLink href="/admin/users" icon={<UserCog size={14} />} label="User Management" />
                                             <NavLink href="/admin/audit" icon={<History size={14} />} label="Audit Log" />
                                         </div>
@@ -301,19 +302,19 @@ export default function Navbar() {
                         )}
                     </div>
 
-                    <div className="navbar-right">
+                    <div className={styles.navbarRight}>
                         <LiveClock />
-                        <div className="nav-divider" />
+                        <div className={styles.navDivider} />
                         <NotificationBell />
                         <NavLink href="/settings" icon={<Settings size={16} />} label="Settings" />
-                        <div className="nav-divider" />
-                        <div className="user-section">
-                            <span className="user-name">{session.user.name?.split(' ')[0] || 'User'}</span>
+                        <div className={styles.navDivider} />
+                        <div className={styles.userSection}>
+                            <span className={styles.userName}>{session.user.name?.split(' ')[0] || 'User'}</span>
                             <RoleBadge role={role} />
                         </div>
                         <button
                             onClick={handleLogout}
-                            className="nav-link logout-btn"
+                            className={styles.logoutBtn}
                             aria-label="Sign out"
                             disabled={isLoggingOut}
                         >
@@ -322,7 +323,7 @@ export default function Navbar() {
 
                         {/* Mobile Menu Button */}
                         <button
-                            className="mobile-menu-btn"
+                            className={styles.mobileMenuBtn}
                             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                             aria-expanded={mobileMenuOpen}
                             aria-controls="mobile-nav"
@@ -336,35 +337,35 @@ export default function Navbar() {
 
             {/* Mobile Navigation Overlay */}
             {mobileMenuOpen && (
-                <div className="mobile-nav-overlay" onClick={closeMobileMenu} aria-hidden="true" />
+                <div className={styles.mobileNavOverlay} onClick={closeMobileMenu} aria-hidden="true" />
             )}
 
             {/* Mobile Navigation Drawer */}
             <div
                 id="mobile-nav"
-                className={`mobile-nav-drawer ${mobileMenuOpen ? "open" : ""}`}
+                className={mobileMenuOpen ? styles.mobileNavDrawerOpen : styles.mobileNavDrawer}
                 role="dialog"
                 aria-modal="true"
                 aria-label="Mobile navigation"
             >
-                <div className="mobile-nav-header">
-                    <div className="mobile-user-info">
-                        <div className="mobile-avatar">
+                <div className={styles.mobileNavHeader}>
+                    <div className={styles.mobileUserInfo}>
+                        <div className={styles.mobileAvatar}>
                             {(session.user.name || session.user.email || "U").charAt(0).toUpperCase()}
                         </div>
-                        <div className="mobile-user-details">
-                            <span className="mobile-user-name">{session.user.name || "User"}</span>
+                        <div className={styles.mobileUserDetails}>
+                            <span className={styles.mobileUserName}>{session.user.name || "User"}</span>
                             <RoleBadge role={role} />
                         </div>
                     </div>
-                    <button onClick={closeMobileMenu} className="mobile-close-btn" aria-label="Close menu">
+                    <button onClick={closeMobileMenu} className={styles.mobileCloseBtn} aria-label="Close menu">
                         <X size={20} />
                     </button>
                 </div>
 
-                <div className="mobile-nav-content">
-                    <div className="mobile-nav-section">
-                        <span className="mobile-section-label">Operations</span>
+                <div className={styles.mobileNavContent}>
+                    <div className={styles.mobileNavSection}>
+                        <span className={styles.mobileSectionLabel}>Operations</span>
                         <NavLink href="/dashboard" icon={<LayoutDashboard size={16} />} label="Dashboard" onClick={closeMobileMenu} />
                         {!isSuperAdmin && (
                             <NavLink href="/schedule" icon={<Calendar size={16} />} label="My Schedule" onClick={closeMobileMenu} />
@@ -378,23 +379,23 @@ export default function Navbar() {
                     </div>
 
                     {hasAccountingAccess && (
-                        <div className="mobile-nav-section">
-                            <span className="mobile-section-label">Accounting</span>
+                        <div className={styles.mobileNavSection}>
+                            <span className={styles.mobileSectionLabel}>Accounting</span>
                             <NavLink href="/accounting" icon={<Calculator size={16} />} label="Accounting Dashboard" onClick={closeMobileMenu} />
                         </div>
                     )}
 
                     {isAdmin && (
-                        <div className="mobile-nav-section">
-                            <span className="mobile-section-label">Admin - Scheduling</span>
+                        <div className={styles.mobileNavSection}>
+                            <span className={styles.mobileSectionLabel}>Admin - Scheduling</span>
                             <NavLink href="/admin/scheduler" icon={<CalendarClock size={16} />} label="Dispatcher Scheduler" onClick={closeMobileMenu} />
                             <NavLink href="/admin/requests" icon={<FileEdit size={16} />} label="Pending Requests" onClick={closeMobileMenu} />
                         </div>
                     )}
 
                     {isAdmin && (
-                        <div className="mobile-nav-section">
-                            <span className="mobile-section-label">Admin - Team</span>
+                        <div className={styles.mobileNavSection}>
+                            <span className={styles.mobileSectionLabel}>Admin - Team</span>
                             <NavLink href="/admin/tasks" icon={<CheckSquare size={16} />} label="Admin Tasks" onClick={closeMobileMenu} />
                             <NavLink href="/admin/notes" icon={<StickyNote size={16} />} label="Global Notes" onClick={closeMobileMenu} />
                             <NavLink href="/admin/sops" icon={<BookOpen size={16} />} label="Manage SOPs" onClick={closeMobileMenu} />
@@ -406,22 +407,22 @@ export default function Navbar() {
                     )}
 
                     {isSuperAdmin && (
-                        <div className="mobile-nav-section">
-                            <span className="mobile-section-label">System</span>
+                        <div className={styles.mobileNavSection}>
+                            <span className={styles.mobileSectionLabel}>System</span>
                             <NavLink href="/admin/users" icon={<UserCog size={16} />} label="User Management" onClick={closeMobileMenu} />
                             <NavLink href="/admin/audit" icon={<History size={16} />} label="Audit Log" onClick={closeMobileMenu} />
                         </div>
                     )}
 
-                    <div className="mobile-nav-section">
-                        <span className="mobile-section-label">Account</span>
+                    <div className={styles.mobileNavSection}>
+                        <span className={styles.mobileSectionLabel}>Account</span>
                         <NavLink href="/settings" icon={<Settings size={16} />} label="Settings" onClick={closeMobileMenu} />
                         <button
                             onClick={() => {
                                 handleLogout();
                                 closeMobileMenu();
                             }}
-                            className="nav-link logout-btn"
+                            className={styles.logoutBtn}
                             disabled={isLoggingOut}
                         >
                             <LogOut size={16} />
@@ -430,487 +431,6 @@ export default function Navbar() {
                     </div>
                 </div>
             </div>
-
-            <style jsx>{`
-                /* Logout Error Toast */
-                .logout-error-toast {
-                    position: fixed;
-                    top: 80px;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    background: var(--danger-soft);
-                    border: 1px solid var(--danger-border);
-                    color: var(--danger);
-                    padding: 0.875rem 1.25rem;
-                    border-radius: var(--radius-md);
-                    display: flex;
-                    align-items: center;
-                    gap: 0.75rem;
-                    font-size: 0.875rem;
-                    z-index: 1000;
-                    box-shadow: var(--shadow-lg);
-                    animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                    max-width: 90%;
-                    backdrop-filter: blur(12px);
-                }
-
-                .logout-error-toast button {
-                    background: none;
-                    border: none;
-                    color: var(--danger);
-                    cursor: pointer;
-                    padding: 0.25rem;
-                    border-radius: var(--radius-sm);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    opacity: 0.7;
-                    transition: opacity 0.15s ease;
-                }
-
-                .logout-error-toast button:hover {
-                    opacity: 1;
-                }
-
-                @keyframes slideDown {
-                    from {
-                        opacity: 0;
-                        transform: translateX(-50%) translateY(-10px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateX(-50%) translateY(0);
-                    }
-                }
-
-                /* Navbar Base - Glass Effect */
-                .navbar {
-                    background: rgba(14, 9, 24, 0.85);
-                    backdrop-filter: blur(20px);
-                    -webkit-backdrop-filter: blur(20px);
-                    border-bottom: 1px solid var(--border);
-                    position: sticky;
-                    top: 0;
-                    z-index: 100;
-                }
-
-                .navbar::before {
-                    content: '';
-                    position: absolute;
-                    bottom: 0;
-                    left: 0;
-                    right: 0;
-                    height: 1px;
-                    background: linear-gradient(90deg, transparent, rgba(238, 79, 39, 0.3), transparent);
-                }
-
-                .navbar-inner {
-                    max-width: 1600px;
-                    margin: 0 auto;
-                    padding: 0 1.5rem;
-                    height: 64px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                }
-
-                .navbar-left {
-                    display: flex;
-                    align-items: center;
-                }
-
-                .navbar-brand {
-                    display: flex;
-                    align-items: center;
-                    text-decoration: none;
-                }
-
-                .brand-name {
-                    font-family: var(--font-display);
-                    font-size: 1.375rem;
-                    font-weight: 800;
-                    background: linear-gradient(135deg, var(--accent), #ff7a50);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    background-clip: text;
-                }
-
-                .navbar-right {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.375rem;
-                }
-
-                .user-section {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.625rem;
-                    padding: 0.5rem 0.875rem;
-                    background: var(--bg-hover);
-                    border-radius: var(--radius-md);
-                    margin-left: 0.5rem;
-                }
-
-                .user-name {
-                    font-size: 0.875rem;
-                    font-weight: 600;
-                    color: var(--text-primary);
-                }
-
-                .system-clock {
-                    font-family: var(--font-mono);
-                    font-size: 0.8125rem;
-                    color: var(--accent);
-                    padding: 0.5rem 0.75rem;
-                    background: var(--accent-soft);
-                    border-radius: var(--radius-sm);
-                }
-
-                /* Desktop Navigation */
-                .nav-links {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.25rem;
-                }
-
-                .nav-divider {
-                    width: 1px;
-                    height: 24px;
-                    background: var(--border);
-                    margin: 0 0.75rem;
-                }
-
-                /* Nav Link Styles */
-                :global(.nav-link) {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                    padding: 0.625rem 0.875rem;
-                    border-radius: var(--radius-md);
-                    color: var(--text-secondary);
-                    font-family: var(--font-sans);
-                    font-weight: 500;
-                    font-size: 0.875rem;
-                    transition: all 0.15s ease;
-                    text-decoration: none;
-                    background: none;
-                    border: none;
-                    cursor: pointer;
-                    white-space: nowrap;
-                    position: relative;
-                }
-
-                :global(.nav-link:hover) {
-                    color: var(--text-primary);
-                    background: var(--bg-hover);
-                }
-
-                :global(.nav-link-active) {
-                    color: var(--accent);
-                    background: var(--accent-soft);
-                }
-
-                :global(.nav-link-active::before) {
-                    content: '';
-                    position: absolute;
-                    left: 50%;
-                    bottom: 0;
-                    transform: translateX(-50%);
-                    width: 20px;
-                    height: 2px;
-                    background: var(--accent);
-                    border-radius: 1px;
-                }
-
-                :global(.nav-link-active:hover) {
-                    background: var(--accent-soft);
-                }
-
-                :global(.logout-btn:hover) {
-                    color: var(--danger) !important;
-                    background: var(--danger-soft) !important;
-                }
-
-                /* Dropdown */
-                .nav-dropdown {
-                    position: relative;
-                }
-
-                .nav-dropdown-trigger {
-                    display: flex !important;
-                    align-items: center !important;
-                    gap: 0.5rem !important;
-                }
-
-                .dropdown-arrow {
-                    transition: transform 0.2s ease;
-                    opacity: 0.6;
-                }
-
-                .dropdown-arrow.open {
-                    transform: rotate(180deg);
-                }
-
-                .nav-badge {
-                    font-family: var(--font-mono);
-                    font-size: 0.625rem;
-                    font-weight: 700;
-                    background: linear-gradient(135deg, var(--accent), var(--accent-hover));
-                    color: white;
-                    padding: 0.125rem 0.375rem;
-                    border-radius: var(--radius-sm);
-                    margin-left: 0.25rem;
-                    box-shadow: 0 0 10px rgba(238, 79, 39, 0.4);
-                }
-
-                .nav-dropdown-menu {
-                    position: absolute;
-                    top: calc(100% + 0.75rem);
-                    right: 0;
-                    min-width: 260px;
-                    background: var(--bg-surface);
-                    backdrop-filter: blur(20px);
-                    border: 1px solid var(--border);
-                    border-radius: var(--radius-lg);
-                    padding: 0.75rem;
-                    box-shadow: var(--shadow-xl);
-                    animation: dropdownFade 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-                    z-index: 50;
-                }
-
-                .nav-dropdown-menu::before {
-                    content: '';
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    height: 1px;
-                    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-                }
-
-                @keyframes dropdownFade {
-                    from {
-                        opacity: 0;
-                        transform: translateY(-8px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
-                }
-
-                .dropdown-section {
-                    padding: 0.5rem 0;
-                }
-
-                .dropdown-section:not(:last-child) {
-                    border-bottom: 1px solid var(--border);
-                    margin-bottom: 0.5rem;
-                }
-
-                .dropdown-section-label {
-                    font-size: 0.6875rem;
-                    font-weight: 700;
-                    color: var(--text-muted);
-                    text-transform: uppercase;
-                    letter-spacing: 0.1em;
-                    padding: 0.375rem 0.75rem;
-                    display: block;
-                }
-
-                /* Role Badge */
-                :global(.role-badge) {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 0.25rem;
-                    font-size: 0.6875rem;
-                    font-weight: 600;
-                    padding: 0.25rem 0.625rem;
-                    border-radius: var(--radius-sm);
-                }
-
-                :global(.badge-super-admin) {
-                    background: linear-gradient(135deg, var(--danger-soft), rgba(239, 83, 80, 0.25));
-                    color: var(--danger);
-                    border: 1px solid var(--danger-border);
-                }
-
-                :global(.badge-admin) {
-                    background: linear-gradient(135deg, var(--warning-soft), rgba(245, 166, 35, 0.25));
-                    color: var(--warning);
-                    border: 1px solid var(--warning-border);
-                }
-
-                :global(.badge-dispatcher) {
-                    background: linear-gradient(135deg, var(--success-soft), rgba(53, 166, 112, 0.25));
-                    color: var(--success);
-                    border: 1px solid var(--success-border);
-                }
-
-                :global(.badge-accounting) {
-                    background: linear-gradient(135deg, var(--info-soft), rgba(92, 156, 230, 0.25));
-                    color: var(--info);
-                    border: 1px solid var(--info-border);
-                }
-
-                /* Mobile Menu Button */
-                .mobile-menu-btn {
-                    display: none;
-                    background: var(--bg-elevated);
-                    border: 1px solid var(--border);
-                    color: var(--text-primary);
-                    cursor: pointer;
-                    padding: 0.5rem;
-                    border-radius: var(--radius-md);
-                    transition: all 0.15s ease;
-                }
-
-                .mobile-menu-btn:hover {
-                    background: var(--bg-active);
-                    border-color: var(--border-hover);
-                }
-
-                /* Mobile Overlay */
-                .mobile-nav-overlay {
-                    position: fixed;
-                    inset: 0;
-                    background: rgba(14, 9, 24, 0.8);
-                    backdrop-filter: blur(8px);
-                    z-index: 150;
-                    animation: fadeIn 0.2s ease;
-                }
-
-                @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-
-                /* Mobile Drawer */
-                .mobile-nav-drawer {
-                    position: fixed;
-                    top: 0;
-                    right: 0;
-                    width: 320px;
-                    max-width: 85vw;
-                    height: 100vh;
-                    background: var(--bg-surface);
-                    border-left: 1px solid var(--border);
-                    z-index: 200;
-                    transform: translateX(100%);
-                    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                    overflow-y: auto;
-                    display: flex;
-                    flex-direction: column;
-                    box-shadow: var(--shadow-xl);
-                }
-
-                .mobile-nav-drawer.open {
-                    transform: translateX(0);
-                }
-
-                .mobile-nav-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    padding: 1.25rem;
-                    border-bottom: 1px solid var(--border);
-                    background: var(--bg-elevated);
-                }
-
-                .mobile-user-info {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.875rem;
-                }
-
-                .mobile-avatar {
-                    width: 44px;
-                    height: 44px;
-                    background: linear-gradient(135deg, var(--accent-soft), var(--secondary-soft));
-                    color: var(--accent);
-                    border-radius: var(--radius-md);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-weight: 700;
-                    font-size: 1.125rem;
-                }
-
-                .mobile-user-details {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 0.375rem;
-                }
-
-                .mobile-user-name {
-                    font-weight: 700;
-                    font-size: 1rem;
-                    color: var(--text-primary);
-                }
-
-                .mobile-close-btn {
-                    background: var(--bg-hover);
-                    border: 1px solid var(--border);
-                    color: var(--text-secondary);
-                    cursor: pointer;
-                    padding: 0.5rem;
-                    border-radius: var(--radius-md);
-                    transition: all 0.15s ease;
-                }
-
-                .mobile-close-btn:hover {
-                    background: var(--bg-active);
-                    color: var(--text-primary);
-                }
-
-                .mobile-nav-content {
-                    flex: 1;
-                    padding: 1.25rem;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 0.75rem;
-                }
-
-                .mobile-nav-section {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 0.25rem;
-                    padding-bottom: 1rem;
-                }
-
-                .mobile-nav-section:not(:last-child) {
-                    border-bottom: 1px solid var(--border);
-                    margin-bottom: 0.75rem;
-                }
-
-                .mobile-section-label {
-                    font-size: 0.6875rem;
-                    font-weight: 700;
-                    color: var(--text-muted);
-                    text-transform: uppercase;
-                    letter-spacing: 0.1em;
-                    padding: 0.5rem 0.625rem;
-                }
-
-                /* Responsive */
-                @media (max-width: 1100px) {
-                    .desktop-nav {
-                        display: none !important;
-                    }
-
-                    .user-section {
-                        display: none;
-                    }
-
-                    .system-clock {
-                        display: none;
-                    }
-
-                    .mobile-menu-btn {
-                        display: flex;
-                    }
-                }
-            `}</style>
         </>
     );
 }

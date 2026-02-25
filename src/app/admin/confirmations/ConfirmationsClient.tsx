@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
     Phone,
     Clock,
@@ -124,8 +124,11 @@ export default function ConfirmationsClient({
         });
     };
 
+    // Capture current time once per render to avoid impure Date.now() calls
+    const now = useMemo(() => Date.now(), []);
+
     const isOverdue = (dueAt: Date | string) => {
-        return new Date(dueAt).getTime() < Date.now();
+        return new Date(dueAt).getTime() < now;
     };
 
     const pendingCount = todayConfirmations.filter((c) => c.status === "PENDING").length;

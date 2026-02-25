@@ -5,7 +5,6 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { requireSuperAdmin, requireAdmin, canModifyUser, canDeleteUser, canChangeUserRole } from "./auth-helpers";
 import { createAuditLog } from "./auditActions";
-import { Role } from "@prisma/client";
 
 // Get all users (ADMIN/SUPER_ADMIN only)
 export async function getAllUsers() {

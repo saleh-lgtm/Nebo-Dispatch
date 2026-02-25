@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { DollarSign, Plus, Trash2, Save, X, FileText, Copy } from "lucide-react";
+import { DollarSign, Plus, Trash2, Save, X, FileText } from "lucide-react";
 import {
     upsertAffiliatePricing,
     deleteAffiliatePricing,

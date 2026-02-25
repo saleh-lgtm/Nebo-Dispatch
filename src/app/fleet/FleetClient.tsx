@@ -19,7 +19,7 @@ import {
 import { VehicleType, VehicleStatus } from "@prisma/client";
 import { createVehicle, updateVehicle, deleteVehicle, updateVehicleStatus } from "@/lib/fleetActions";
 import { useToast } from "@/hooks/useToast";
-import ExpirationBadge, { getExpirationStatus } from "@/components/fleet/ExpirationBadge";
+import { getExpirationStatus } from "@/components/fleet/ExpirationBadge";
 
 interface VehicleWithDocs {
     id: string;

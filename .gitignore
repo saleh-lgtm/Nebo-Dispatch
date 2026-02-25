@@ -47,6 +47,10 @@ credentials/
 # vercel
 .vercel
 
+# Claude Code local files
+.claude/worktrees/
+.claude/skills/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

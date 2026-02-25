@@ -7,9 +7,7 @@ import {
     TrendingUp,
     Calendar,
     Timer,
-    User,
     PlayCircle,
-    ChevronRight,
     Filter,
 } from "lucide-react";
 

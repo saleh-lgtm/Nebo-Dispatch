@@ -172,7 +172,7 @@ export async function logAccessDenied(
 export async function logRateLimitExceeded(
     identifier: string,
     endpoint: string,
-    ipAddress?: string
+    _ipAddress?: string
 ): Promise<void> {
     console.warn(`[SECURITY] Rate limit exceeded: ${identifier} on ${endpoint}`);
     // Don't create DB record for rate limits - could be DoS vector

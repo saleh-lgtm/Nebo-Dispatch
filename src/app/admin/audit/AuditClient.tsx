@@ -8,7 +8,6 @@ import {
     Filter,
     ChevronLeft,
     ChevronRight,
-    Calendar,
     User,
     Activity,
     Database,

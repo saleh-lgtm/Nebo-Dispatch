@@ -13,7 +13,6 @@ import {
     ChevronRight,
     Search,
     Route,
-    Car,
 } from "lucide-react";
 import {
     upsertAffiliatePricing,

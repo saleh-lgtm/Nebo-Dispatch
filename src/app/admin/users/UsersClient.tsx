@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Users, UserPlus, Shield, ShieldCheck, User, Mail, Calendar, MoreVertical, X, Check, AlertTriangle } from "lucide-react";
+import { Users, UserPlus, Shield, ShieldCheck, User, Mail, Calendar, MoreVertical, X, AlertTriangle } from "lucide-react";
 import {
     createUser,
     updateUser,
