@@ -1365,6 +1365,7 @@ model TripConfirmation {
   dueAt           DateTime           // 2 hours before pickup (when confirmation is due)
   passengerName   String
   driverName      String
+  accountName     String?            // Account code from manifest (e.g., "LL-SAT")
 
   // Status tracking
   status          ConfirmationStatus @default(PENDING)

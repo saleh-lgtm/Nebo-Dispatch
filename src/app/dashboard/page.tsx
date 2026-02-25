@@ -153,8 +153,8 @@ export default async function DashboardPage() {
         // Task progress for admins
         isAdmin ? getTaskProgress() : Promise.resolve([]),
 
-        // Upcoming 2-hour confirmations
-        getUpcomingConfirmations(10),
+        // Upcoming 2-hour confirmations (next 6 trips)
+        getUpcomingConfirmations(6),
     ]);
 
     const stats = {

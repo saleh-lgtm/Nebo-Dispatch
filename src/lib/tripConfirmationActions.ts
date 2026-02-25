@@ -8,31 +8,28 @@ import { revalidatePath } from "next/cache";
 import { ConfirmationStatus } from "@prisma/client";
 
 /**
- * Get upcoming confirmations due within the next 3 hours
- * Returns trips sorted by most urgent first
+ * Get upcoming confirmations sorted by when call is due
+ * Confirmation call should be made 2 hours before pickup (dueAt)
+ * Returns next N pending trips, prioritizing those due soonest
  */
-export async function getUpcomingConfirmations(limit: number = 10) {
+export async function getUpcomingConfirmations(limit: number = 6) {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
         throw new Error("Unauthorized");
     }
 
     const now = new Date();
-    const threeHoursLater = new Date(now.getTime() + 3 * 60 * 60 * 1000);
 
     const confirmations = await prisma.tripConfirmation.findMany({
         where: {
             status: "PENDING",
             archivedAt: null,
-            dueAt: {
-                lte: threeHoursLater,
-            },
             pickupAt: {
                 gte: now, // Don't show past pickups
             },
         },
         orderBy: {
-            dueAt: "asc", // Most urgent first
+            dueAt: "asc", // Calls due soonest first (2 hours before pickup)
         },
         take: limit,
         include: {
@@ -434,12 +431,14 @@ export async function parseManifestEmail(emailBody: string): Promise<Array<{
     pickupAt: Date;
     passengerName: string;
     driverName: string;
+    accountName?: string;
 }>> {
     const trips: Array<{
         tripNumber: string;
         pickupAt: Date;
         passengerName: string;
         driverName: string;
+        accountName?: string;
     }> = [];
 
     // Convert HTML to plain text if needed
@@ -510,11 +509,19 @@ export async function parseManifestEmail(emailBody: string): Promise<Array<{
             driverName = nameParts.join(" ");
         }
 
+        // Extract account name - look for "Account" or "Account:" followed by account code
+        let accountName: string | undefined;
+        const accountMatch = section.match(/Account[:\s]+([A-Za-z0-9][\w-]*)/i);
+        if (accountMatch) {
+            accountName = accountMatch[1].trim();
+        }
+
         trips.push({
             tripNumber,
             pickupAt,
             passengerName,
             driverName,
+            accountName,
         });
     }
 
@@ -531,6 +538,7 @@ export async function ingestManifestTrips(
         pickupAt: Date;
         passengerName: string;
         driverName: string;
+        accountName?: string;
     }>,
     sourceEmail?: string,
     fromEmail?: string,
@@ -574,6 +582,7 @@ export async function ingestManifestTrips(
                     dueAt,
                     passengerName: trip.passengerName,
                     driverName: trip.driverName,
+                    accountName: trip.accountName,
                     manifestDate: today,
                     sourceEmail: sourceEmail,
                 },
@@ -618,15 +627,11 @@ export async function getPendingConfirmationCount() {
     }
 
     const now = new Date();
-    const threeHoursLater = new Date(now.getTime() + 3 * 60 * 60 * 1000);
 
     const count = await prisma.tripConfirmation.count({
         where: {
             status: "PENDING",
             archivedAt: null,
-            dueAt: {
-                lte: threeHoursLater,
-            },
             pickupAt: {
                 gte: now,
             },
