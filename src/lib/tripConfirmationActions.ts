@@ -450,7 +450,6 @@ export async function parseManifestEmail(emailBody: string): Promise<Array<{
 
     // Split email into trip sections
     // Each trip starts with date pattern: MM/DD/YYYY - Pick Up At:HH:MM AM/PM
-    // Also handle variations like "02/25/2026 - Pick Up At:03:15 AM"
     const sections = plainText.split(/(?=\d{2}\/\d{2}\/\d{4}\s*-?\s*Pick Up At:)/gi);
 
     for (const section of sections) {
@@ -462,13 +461,19 @@ export async function parseManifestEmail(emailBody: string): Promise<Array<{
         );
         if (!dateTimeMatch) continue;
 
-        const [, dateStr, timeStr] = dateTimeMatch;
+        const [fullMatch, dateStr, timeStr] = dateTimeMatch;
 
-        // Extract trip number - look for 4-6 digit number near the beginning
-        const tripNumberMatch = section.match(/\b(\d{4,6})\b/);
+        // Extract trip number - appears after the datetime line
+        // Skip the date part and look for a 4-6 digit number that's NOT part of a date
+        const afterDateTime = section.substring(section.indexOf(fullMatch) + fullMatch.length);
+        const tripNumberMatch = afterDateTime.match(/^\s*(?:\S+\s+)*?(\d{4,6})\b/);
         if (!tripNumberMatch) continue;
 
         const tripNumber = tripNumberMatch[1];
+
+        // Skip if trip number looks like a year (2020-2030)
+        const tripNumInt = parseInt(tripNumber, 10);
+        if (tripNumInt >= 2020 && tripNumInt <= 2030) continue;
 
         // Parse date and time
         const [month, day, year] = dateStr.split("/").map(Number);
@@ -487,18 +492,22 @@ export async function parseManifestEmail(emailBody: string): Promise<Array<{
 
         const pickupAt = new Date(year, month - 1, day, hours, minutes);
 
-        // Extract passenger name - look for "Passenger" section
+        // Extract passenger name - look for "Passenger" section followed by a name
         let passengerName = "Unknown Passenger";
-        const passengerMatch = section.match(/Passenger\s+([A-Za-z]+(?:\s+[A-Za-z]+)*)/i);
+        const passengerMatch = section.match(/Passenger\s+([A-Za-z][A-Za-z\s]*[A-Za-z])/i);
         if (passengerMatch) {
-            passengerName = passengerMatch[1].trim();
+            // Take only first two words (first + last name)
+            const nameParts = passengerMatch[1].trim().split(/\s+/).slice(0, 3);
+            passengerName = nameParts.join(" ");
         }
 
         // Extract driver name - look for "Driver Info" section
         let driverName = "Unknown Driver";
-        const driverMatch = section.match(/Driver Info\s+([A-Za-z0-9]+(?:\s+[A-Za-z0-9]+)*)/i);
+        const driverMatch = section.match(/Driver Info\s+([A-Za-z][A-Za-z0-9\s]*[A-Za-z0-9])/i);
         if (driverMatch) {
-            driverName = driverMatch[1].trim();
+            // Take only first two words (first + last name)
+            const nameParts = driverMatch[1].trim().split(/\s+/).slice(0, 3);
+            driverName = nameParts.join(" ");
         }
 
         trips.push({
