@@ -441,7 +441,7 @@ export default function Navbar() {
                     background: var(--danger-soft);
                     border: 1px solid var(--danger-border);
                     color: var(--danger);
-                    padding: 0.75rem 1rem;
+                    padding: 0.875rem 1.25rem;
                     border-radius: var(--radius-md);
                     display: flex;
                     align-items: center;
@@ -449,8 +449,9 @@ export default function Navbar() {
                     font-size: 0.875rem;
                     z-index: 1000;
                     box-shadow: var(--shadow-lg);
-                    animation: slideDown 0.3s ease;
+                    animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                     max-width: 90%;
+                    backdrop-filter: blur(12px);
                 }
 
                 .logout-error-toast button {
@@ -482,20 +483,32 @@ export default function Navbar() {
                     }
                 }
 
-                /* Navbar Base */
+                /* Navbar Base - Glass Effect */
                 .navbar {
-                    background: var(--bg-card);
+                    background: rgba(14, 9, 24, 0.85);
+                    backdrop-filter: blur(20px);
+                    -webkit-backdrop-filter: blur(20px);
                     border-bottom: 1px solid var(--border);
                     position: sticky;
                     top: 0;
                     z-index: 100;
                 }
 
+                .navbar::before {
+                    content: '';
+                    position: absolute;
+                    bottom: 0;
+                    left: 0;
+                    right: 0;
+                    height: 1px;
+                    background: linear-gradient(90deg, transparent, rgba(238, 79, 39, 0.3), transparent);
+                }
+
                 .navbar-inner {
                     max-width: 1600px;
                     margin: 0 auto;
                     padding: 0 1.5rem;
-                    height: 60px;
+                    height: 64px;
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
@@ -514,35 +527,43 @@ export default function Navbar() {
 
                 .brand-name {
                     font-family: var(--font-display);
-                    font-size: 1.25rem;
-                    font-weight: 700;
-                    color: var(--accent);
+                    font-size: 1.375rem;
+                    font-weight: 800;
+                    background: linear-gradient(135deg, var(--accent), #ff7a50);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    background-clip: text;
                 }
 
                 .navbar-right {
                     display: flex;
                     align-items: center;
-                    gap: 0.25rem;
+                    gap: 0.375rem;
                 }
 
                 .user-section {
                     display: flex;
                     align-items: center;
-                    gap: 0.5rem;
-                    padding: 0.375rem 0.75rem;
+                    gap: 0.625rem;
+                    padding: 0.5rem 0.875rem;
+                    background: var(--bg-hover);
+                    border-radius: var(--radius-md);
+                    margin-left: 0.5rem;
                 }
 
                 .user-name {
                     font-size: 0.875rem;
-                    font-weight: 500;
+                    font-weight: 600;
                     color: var(--text-primary);
                 }
 
                 .system-clock {
                     font-family: var(--font-mono);
                     font-size: 0.8125rem;
-                    color: var(--text-secondary);
-                    padding: 0.375rem 0.75rem;
+                    color: var(--accent);
+                    padding: 0.5rem 0.75rem;
+                    background: var(--accent-soft);
+                    border-radius: var(--radius-sm);
                 }
 
                 /* Desktop Navigation */
@@ -556,7 +577,7 @@ export default function Navbar() {
                     width: 1px;
                     height: 24px;
                     background: var(--border);
-                    margin: 0 0.5rem;
+                    margin: 0 0.75rem;
                 }
 
                 /* Nav Link Styles */
@@ -564,7 +585,7 @@ export default function Navbar() {
                     display: flex;
                     align-items: center;
                     gap: 0.5rem;
-                    padding: 0.5rem 0.75rem;
+                    padding: 0.625rem 0.875rem;
                     border-radius: var(--radius-md);
                     color: var(--text-secondary);
                     font-family: var(--font-sans);
@@ -576,6 +597,7 @@ export default function Navbar() {
                     border: none;
                     cursor: pointer;
                     white-space: nowrap;
+                    position: relative;
                 }
 
                 :global(.nav-link:hover) {
@@ -586,6 +608,18 @@ export default function Navbar() {
                 :global(.nav-link-active) {
                     color: var(--accent);
                     background: var(--accent-soft);
+                }
+
+                :global(.nav-link-active::before) {
+                    content: '';
+                    position: absolute;
+                    left: 50%;
+                    bottom: 0;
+                    transform: translateX(-50%);
+                    width: 20px;
+                    height: 2px;
+                    background: var(--accent);
+                    border-radius: 1px;
                 }
 
                 :global(.nav-link-active:hover) {
@@ -609,7 +643,7 @@ export default function Navbar() {
                 }
 
                 .dropdown-arrow {
-                    transition: transform 0.15s ease;
+                    transition: transform 0.2s ease;
                     opacity: 0.6;
                 }
 
@@ -620,32 +654,44 @@ export default function Navbar() {
                 .nav-badge {
                     font-family: var(--font-mono);
                     font-size: 0.625rem;
-                    font-weight: 600;
-                    background: var(--danger);
+                    font-weight: 700;
+                    background: linear-gradient(135deg, var(--accent), var(--accent-hover));
                     color: white;
                     padding: 0.125rem 0.375rem;
                     border-radius: var(--radius-sm);
                     margin-left: 0.25rem;
+                    box-shadow: 0 0 10px rgba(238, 79, 39, 0.4);
                 }
 
                 .nav-dropdown-menu {
                     position: absolute;
-                    top: calc(100% + 0.5rem);
+                    top: calc(100% + 0.75rem);
                     right: 0;
-                    min-width: 240px;
-                    background: var(--bg-card);
+                    min-width: 260px;
+                    background: var(--bg-surface);
+                    backdrop-filter: blur(20px);
                     border: 1px solid var(--border);
                     border-radius: var(--radius-lg);
-                    padding: 0.5rem;
-                    box-shadow: var(--shadow-lg);
-                    animation: dropdownFade 0.15s ease;
+                    padding: 0.75rem;
+                    box-shadow: var(--shadow-xl);
+                    animation: dropdownFade 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                     z-index: 50;
+                }
+
+                .nav-dropdown-menu::before {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    height: 1px;
+                    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
                 }
 
                 @keyframes dropdownFade {
                     from {
                         opacity: 0;
-                        transform: translateY(-4px);
+                        transform: translateY(-8px);
                     }
                     to {
                         opacity: 1;
@@ -654,20 +700,20 @@ export default function Navbar() {
                 }
 
                 .dropdown-section {
-                    padding: 0.375rem 0;
+                    padding: 0.5rem 0;
                 }
 
                 .dropdown-section:not(:last-child) {
                     border-bottom: 1px solid var(--border);
-                    margin-bottom: 0.375rem;
+                    margin-bottom: 0.5rem;
                 }
 
                 .dropdown-section-label {
                     font-size: 0.6875rem;
-                    font-weight: 600;
+                    font-weight: 700;
                     color: var(--text-muted);
                     text-transform: uppercase;
-                    letter-spacing: 0.05em;
+                    letter-spacing: 0.1em;
                     padding: 0.375rem 0.75rem;
                     display: block;
                 }
@@ -678,35 +724,39 @@ export default function Navbar() {
                     align-items: center;
                     gap: 0.25rem;
                     font-size: 0.6875rem;
-                    font-weight: 500;
-                    padding: 0.25rem 0.5rem;
+                    font-weight: 600;
+                    padding: 0.25rem 0.625rem;
                     border-radius: var(--radius-sm);
                 }
 
                 :global(.badge-super-admin) {
-                    background: var(--danger-soft);
+                    background: linear-gradient(135deg, var(--danger-soft), rgba(239, 83, 80, 0.25));
                     color: var(--danger);
+                    border: 1px solid var(--danger-border);
                 }
 
                 :global(.badge-admin) {
-                    background: var(--warning-soft);
-                    color: #9A6B1F;
+                    background: linear-gradient(135deg, var(--warning-soft), rgba(245, 166, 35, 0.25));
+                    color: var(--warning);
+                    border: 1px solid var(--warning-border);
                 }
 
                 :global(.badge-dispatcher) {
-                    background: var(--success-soft);
+                    background: linear-gradient(135deg, var(--success-soft), rgba(53, 166, 112, 0.25));
                     color: var(--success);
+                    border: 1px solid var(--success-border);
                 }
 
                 :global(.badge-accounting) {
-                    background: var(--info-soft);
+                    background: linear-gradient(135deg, var(--info-soft), rgba(92, 156, 230, 0.25));
                     color: var(--info);
+                    border: 1px solid var(--info-border);
                 }
 
                 /* Mobile Menu Button */
                 .mobile-menu-btn {
                     display: none;
-                    background: transparent;
+                    background: var(--bg-elevated);
                     border: 1px solid var(--border);
                     color: var(--text-primary);
                     cursor: pointer;
@@ -716,15 +766,16 @@ export default function Navbar() {
                 }
 
                 .mobile-menu-btn:hover {
-                    background: var(--bg-hover);
+                    background: var(--bg-active);
+                    border-color: var(--border-hover);
                 }
 
                 /* Mobile Overlay */
                 .mobile-nav-overlay {
                     position: fixed;
                     inset: 0;
-                    background: rgba(30, 36, 48, 0.5);
-                    backdrop-filter: blur(4px);
+                    background: rgba(14, 9, 24, 0.8);
+                    backdrop-filter: blur(8px);
                     z-index: 150;
                     animation: fadeIn 0.2s ease;
                 }
@@ -739,14 +790,14 @@ export default function Navbar() {
                     position: fixed;
                     top: 0;
                     right: 0;
-                    width: 300px;
+                    width: 320px;
                     max-width: 85vw;
                     height: 100vh;
-                    background: var(--bg-card);
+                    background: var(--bg-surface);
                     border-left: 1px solid var(--border);
                     z-index: 200;
                     transform: translateX(100%);
-                    transition: transform 0.25s ease;
+                    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                     overflow-y: auto;
                     display: flex;
                     flex-direction: column;
@@ -761,44 +812,44 @@ export default function Navbar() {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
-                    padding: 1rem 1.25rem;
+                    padding: 1.25rem;
                     border-bottom: 1px solid var(--border);
-                    background: var(--bg-muted);
+                    background: var(--bg-elevated);
                 }
 
                 .mobile-user-info {
                     display: flex;
                     align-items: center;
-                    gap: 0.75rem;
+                    gap: 0.875rem;
                 }
 
                 .mobile-avatar {
-                    width: 40px;
-                    height: 40px;
-                    background: var(--accent-soft);
+                    width: 44px;
+                    height: 44px;
+                    background: linear-gradient(135deg, var(--accent-soft), var(--secondary-soft));
                     color: var(--accent);
                     border-radius: var(--radius-md);
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    font-weight: 600;
-                    font-size: 1rem;
+                    font-weight: 700;
+                    font-size: 1.125rem;
                 }
 
                 .mobile-user-details {
                     display: flex;
                     flex-direction: column;
-                    gap: 0.25rem;
+                    gap: 0.375rem;
                 }
 
                 .mobile-user-name {
-                    font-weight: 600;
-                    font-size: 0.9375rem;
+                    font-weight: 700;
+                    font-size: 1rem;
                     color: var(--text-primary);
                 }
 
                 .mobile-close-btn {
-                    background: transparent;
+                    background: var(--bg-hover);
                     border: 1px solid var(--border);
                     color: var(--text-secondary);
                     cursor: pointer;
@@ -808,37 +859,37 @@ export default function Navbar() {
                 }
 
                 .mobile-close-btn:hover {
-                    background: var(--bg-hover);
+                    background: var(--bg-active);
                     color: var(--text-primary);
                 }
 
                 .mobile-nav-content {
                     flex: 1;
-                    padding: 1rem;
+                    padding: 1.25rem;
                     display: flex;
                     flex-direction: column;
-                    gap: 0.5rem;
+                    gap: 0.75rem;
                 }
 
                 .mobile-nav-section {
                     display: flex;
                     flex-direction: column;
                     gap: 0.25rem;
-                    padding-bottom: 0.75rem;
+                    padding-bottom: 1rem;
                 }
 
                 .mobile-nav-section:not(:last-child) {
                     border-bottom: 1px solid var(--border);
-                    margin-bottom: 0.5rem;
+                    margin-bottom: 0.75rem;
                 }
 
                 .mobile-section-label {
                     font-size: 0.6875rem;
-                    font-weight: 600;
+                    font-weight: 700;
                     color: var(--text-muted);
                     text-transform: uppercase;
-                    letter-spacing: 0.05em;
-                    padding: 0.375rem 0.5rem;
+                    letter-spacing: 0.1em;
+                    padding: 0.5rem 0.625rem;
                 }
 
                 /* Responsive */
