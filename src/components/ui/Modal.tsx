@@ -101,7 +101,7 @@ export default function Modal({
                         )}
                     </div>
                 )}
-                <div style={{ padding: "1.5rem" }}>{children}</div>
+                <div style={{ padding: "1.5rem", maxHeight: "calc(100vh - 200px)", overflowY: "auto" }}>{children}</div>
             </div>
         </div>
     );

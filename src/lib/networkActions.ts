@@ -509,6 +509,75 @@ export async function deletePartnerAttachment(id: string) {
 }
 
 // ============================================
+// QUICK CONTACT (Contact-Only Entry)
+// ============================================
+
+export interface CreateQuickContactData {
+    name: string;
+    phone: string;
+    email?: string;
+    notes?: string;
+}
+
+// Create a contact-only entry (auto-approved, no partner details needed)
+export async function createQuickContact(data: CreateQuickContactData) {
+    const session = await requireAuth();
+
+    const normalizedPhone = formatPhoneNumber(data.phone);
+
+    // Check if this phone already exists as a contact
+    const existingContact = await prisma.sMSContact.findUnique({
+        where: { phoneNumber: normalizedPhone },
+        include: { affiliate: { select: { id: true, name: true } } },
+    });
+
+    if (existingContact?.affiliate) {
+        throw new Error(`This phone number is already linked to ${existingContact.affiliate.name}`);
+    }
+
+    // Create affiliate as contact-only (auto-approved)
+    const contact = await prisma.affiliate.create({
+        data: {
+            name: data.name,
+            email: data.email || `${normalizedPhone.replace(/\D/g, "")}@contact.local`,
+            phone: data.phone,
+            type: "FARM_OUT", // Default type for contacts
+            isContactOnly: true,
+            isApproved: true, // Auto-approve contacts
+            isActive: true,
+            notes: data.notes,
+            submittedById: session.user.id,
+        },
+    });
+
+    // Create SMS contact link
+    await prisma.sMSContact.upsert({
+        where: { phoneNumber: normalizedPhone },
+        create: {
+            phoneNumber: normalizedPhone,
+            affiliateId: contact.id,
+            name: data.name,
+        },
+        update: {
+            affiliateId: contact.id,
+            name: data.name,
+        },
+    });
+
+    await createAuditLog(
+        session.user.id,
+        "CREATE",
+        "Affiliate",
+        contact.id,
+        { name: data.name, phone: data.phone, isContactOnly: true }
+    );
+
+    revalidatePath("/network");
+    revalidatePath("/sms");
+    return contact;
+}
+
+// ============================================
 // GET PARTNER WITH ALL RELATIONS
 // ============================================
 

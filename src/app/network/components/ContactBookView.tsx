@@ -12,8 +12,13 @@ import {
     Users,
     ChevronRight,
     User,
+    UserPlus,
+    X,
+    Loader2,
 } from "lucide-react";
-import { type PartnerType } from "@/lib/networkActions";
+import { type PartnerType, createQuickContact } from "@/lib/networkActions";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/useToast";
 
 interface Partner {
     id: string;
@@ -40,8 +45,39 @@ const TYPE_CONFIG: Record<PartnerType, { icon: typeof ArrowUpRight; label: strin
 };
 
 export default function ContactBookView({ partners, onStartChat }: Props) {
+    const router = useRouter();
+    const { addToast } = useToast();
     const [search, setSearch] = useState("");
     const [selectedType, setSelectedType] = useState<PartnerType | "all">("all");
+    const [showQuickAdd, setShowQuickAdd] = useState(false);
+    const [quickAddLoading, setQuickAddLoading] = useState(false);
+    const [quickAddData, setQuickAddData] = useState({ name: "", phone: "", email: "", notes: "" });
+
+    const handleQuickAdd = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!quickAddData.name.trim() || !quickAddData.phone.trim()) {
+            addToast("Name and phone are required", "error");
+            return;
+        }
+
+        setQuickAddLoading(true);
+        try {
+            await createQuickContact({
+                name: quickAddData.name.trim(),
+                phone: quickAddData.phone.trim(),
+                email: quickAddData.email.trim() || undefined,
+                notes: quickAddData.notes.trim() || undefined,
+            });
+            addToast("Contact added successfully!", "success");
+            setShowQuickAdd(false);
+            setQuickAddData({ name: "", phone: "", email: "", notes: "" });
+            router.refresh();
+        } catch (err) {
+            addToast(err instanceof Error ? err.message : "Failed to add contact", "error");
+        } finally {
+            setQuickAddLoading(false);
+        }
+    };
 
     const filteredContacts = useMemo(() => {
         return partners
@@ -85,18 +121,87 @@ export default function ContactBookView({ partners, onStartChat }: Props) {
 
     return (
         <div className="flex flex-col gap-4">
+            {/* Quick Add Contact Form */}
+            {showQuickAdd && (
+                <div className="glass-card" style={{ padding: "1.5rem", border: "1px solid var(--accent-soft)" }}>
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--accent)" }}>Quick Add Contact</h3>
+                        <button onClick={() => setShowQuickAdd(false)} className="btn btn-ghost btn-icon">
+                            <X size={18} />
+                        </button>
+                    </div>
+                    <form onSubmit={handleQuickAdd} className="flex flex-col gap-3">
+                        <div className="flex gap-3 flex-wrap">
+                            <div className="flex flex-col gap-1 flex-1" style={{ minWidth: "200px" }}>
+                                <label style={{ fontSize: "0.7rem", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+                                    Name *
+                                </label>
+                                <input
+                                    className="input"
+                                    placeholder="Contact name"
+                                    value={quickAddData.name}
+                                    onChange={(e) => setQuickAddData({ ...quickAddData, name: e.target.value })}
+                                    required
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1 flex-1" style={{ minWidth: "150px" }}>
+                                <label style={{ fontSize: "0.7rem", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+                                    Phone *
+                                </label>
+                                <input
+                                    className="input"
+                                    placeholder="(555) 123-4567"
+                                    value={quickAddData.phone}
+                                    onChange={(e) => setQuickAddData({ ...quickAddData, phone: e.target.value })}
+                                    required
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1 flex-1" style={{ minWidth: "180px" }}>
+                                <label style={{ fontSize: "0.7rem", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+                                    Email (optional)
+                                </label>
+                                <input
+                                    className="input"
+                                    type="email"
+                                    placeholder="email@example.com"
+                                    value={quickAddData.email}
+                                    onChange={(e) => setQuickAddData({ ...quickAddData, email: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2 mt-2">
+                            <button type="button" onClick={() => setShowQuickAdd(false)} className="btn btn-ghost">
+                                Cancel
+                            </button>
+                            <button type="submit" className="btn btn-primary" disabled={quickAddLoading}>
+                                {quickAddLoading ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
+                                {quickAddLoading ? "Adding..." : "Add Contact"}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
             {/* Search and Filter */}
             <div className="glass-card" style={{ padding: "1rem" }}>
                 <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-3" style={{ background: "rgba(255,255,255,0.05)", borderRadius: "0.5rem", padding: "0.5rem 1rem", border: "1px solid rgba(255,255,255,0.1)" }}>
-                        <Search size={18} className="text-accent" />
-                        <input
-                            type="text"
-                            placeholder="Search contacts by name, phone, email..."
-                            style={{ background: "transparent", border: "none", outline: "none", flex: 1, color: "white" }}
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-1" style={{ background: "rgba(255,255,255,0.05)", borderRadius: "0.5rem", padding: "0.5rem 1rem", border: "1px solid rgba(255,255,255,0.1)" }}>
+                            <Search size={18} className="text-accent" />
+                            <input
+                                type="text"
+                                placeholder="Search contacts by name, phone, email..."
+                                style={{ background: "transparent", border: "none", outline: "none", flex: 1, color: "white" }}
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                        </div>
+                        {!showQuickAdd && (
+                            <button onClick={() => setShowQuickAdd(true)} className="btn btn-primary" style={{ flexShrink: 0 }}>
+                                <UserPlus size={16} />
+                                <span>Quick Add</span>
+                            </button>
+                        )}
                     </div>
                     <div className="flex gap-2 flex-wrap">
                         <button

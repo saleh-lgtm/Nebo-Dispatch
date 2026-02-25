@@ -69,6 +69,7 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
     const [showQuoteModal, setShowQuoteModal] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showDraftRecovery, setShowDraftRecovery] = useState(false);
+    const [draftDecisionMade, setDraftDecisionMade] = useState(!!initialDraft);
 
     // Combine all form data for auto-save
     const formData = useMemo<ShiftReportDraft>(() => ({
@@ -102,12 +103,12 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
         enabled: !!activeShift?.id,
     });
 
-    // Check for draft on mount
+    // Check for draft on mount (only if user hasn't already made a decision)
     useEffect(() => {
-        if (saveState.hasDraft && !initialDraft) {
+        if (saveState.hasDraft && !initialDraft && !draftDecisionMade) {
             setShowDraftRecovery(true);
         }
-    }, [saveState.hasDraft, initialDraft]);
+    }, [saveState.hasDraft, initialDraft, draftDecisionMade]);
 
     // Handle draft restoration
     const handleRestoreDraft = useCallback(() => {
@@ -121,11 +122,13 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
             setMetrics(draft.metrics || { calls: 0, emails: 0, totalReservationsHandled: 0 });
             setNarrative(draft.narrative || { comments: "", incidents: "", ideas: "" });
         }
+        setDraftDecisionMade(true);
         setShowDraftRecovery(false);
     }, [restoreDraft]);
 
     const handleDiscardDraft = useCallback(() => {
         clearDraft();
+        setDraftDecisionMade(true);
         setShowDraftRecovery(false);
     }, [clearDraft]);
 
