@@ -110,9 +110,10 @@ export default function ConfirmationWidget({ confirmations, onRefresh }: Props) 
     };
 
     const formatTime = (date: Date | string) => {
-        return new Date(date).toLocaleTimeString([], {
+        return new Date(date).toLocaleTimeString("en-US", {
             hour: "numeric",
             minute: "2-digit",
+            timeZone: "America/Chicago",
         });
     };
 

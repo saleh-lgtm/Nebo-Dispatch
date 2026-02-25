@@ -424,6 +424,38 @@ function htmlToPlainText(html: string): string {
 }
 
 /**
+ * Check if a date falls within Daylight Saving Time for America/Chicago
+ * DST starts 2nd Sunday of March, ends 1st Sunday of November
+ */
+function isDaylightSavingTime(date: Date): boolean {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const day = date.getDate();
+
+    // DST is roughly March through November
+    if (month < 2 || month > 10) return false; // Jan, Feb, Dec = standard time
+    if (month > 2 && month < 10) return true;  // Apr-Oct = DST
+
+    // March: DST starts 2nd Sunday
+    if (month === 2) {
+        const marchFirst = new Date(year, 2, 1);
+        const dayOfWeek = marchFirst.getDay();
+        const secondSunday = 8 + (7 - dayOfWeek) % 7;
+        return day >= secondSunday;
+    }
+
+    // November: DST ends 1st Sunday
+    if (month === 10) {
+        const novFirst = new Date(year, 10, 1);
+        const dayOfWeek = novFirst.getDay();
+        const firstSunday = 1 + (7 - dayOfWeek) % 7;
+        return day < firstSunday;
+    }
+
+    return false;
+}
+
+/**
  * Parse manifest email and extract trips
  */
 export async function parseManifestEmail(emailBody: string): Promise<Array<{
@@ -489,7 +521,15 @@ export async function parseManifestEmail(emailBody: string): Promise<Array<{
             hours = 0;
         }
 
-        const pickupAt = new Date(year, month - 1, day, hours, minutes);
+        // Create date in CST/CDT (America/Chicago) timezone
+        // Determine if date is in DST (roughly March-November)
+        // DST: UTC-5, Standard: UTC-6
+        const tempDate = new Date(year, month - 1, day);
+        const isDST = isDaylightSavingTime(tempDate);
+        const cstOffset = isDST ? 5 : 6; // hours to add to get UTC
+
+        // Create UTC date by adding the CST offset
+        const pickupAt = new Date(Date.UTC(year, month - 1, day, hours + cstOffset, minutes));
 
         // Extract passenger name - look for "Passenger" section followed by a name
         let passengerName = "Unknown Passenger";
