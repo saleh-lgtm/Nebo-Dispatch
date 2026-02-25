@@ -395,6 +395,38 @@ export async function markExpiredConfirmations() {
 }
 
 /**
+ * Strip HTML tags and convert to plain text
+ */
+function htmlToPlainText(html: string): string {
+    // Replace <br> and </div> with newlines
+    let text = html.replace(/<br\s*\/?>/gi, "\n");
+    text = text.replace(/<\/div>/gi, "\n");
+    text = text.replace(/<\/p>/gi, "\n\n");
+    text = text.replace(/<\/tr>/gi, "\n");
+    text = text.replace(/<\/td>/gi, " ");
+
+    // Remove all HTML tags
+    text = text.replace(/<[^>]+>/g, "");
+
+    // Decode HTML entities
+    text = text.replace(/&nbsp;/g, " ");
+    text = text.replace(/&amp;/g, "&");
+    text = text.replace(/&lt;/g, "<");
+    text = text.replace(/&gt;/g, ">");
+    text = text.replace(/&quot;/g, '"');
+    text = text.replace(/&#39;/g, "'");
+
+    // Normalize whitespace
+    text = text.replace(/\r\n/g, "\n");
+    text = text.replace(/[ \t]+/g, " ");
+    text = text.replace(/\n[ \t]+/g, "\n");
+    text = text.replace(/[ \t]+\n/g, "\n");
+    text = text.replace(/\n{3,}/g, "\n\n");
+
+    return text.trim();
+}
+
+/**
  * Parse manifest email and extract trips
  */
 export async function parseManifestEmail(emailBody: string): Promise<Array<{
@@ -410,59 +442,64 @@ export async function parseManifestEmail(emailBody: string): Promise<Array<{
         driverName: string;
     }> = [];
 
+    // Convert HTML to plain text if needed
+    let plainText = emailBody;
+    if (emailBody.includes("<html") || emailBody.includes("<div") || emailBody.includes("<table")) {
+        plainText = htmlToPlainText(emailBody);
+    }
+
     // Split email into trip sections
     // Each trip starts with date pattern: MM/DD/YYYY - Pick Up At:HH:MM AM/PM
-    const tripPattern =
-        /(\d{2}\/\d{2}\/\d{4})\s+-\s+Pick Up At:\s*(\d{1,2}:\d{2}\s*(?:AM|PM))\s*\n\s*\n\s*(\d+)/gi;
-
-    // Passenger pattern: Look for "Passenger" followed by name
-    const passengerPattern = /Passenger\s*\n\s*([^\n]+)/gi;
-
-    // Driver pattern: Look for "Driver Info" section
-    const driverPattern = /Driver Info\s*\n\s*([^\n]+)/gi;
-
-    // Split into sections by trip number pattern
-    const sections = emailBody.split(/(?=\d{2}\/\d{2}\/\d{4}\s+-\s+Pick Up At:)/gi);
+    // Also handle variations like "02/25/2026 - Pick Up At:03:15 AM"
+    const sections = plainText.split(/(?=\d{2}\/\d{2}\/\d{4}\s*-?\s*Pick Up At:)/gi);
 
     for (const section of sections) {
         if (!section.trim()) continue;
 
-        // Extract date and time
+        // Extract date and time - handle various formats
         const dateTimeMatch = section.match(
-            /(\d{2}\/\d{2}\/\d{4})\s+-\s+Pick Up At:\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/i
+            /(\d{2}\/\d{2}\/\d{4})\s*-?\s*Pick Up At:\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/i
         );
         if (!dateTimeMatch) continue;
 
         const [, dateStr, timeStr] = dateTimeMatch;
 
-        // Extract trip number (next line after datetime)
-        const tripNumberMatch = section.match(/\n\s*\n\s*(\d{4,6})/);
+        // Extract trip number - look for 4-6 digit number near the beginning
+        const tripNumberMatch = section.match(/\b(\d{4,6})\b/);
         if (!tripNumberMatch) continue;
 
         const tripNumber = tripNumberMatch[1];
 
         // Parse date and time
         const [month, day, year] = dateStr.split("/").map(Number);
-        let [hourMin, period] = timeStr.trim().split(/\s+/);
-        let [hours, minutes] = hourMin.split(":").map(Number);
+        const timeParts = timeStr.trim().match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+        if (!timeParts) continue;
 
-        if (period?.toUpperCase() === "PM" && hours !== 12) {
+        let hours = parseInt(timeParts[1], 10);
+        const minutes = parseInt(timeParts[2], 10);
+        const period = timeParts[3].toUpperCase();
+
+        if (period === "PM" && hours !== 12) {
             hours += 12;
-        } else if (period?.toUpperCase() === "AM" && hours === 12) {
+        } else if (period === "AM" && hours === 12) {
             hours = 0;
         }
 
         const pickupAt = new Date(year, month - 1, day, hours, minutes);
 
-        // Extract passenger name
-        const passengerMatch = section.match(/Passenger\s*\n\s*([^\n]+)/i);
-        const passengerName = passengerMatch
-            ? passengerMatch[1].trim()
-            : "Unknown Passenger";
+        // Extract passenger name - look for "Passenger" section
+        let passengerName = "Unknown Passenger";
+        const passengerMatch = section.match(/Passenger\s+([A-Za-z]+(?:\s+[A-Za-z]+)*)/i);
+        if (passengerMatch) {
+            passengerName = passengerMatch[1].trim();
+        }
 
-        // Extract driver name
-        const driverMatch = section.match(/Driver Info\s*\n\s*([^\n]+)/i);
-        const driverName = driverMatch ? driverMatch[1].trim() : "Unknown Driver";
+        // Extract driver name - look for "Driver Info" section
+        let driverName = "Unknown Driver";
+        const driverMatch = section.match(/Driver Info\s+([A-Za-z0-9]+(?:\s+[A-Za-z0-9]+)*)/i);
+        if (driverMatch) {
+            driverName = driverMatch[1].trim();
+        }
 
         trips.push({
             tripNumber,
