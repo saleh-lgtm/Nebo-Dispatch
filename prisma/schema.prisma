@@ -180,6 +180,9 @@ model User {
 
   // Trip Confirmations completed
   confirmationsCompleted TripConfirmation[]     @relation("ConfirmationCompletedBy")
+
+  // Missed confirmation accountability (when on duty but confirmation expired)
+  missedConfirmations    MissedConfirmationAccountability[] @relation("MissedConfirmations")
 }
 
 model Shift {
@@ -204,6 +207,9 @@ model Shift {
   requests   SchedulingRequest[]
   quotes     Quote[]
   drafts     ShiftReportDraft[]
+
+  // Missed confirmation accountability
+  missedConfirmations MissedConfirmationAccountability[]
 }
 
 model ShiftReport {
@@ -383,6 +389,7 @@ model Affiliate {
   isApproved       Boolean       @default(false)
   type             AffiliateType @default(FARM_OUT)
   isActive         Boolean       @default(true)
+  isContactOnly    Boolean       @default(false) // Contact-only entries (not full partners)
 
   // Fields for IOS (Independent Operators)
   market           String?       // Market/region they operate in
@@ -1391,6 +1398,9 @@ model TripConfirmation {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
+  // Accountability tracking (who was on duty when this expired)
+  accountableDispatchers MissedConfirmationAccountability[]
+
   @@unique([tripNumber, manifestDate])  // Prevent duplicates from same manifest
   @@index([status, dueAt])
   @@index([dueAt])
@@ -1412,4 +1422,28 @@ model ManifestLog {
   parseErrors     String?  @db.Text     // Any parsing errors
 
   @@index([receivedAt])
+}
+
+// ============================================
+// MISSED CONFIRMATION ACCOUNTABILITY
+// ============================================
+
+// Track which dispatchers were on duty when a confirmation expired
+model MissedConfirmationAccountability {
+  id                    String           @id @default(cuid())
+  confirmationId        String
+  confirmation          TripConfirmation @relation(fields: [confirmationId], references: [id], onDelete: Cascade)
+  dispatcherId          String
+  dispatcher            User             @relation("MissedConfirmations", fields: [dispatcherId], references: [id])
+  shiftId               String
+  shift                 Shift            @relation(fields: [shiftId], references: [id])
+  shiftStartedAt        DateTime         // When their shift started (for context)
+  confirmationDueAt     DateTime         // When confirmation was due
+  confirmationExpiredAt DateTime         // When it actually expired
+  createdAt             DateTime         @default(now())
+
+  @@unique([confirmationId, dispatcherId])
+  @@index([dispatcherId])
+  @@index([confirmationId])
+  @@index([createdAt])
 }

@@ -17,6 +17,9 @@ import {
     Users,
     Calendar,
     ArrowRight,
+    ShieldAlert,
+    ChevronDown,
+    ChevronUp,
 } from "lucide-react";
 
 interface Stats {
@@ -54,10 +57,40 @@ interface Confirmation {
     completedBy: { id: string; name: string | null } | null;
 }
 
+interface AccountabilityMetric {
+    id: string;
+    name: string;
+    role: string;
+    totalShifts: number;
+    confirmationsCompleted: number;
+    confirmationsOnTime: number;
+    confirmationsMissedWhileOnDuty: number;
+    accountabilityRate: number;
+}
+
+interface MissedConfirmation {
+    id: string;
+    tripNumber: string;
+    passengerName: string;
+    driverName: string;
+    dueAt: Date | string;
+    pickupAt: Date | string;
+    expiredAt: Date | string | null;
+    onDutyDispatchers: Array<{
+        id: string;
+        name: string | null;
+        role: string;
+        shiftStart: Date | string;
+        shiftEnd: Date | string | null;
+    }>;
+}
+
 interface Props {
     stats: Stats;
     dispatcherMetrics: DispatcherMetric[];
     todayConfirmations: Confirmation[];
+    accountabilityMetrics?: AccountabilityMetric[];
+    missedConfirmations?: MissedConfirmation[];
 }
 
 const STATUS_CONFIG: Record<
@@ -76,10 +109,13 @@ export default function ConfirmationsClient({
     stats,
     dispatcherMetrics,
     todayConfirmations,
+    accountabilityMetrics = [],
+    missedConfirmations = [],
 }: Props) {
-    const [selectedTab, setSelectedTab] = useState<"overview" | "dispatchers" | "today">(
-        "overview"
-    );
+    const [selectedTab, setSelectedTab] = useState<
+        "overview" | "dispatchers" | "today" | "accountability"
+    >("overview");
+    const [expandedMissed, setExpandedMissed] = useState<Set<string>>(new Set());
 
     const formatTime = (date: Date | string) => {
         return new Date(date).toLocaleTimeString([], {
@@ -94,6 +130,30 @@ export default function ConfirmationsClient({
 
     const pendingCount = todayConfirmations.filter((c) => c.status === "PENDING").length;
     const completedToday = todayConfirmations.filter((c) => c.completedAt !== null).length;
+
+    const toggleMissedExpand = (id: string) => {
+        setExpandedMissed((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
+    };
+
+    const totalMissed = missedConfirmations.length;
+    const avgAccountabilityRate =
+        accountabilityMetrics.length > 0
+            ? Math.round(
+                  accountabilityMetrics.reduce((sum, m) => sum + m.accountabilityRate, 0) /
+                      accountabilityMetrics.length
+              )
+            : 100;
+    const worstPerformers = accountabilityMetrics
+        .filter((m) => m.confirmationsMissedWhileOnDuty > 0)
+        .slice(0, 3);
 
     return (
         <div className="confirmations-page">
@@ -132,6 +192,16 @@ export default function ConfirmationsClient({
                     Today
                     {pendingCount > 0 && (
                         <span className="pending-badge">{pendingCount}</span>
+                    )}
+                </button>
+                <button
+                    className={`tab-btn ${selectedTab === "accountability" ? "active" : ""}`}
+                    onClick={() => setSelectedTab("accountability")}
+                >
+                    <ShieldAlert size={16} />
+                    Accountability
+                    {totalMissed > 0 && (
+                        <span className="missed-badge">{totalMissed}</span>
                     )}
                 </button>
             </div>
@@ -360,6 +430,247 @@ export default function ConfirmationsClient({
                                         </div>
                                     );
                                 })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Accountability Tab */}
+            {selectedTab === "accountability" && (
+                <div className="accountability-content">
+                    {/* Summary Stats */}
+                    <div className="accountability-summary">
+                        <div className="summary-stat danger">
+                            <span className="label">Missed Confirmations</span>
+                            <span className="value">{totalMissed}</span>
+                            <span className="sub">Last 30 days</span>
+                        </div>
+                        <div
+                            className={`summary-stat ${
+                                avgAccountabilityRate >= 90
+                                    ? "success"
+                                    : avgAccountabilityRate >= 70
+                                    ? "warning"
+                                    : "danger"
+                            }`}
+                        >
+                            <span className="label">Team Accountability</span>
+                            <span className="value">{avgAccountabilityRate}%</span>
+                            <span className="sub">Average rate</span>
+                        </div>
+                        <div className="summary-stat">
+                            <span className="label">Dispatchers Tracked</span>
+                            <span className="value">{accountabilityMetrics.length}</span>
+                            <span className="sub">Active users</span>
+                        </div>
+                    </div>
+
+                    {/* Top Issues */}
+                    {worstPerformers.length > 0 && (
+                        <div className="card top-issues-card">
+                            <h3>
+                                <AlertTriangle size={16} />
+                                Top Issues
+                            </h3>
+                            <div className="top-issues">
+                                {worstPerformers.map((m) => (
+                                    <div key={m.id} className="issue-item">
+                                        <div className="issue-avatar">
+                                            {m.name.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div className="issue-info">
+                                            <span className="issue-name">{m.name}</span>
+                                            <span className="issue-role">{m.role}</span>
+                                        </div>
+                                        <div className="issue-stats">
+                                            <span className="missed-count">
+                                                {m.confirmationsMissedWhileOnDuty} missed
+                                            </span>
+                                            <span
+                                                className={`rate ${
+                                                    m.accountabilityRate >= 80
+                                                        ? "success"
+                                                        : m.accountabilityRate >= 50
+                                                        ? "warning"
+                                                        : "danger"
+                                                }`}
+                                            >
+                                                {m.accountabilityRate}%
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Dispatcher Accountability Table */}
+                    <div className="card">
+                        <h3>Dispatcher Accountability</h3>
+                        <p className="card-subtitle">
+                            Performance metrics including missed confirmations while on duty
+                        </p>
+
+                        {accountabilityMetrics.length === 0 ? (
+                            <div className="empty-state">
+                                <ShieldAlert size={48} />
+                                <p>No accountability data yet</p>
+                            </div>
+                        ) : (
+                            <div className="accountability-table">
+                                <div className="table-header accountability-header">
+                                    <span className="col-name">Dispatcher</span>
+                                    <span className="col-shifts">Shifts</span>
+                                    <span className="col-completed">Completed</span>
+                                    <span className="col-ontime">On-Time</span>
+                                    <span className="col-missed">Missed</span>
+                                    <span className="col-rate">Rate</span>
+                                </div>
+                                {accountabilityMetrics.map((m) => (
+                                    <div key={m.id} className="table-row accountability-row">
+                                        <div className="col-name">
+                                            <div className="dispatcher-avatar">
+                                                {m.name.charAt(0).toUpperCase()}
+                                            </div>
+                                            <div className="name-info">
+                                                <span className="name">{m.name}</span>
+                                                <span className="role">{m.role}</span>
+                                            </div>
+                                        </div>
+                                        <span className="col-shifts">{m.totalShifts}</span>
+                                        <span className="col-completed">
+                                            {m.confirmationsCompleted}
+                                        </span>
+                                        <span className="col-ontime success">
+                                            {m.confirmationsOnTime}
+                                        </span>
+                                        <span
+                                            className={`col-missed ${
+                                                m.confirmationsMissedWhileOnDuty > 0
+                                                    ? "danger"
+                                                    : ""
+                                            }`}
+                                        >
+                                            {m.confirmationsMissedWhileOnDuty}
+                                        </span>
+                                        <span
+                                            className={`col-rate ${
+                                                m.accountabilityRate >= 80
+                                                    ? "success"
+                                                    : m.accountabilityRate >= 50
+                                                    ? "warning"
+                                                    : "danger"
+                                            }`}
+                                        >
+                                            {m.accountabilityRate}%
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Missed Confirmations List */}
+                    <div className="card">
+                        <h3>Missed Confirmations</h3>
+                        <p className="card-subtitle">
+                            Confirmations that expired while dispatchers were on duty
+                        </p>
+
+                        {missedConfirmations.length === 0 ? (
+                            <div className="empty-state">
+                                <CheckCircle size={48} />
+                                <p>No missed confirmations</p>
+                            </div>
+                        ) : (
+                            <div className="missed-list">
+                                {missedConfirmations.map((conf) => (
+                                    <div key={conf.id} className="missed-item">
+                                        <div
+                                            className="missed-header"
+                                            onClick={() => toggleMissedExpand(conf.id)}
+                                        >
+                                            <div className="missed-info">
+                                                <span className="trip-number">
+                                                    #{conf.tripNumber}
+                                                </span>
+                                                <span className="passenger">
+                                                    {conf.passengerName}
+                                                </span>
+                                            </div>
+                                            <div className="missed-meta">
+                                                <span className="due-time">
+                                                    <Clock size={12} />
+                                                    Due: {formatTime(conf.dueAt)}
+                                                </span>
+                                                <span className="on-duty-count">
+                                                    <Users size={12} />
+                                                    {conf.onDutyDispatchers.length} on duty
+                                                </span>
+                                            </div>
+                                            <div className="expand-icon">
+                                                {expandedMissed.has(conf.id) ? (
+                                                    <ChevronUp size={18} />
+                                                ) : (
+                                                    <ChevronDown size={18} />
+                                                )}
+                                            </div>
+                                        </div>
+                                        {expandedMissed.has(conf.id) && (
+                                            <div className="missed-details">
+                                                <div className="detail-row">
+                                                    <span className="detail-label">Driver:</span>
+                                                    <span>{conf.driverName}</span>
+                                                </div>
+                                                <div className="detail-row">
+                                                    <span className="detail-label">Pickup:</span>
+                                                    <span>{formatTime(conf.pickupAt)}</span>
+                                                </div>
+                                                <div className="detail-row">
+                                                    <span className="detail-label">Expired:</span>
+                                                    <span>
+                                                        {conf.expiredAt
+                                                            ? new Date(
+                                                                  conf.expiredAt
+                                                              ).toLocaleString()
+                                                            : "N/A"}
+                                                    </span>
+                                                </div>
+                                                <div className="on-duty-section">
+                                                    <span className="detail-label">
+                                                        Dispatchers On Duty:
+                                                    </span>
+                                                    <div className="on-duty-list">
+                                                        {conf.onDutyDispatchers.map((d) => (
+                                                            <div
+                                                                key={d.id}
+                                                                className="on-duty-dispatcher"
+                                                            >
+                                                                <div className="dispatcher-avatar small">
+                                                                    {(d.name || "?")
+                                                                        .charAt(0)
+                                                                        .toUpperCase()}
+                                                                </div>
+                                                                <span className="name">
+                                                                    {d.name || "Unknown"}
+                                                                </span>
+                                                                <span className="shift-time">
+                                                                    {formatTime(d.shiftStart)}
+                                                                    {d.shiftEnd
+                                                                        ? ` - ${formatTime(
+                                                                              d.shiftEnd
+                                                                          )}`
+                                                                        : " (active)"}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </div>
@@ -793,6 +1104,279 @@ export default function ConfirmationsClient({
                     opacity: 0.3;
                 }
 
+                /* Accountability Tab Styles */
+                .accountability-content {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1.5rem;
+                }
+
+                .accountability-summary {
+                    display: flex;
+                    gap: 1rem;
+                }
+
+                .accountability-summary .summary-stat {
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    padding: 1.25rem;
+                }
+
+                .accountability-summary .summary-stat .sub {
+                    font-size: 0.75rem;
+                    color: var(--text-muted);
+                    margin-top: 0.25rem;
+                }
+
+                .accountability-summary .summary-stat.danger {
+                    border-color: rgba(239, 68, 68, 0.3);
+                    background: rgba(239, 68, 68, 0.05);
+                }
+
+                .accountability-summary .summary-stat.danger .value {
+                    color: #f87171;
+                }
+
+                .missed-badge {
+                    background: #f87171;
+                    color: white;
+                    padding: 0.125rem 0.5rem;
+                    border-radius: 9999px;
+                    font-size: 0.75rem;
+                    font-weight: 600;
+                }
+
+                .top-issues-card h3 {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+
+                .top-issues-card h3 :global(svg) {
+                    color: #fbbf24;
+                }
+
+                .top-issues {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.75rem;
+                    margin-top: 1rem;
+                }
+
+                .issue-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    padding: 0.75rem;
+                    background: var(--bg-secondary);
+                    border-radius: 8px;
+                }
+
+                .issue-avatar {
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    background: rgba(239, 68, 68, 0.15);
+                    color: #f87171;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: 600;
+                    font-size: 0.875rem;
+                    flex-shrink: 0;
+                }
+
+                .issue-info {
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                }
+
+                .issue-name {
+                    font-weight: 500;
+                    color: var(--text-primary);
+                }
+
+                .issue-role {
+                    font-size: 0.75rem;
+                    color: var(--text-muted);
+                }
+
+                .issue-stats {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: flex-end;
+                    gap: 0.125rem;
+                }
+
+                .missed-count {
+                    font-size: 0.8125rem;
+                    color: #f87171;
+                    font-weight: 500;
+                }
+
+                .issue-stats .rate {
+                    font-size: 0.75rem;
+                    font-weight: 600;
+                }
+
+                /* Accountability Table */
+                .accountability-table {
+                    margin-top: 1rem;
+                }
+
+                .accountability-header,
+                .accountability-row {
+                    display: grid;
+                    grid-template-columns: 2fr 0.75fr 1fr 0.75fr 0.75fr 0.75fr;
+                    gap: 0.75rem;
+                    padding: 0.75rem 0;
+                    align-items: center;
+                }
+
+                .col-shifts,
+                .col-completed,
+                .col-missed {
+                    font-size: 0.875rem;
+                    text-align: center;
+                }
+
+                .name-info {
+                    display: flex;
+                    flex-direction: column;
+                }
+
+                .name-info .name {
+                    font-weight: 500;
+                    color: var(--text-primary);
+                }
+
+                .name-info .role {
+                    font-size: 0.75rem;
+                    color: var(--text-muted);
+                }
+
+                /* Missed Confirmations List */
+                .missed-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.5rem;
+                    margin-top: 1rem;
+                }
+
+                .missed-item {
+                    border: 1px solid var(--border);
+                    border-radius: 8px;
+                    overflow: hidden;
+                }
+
+                .missed-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                    padding: 0.875rem 1rem;
+                    cursor: pointer;
+                    background: var(--bg-secondary);
+                    transition: background 0.15s;
+                }
+
+                .missed-header:hover {
+                    background: var(--bg-hover);
+                }
+
+                .missed-info {
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                }
+
+                .missed-info .trip-number {
+                    font-weight: 600;
+                    color: #f87171;
+                }
+
+                .missed-info .passenger {
+                    font-size: 0.8125rem;
+                    color: var(--text-secondary);
+                }
+
+                .missed-meta {
+                    display: flex;
+                    gap: 1rem;
+                }
+
+                .missed-meta span {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.25rem;
+                    font-size: 0.75rem;
+                    color: var(--text-muted);
+                }
+
+                .expand-icon {
+                    color: var(--text-muted);
+                }
+
+                .missed-details {
+                    padding: 1rem;
+                    border-top: 1px solid var(--border);
+                    background: var(--bg-card);
+                }
+
+                .detail-row {
+                    display: flex;
+                    gap: 0.5rem;
+                    font-size: 0.8125rem;
+                    margin-bottom: 0.5rem;
+                }
+
+                .detail-label {
+                    color: var(--text-muted);
+                    min-width: 80px;
+                }
+
+                .on-duty-section {
+                    margin-top: 0.75rem;
+                    padding-top: 0.75rem;
+                    border-top: 1px solid var(--border);
+                }
+
+                .on-duty-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.5rem;
+                    margin-top: 0.5rem;
+                }
+
+                .on-duty-dispatcher {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.5rem;
+                    background: var(--bg-secondary);
+                    border-radius: 6px;
+                }
+
+                .dispatcher-avatar.small {
+                    width: 24px;
+                    height: 24px;
+                    font-size: 0.75rem;
+                }
+
+                .on-duty-dispatcher .name {
+                    font-weight: 500;
+                    color: var(--text-primary);
+                    font-size: 0.8125rem;
+                }
+
+                .on-duty-dispatcher .shift-time {
+                    font-size: 0.75rem;
+                    color: var(--text-muted);
+                    margin-left: auto;
+                }
+
                 @media (max-width: 768px) {
                     .confirmations-page {
                         padding: 1rem;
@@ -823,6 +1407,25 @@ export default function ConfirmationsClient({
 
                     .today-summary {
                         flex-direction: column;
+                    }
+
+                    .accountability-summary {
+                        flex-direction: column;
+                    }
+
+                    .accountability-header,
+                    .accountability-row {
+                        grid-template-columns: 1.5fr 1fr 1fr;
+                    }
+
+                    .col-shifts,
+                    .col-completed {
+                        display: none;
+                    }
+
+                    .missed-meta {
+                        flex-direction: column;
+                        gap: 0.25rem;
                     }
                 }
             `}</style>

@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getPerformanceMetrics, getDispatcherComparison, getDailyTrend } from "@/lib/analyticsActions";
 import { getDispatcherHours } from "@/lib/hoursActions";
+import { getConfirmationStats } from "@/lib/tripConfirmationActions";
 import dynamic from "next/dynamic";
 
 const AnalyticsClient = dynamic(() => import("./AnalyticsClient"), {
@@ -43,12 +44,20 @@ export default async function AnalyticsPage() {
     startDate.setHours(0, 0, 0, 0);
     endDate.setHours(23, 59, 59, 999);
 
-    const [metrics, comparison, dailyTrend, hours] = await Promise.all([
+    const [metrics, comparison, dailyTrend, hours, confirmationStats] = await Promise.all([
         getPerformanceMetrics(startDate, endDate),
         getDispatcherComparison(startDate, endDate),
         getDailyTrend(startDate, endDate),
         getDispatcherHours(startDate, endDate),
+        getConfirmationStats(30),
     ]);
+
+    const confirmationSummary = {
+        total: confirmationStats.total,
+        completed: confirmationStats.completed,
+        expired: confirmationStats.expired,
+        onTimeRate: confirmationStats.onTimeRate,
+    };
 
     return (
         <AnalyticsClient
@@ -58,6 +67,7 @@ export default async function AnalyticsPage() {
             initialHours={hours}
             initialStartDate={startDate.toISOString().split("T")[0]}
             initialEndDate={endDate.toISOString().split("T")[0]}
+            confirmationSummary={confirmationSummary}
         />
     );
 }

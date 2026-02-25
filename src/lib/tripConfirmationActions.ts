@@ -370,25 +370,228 @@ export async function getAllDispatcherMetrics(days: number = 30) {
 }
 
 /**
- * Mark expired confirmations (run periodically via cron)
+ * Get detailed report of missed confirmations with accountability
+ * Shows expired confirmations and which dispatchers were on duty
+ */
+export async function getMissedConfirmationReport(days: number = 30) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+        throw new Error("Unauthorized");
+    }
+
+    const isAdmin = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"].includes(
+        session.user.role || ""
+    );
+    if (!isAdmin) {
+        throw new Error("Admin access required");
+    }
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const missedConfirmations = await prisma.tripConfirmation.findMany({
+        where: {
+            status: "EXPIRED",
+            archivedAt: { gte: startDate },
+        },
+        include: {
+            accountableDispatchers: {
+                include: {
+                    dispatcher: { select: { id: true, name: true, role: true } },
+                    shift: { select: { clockIn: true, clockOut: true } },
+                },
+            },
+        },
+        orderBy: { archivedAt: "desc" },
+    });
+
+    return missedConfirmations.map((conf) => ({
+        id: conf.id,
+        tripNumber: conf.tripNumber,
+        passengerName: conf.passengerName,
+        driverName: conf.driverName,
+        dueAt: conf.dueAt,
+        pickupAt: conf.pickupAt,
+        expiredAt: conf.archivedAt,
+        onDutyDispatchers: conf.accountableDispatchers.map((a) => ({
+            id: a.dispatcher.id,
+            name: a.dispatcher.name,
+            role: a.dispatcher.role,
+            shiftStart: a.shift.clockIn,
+            shiftEnd: a.shift.clockOut,
+        })),
+    }));
+}
+
+/**
+ * Get accountability metrics per dispatcher
+ * Includes DISPATCHER and ADMIN roles, excludes SUPER_ADMIN
+ */
+export async function getDispatcherAccountabilityMetrics(days: number = 30) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+        throw new Error("Unauthorized");
+    }
+
+    const isAdmin = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"].includes(
+        session.user.role || ""
+    );
+    if (!isAdmin) {
+        throw new Error("Admin access required");
+    }
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    // Get missed confirmation counts per dispatcher
+    const accountabilityRecords =
+        await prisma.missedConfirmationAccountability.groupBy({
+            by: ["dispatcherId"],
+            _count: { confirmationId: true },
+            where: {
+                createdAt: { gte: startDate },
+                dispatcher: {
+                    role: { in: ["DISPATCHER", "ADMIN"] },
+                },
+            },
+        });
+
+    // Get dispatcher info and their confirmation completions
+    const dispatchers = await prisma.user.findMany({
+        where: {
+            role: { in: ["DISPATCHER", "ADMIN"] },
+            isActive: true,
+        },
+        select: {
+            id: true,
+            name: true,
+            role: true,
+            shifts: {
+                where: { clockIn: { gte: startDate } },
+                select: { id: true },
+            },
+            confirmationsCompleted: {
+                where: { completedAt: { gte: startDate } },
+                select: { id: true, minutesBeforeDue: true },
+            },
+        },
+    });
+
+    return dispatchers
+        .map((d) => {
+            const missedCount =
+                accountabilityRecords.find((a) => a.dispatcherId === d.id)
+                    ?._count.confirmationId || 0;
+
+            const completedCount = d.confirmationsCompleted.length;
+            const onTimeCount = d.confirmationsCompleted.filter(
+                (c) => c.minutesBeforeDue !== null && c.minutesBeforeDue > 0
+            ).length;
+
+            return {
+                id: d.id,
+                name: d.name || "Unknown",
+                role: d.role,
+                totalShifts: d.shifts.length,
+                confirmationsCompleted: completedCount,
+                confirmationsOnTime: onTimeCount,
+                confirmationsMissedWhileOnDuty: missedCount,
+                accountabilityRate:
+                    completedCount + missedCount > 0
+                        ? Math.round(
+                              (completedCount / (completedCount + missedCount)) * 100
+                          )
+                        : 100,
+            };
+        })
+        .sort(
+            (a, b) =>
+                b.confirmationsMissedWhileOnDuty - a.confirmationsMissedWhileOnDuty
+        );
+}
+
+/**
+ * Mark expired confirmations and record dispatcher accountability
  * This is called by a cron job or API route
+ * Records which dispatchers were on duty when confirmations expired
  */
 export async function markExpiredConfirmations() {
     const now = new Date();
 
-    const expired = await prisma.tripConfirmation.updateMany({
+    // Find confirmations that should be expired
+    const toExpire = await prisma.tripConfirmation.findMany({
         where: {
             status: "PENDING",
-            pickupAt: { lt: now }, // Pickup time has passed
+            pickupAt: { lt: now },
             archivedAt: null,
         },
-        data: {
-            status: "EXPIRED",
-            archivedAt: now,
+        select: {
+            id: true,
+            dueAt: true,
+            pickupAt: true,
         },
     });
 
-    return expired.count;
+    if (toExpire.length === 0) {
+        return { count: 0, accountabilityRecords: 0 };
+    }
+
+    let accountabilityRecords = 0;
+
+    for (const confirmation of toExpire) {
+        // Find all shifts that were active during the confirmation window
+        // Window: from dueAt (2 hours before pickup) to pickupAt
+        const activeShifts = await prisma.shift.findMany({
+            where: {
+                // Shift must have been active during the confirmation window
+                clockIn: { lte: confirmation.pickupAt },
+                OR: [
+                    { clockOut: null }, // Still active
+                    { clockOut: { gte: confirmation.dueAt } }, // Ended after due time
+                ],
+                // Only include DISPATCHER and ADMIN roles (exclude SUPER_ADMIN)
+                user: {
+                    role: { in: ["DISPATCHER", "ADMIN"] },
+                    isActive: true,
+                },
+            },
+            select: {
+                id: true,
+                userId: true,
+                clockIn: true,
+            },
+        });
+
+        // Create accountability records for each dispatcher on duty
+        for (const shift of activeShifts) {
+            try {
+                await prisma.missedConfirmationAccountability.create({
+                    data: {
+                        confirmationId: confirmation.id,
+                        dispatcherId: shift.userId,
+                        shiftId: shift.id,
+                        shiftStartedAt: shift.clockIn,
+                        confirmationDueAt: confirmation.dueAt,
+                        confirmationExpiredAt: now,
+                    },
+                });
+                accountabilityRecords++;
+            } catch {
+                // Unique constraint violation - already recorded, skip
+            }
+        }
+
+        // Update confirmation status to EXPIRED
+        await prisma.tripConfirmation.update({
+            where: { id: confirmation.id },
+            data: {
+                status: "EXPIRED",
+                archivedAt: now,
+            },
+        });
+    }
+
+    return { count: toExpire.length, accountabilityRecords };
 }
 
 /**

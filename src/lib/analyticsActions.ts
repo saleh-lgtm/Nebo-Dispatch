@@ -21,6 +21,7 @@ interface DispatcherMetrics {
 }
 
 // Get overall performance metrics for a date range (ADMIN/SUPER_ADMIN only)
+// Includes DISPATCHER and ADMIN metrics, excludes SUPER_ADMIN
 export async function getPerformanceMetrics(
     startDate: Date,
     endDate: Date
@@ -30,6 +31,9 @@ export async function getPerformanceMetrics(
     const reports = await prisma.shiftReport.findMany({
         where: {
             createdAt: { gte: startDate, lte: endDate },
+            user: {
+                role: { in: ["DISPATCHER", "ADMIN"] },
+            },
         },
     });
 
@@ -47,6 +51,7 @@ export async function getPerformanceMetrics(
 }
 
 // Get per-dispatcher comparison metrics (ADMIN/SUPER_ADMIN only)
+// Includes DISPATCHER and ADMIN metrics, excludes SUPER_ADMIN
 export async function getDispatcherComparison(
     startDate: Date,
     endDate: Date
@@ -56,8 +61,11 @@ export async function getDispatcherComparison(
     const reports = await prisma.shiftReport.findMany({
         where: {
             createdAt: { gte: startDate, lte: endDate },
+            user: {
+                role: { in: ["DISPATCHER", "ADMIN"] },
+            },
         },
-        include: { user: { select: { id: true, name: true } } },
+        include: { user: { select: { id: true, name: true, role: true } } },
     });
 
     const userMap = new Map<string, DispatcherMetrics>();
@@ -84,6 +92,7 @@ export async function getDispatcherComparison(
 }
 
 // Get daily trend data (ADMIN/SUPER_ADMIN only)
+// Includes DISPATCHER and ADMIN metrics, excludes SUPER_ADMIN
 export async function getDailyTrend(
     startDate: Date,
     endDate: Date
@@ -93,6 +102,9 @@ export async function getDailyTrend(
     const reports = await prisma.shiftReport.findMany({
         where: {
             createdAt: { gte: startDate, lte: endDate },
+            user: {
+                role: { in: ["DISPATCHER", "ADMIN"] },
+            },
         },
         orderBy: { createdAt: "asc" },
     });
@@ -114,12 +126,65 @@ export async function getDailyTrend(
 }
 
 // Get all dispatchers for selection (ADMIN/SUPER_ADMIN only)
+// Includes DISPATCHER and ADMIN roles, excludes SUPER_ADMIN
 export async function getDispatcherList() {
     await requireAdmin();
 
     return await prisma.user.findMany({
-        where: { role: "DISPATCHER", isActive: true },
-        select: { id: true, name: true, email: true },
+        where: {
+            role: { in: ["DISPATCHER", "ADMIN"] },
+            isActive: true
+        },
+        select: { id: true, name: true, email: true, role: true },
         orderBy: { name: "asc" },
     });
+}
+
+// Get daily confirmation accountability trend
+export async function getConfirmationAccountabilityTrend(
+    startDate: Date,
+    endDate: Date
+): Promise<{ date: string; completed: number; missed: number; onTime: number }[]> {
+    await requireAdmin();
+
+    const confirmations = await prisma.tripConfirmation.findMany({
+        where: {
+            pickupAt: { gte: startDate, lte: endDate },
+        },
+        select: {
+            status: true,
+            pickupAt: true,
+            completedAt: true,
+            minutesBeforeDue: true,
+        },
+    });
+
+    const dayMap = new Map<
+        string,
+        { completed: number; missed: number; onTime: number }
+    >();
+
+    for (const conf of confirmations) {
+        const dateKey = conf.pickupAt.toISOString().split("T")[0];
+        const existing = dayMap.get(dateKey) || {
+            completed: 0,
+            missed: 0,
+            onTime: 0,
+        };
+
+        if (conf.status === "EXPIRED") {
+            existing.missed++;
+        } else if (conf.completedAt) {
+            existing.completed++;
+            if (conf.minutesBeforeDue && conf.minutesBeforeDue > 0) {
+                existing.onTime++;
+            }
+        }
+
+        dayMap.set(dateKey, existing);
+    }
+
+    return Array.from(dayMap.entries())
+        .map(([date, data]) => ({ date, ...data }))
+        .sort((a, b) => a.date.localeCompare(b.date));
 }

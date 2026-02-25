@@ -12,7 +12,11 @@ import {
     Calendar,
     RefreshCw,
     Award,
+    PhoneCall,
+    AlertTriangle,
+    ArrowRight,
 } from "lucide-react";
+import Link from "next/link";
 import {
     AreaChart,
     Area,
@@ -63,6 +67,13 @@ interface HoursSummary {
     overtime: number;
 }
 
+interface ConfirmationSummary {
+    total: number;
+    completed: number;
+    expired: number;
+    onTimeRate: number;
+}
+
 interface Props {
     initialMetrics: OverallMetrics;
     initialComparison: DispatcherMetrics[];
@@ -70,6 +81,7 @@ interface Props {
     initialHours: HoursSummary[];
     initialStartDate: string;
     initialEndDate: string;
+    confirmationSummary?: ConfirmationSummary;
 }
 
 const CHART_COLORS = {
@@ -90,6 +102,7 @@ export default function AnalyticsClient({
     initialHours,
     initialStartDate,
     initialEndDate,
+    confirmationSummary,
 }: Props) {
     const [activeTab, setActiveTab] = useState<"performance" | "hours">("performance");
     const [metrics, setMetrics] = useState(initialMetrics);
@@ -588,6 +601,93 @@ export default function AnalyticsClient({
                             </div>
                         )}
                     </div>
+
+                    {/* Confirmation Accountability Summary */}
+                    {confirmationSummary && (
+                        <Link href="/admin/confirmations" style={{ textDecoration: "none" }}>
+                            <div
+                                className="glass-card"
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    padding: "1.25rem",
+                                    cursor: "pointer",
+                                    transition: "all 0.2s",
+                                    border: "1px solid var(--glass-border)",
+                                }}
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div
+                                        style={{
+                                            padding: "0.75rem",
+                                            borderRadius: "0.5rem",
+                                            background:
+                                                confirmationSummary.expired > 0
+                                                    ? "rgba(255, 107, 107, 0.15)"
+                                                    : "rgba(78, 205, 196, 0.15)",
+                                        }}
+                                    >
+                                        <PhoneCall
+                                            size={24}
+                                            style={{
+                                                color:
+                                                    confirmationSummary.expired > 0
+                                                        ? "#FF6B6B"
+                                                        : "#4ECDC4",
+                                            }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <h3 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.25rem" }}>
+                                            2-Hour Confirmations
+                                        </h3>
+                                        <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+                                            {confirmationSummary.completed} completed,{" "}
+                                            {confirmationSummary.expired > 0 && (
+                                                <span style={{ color: "#FF6B6B" }}>
+                                                    {confirmationSummary.expired} missed
+                                                </span>
+                                            )}
+                                            {confirmationSummary.expired === 0 && (
+                                                <span style={{ color: "#4ade80" }}>0 missed</span>
+                                            )}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-2">
+                                        {confirmationSummary.expired > 0 && (
+                                            <AlertTriangle size={18} style={{ color: "#fbbf24" }} />
+                                        )}
+                                        <span
+                                            style={{
+                                                padding: "0.375rem 0.75rem",
+                                                borderRadius: "9999px",
+                                                fontSize: "0.875rem",
+                                                fontWeight: 600,
+                                                background:
+                                                    confirmationSummary.onTimeRate >= 90
+                                                        ? "rgba(74, 222, 128, 0.15)"
+                                                        : confirmationSummary.onTimeRate >= 70
+                                                        ? "rgba(251, 191, 36, 0.15)"
+                                                        : "rgba(248, 113, 113, 0.15)",
+                                                color:
+                                                    confirmationSummary.onTimeRate >= 90
+                                                        ? "#4ade80"
+                                                        : confirmationSummary.onTimeRate >= 70
+                                                        ? "#fbbf24"
+                                                        : "#f87171",
+                                            }}
+                                        >
+                                            {confirmationSummary.onTimeRate}% on-time
+                                        </span>
+                                    </div>
+                                    <ArrowRight size={18} style={{ color: "var(--text-secondary)" }} />
+                                </div>
+                            </div>
+                        </Link>
+                    )}
                 </>
             )}
 
