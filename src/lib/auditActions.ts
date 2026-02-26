@@ -42,6 +42,7 @@ export type AuditEntity =
     | "AdminTaskCompletion"
     | "SOP"
     | "AccountingFlag"
+    | "BillingReview"
     | "AffiliatePricing"
     | "SMS"
     | "RetailLead"

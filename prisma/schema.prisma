@@ -75,6 +75,22 @@ enum AccountingFlagStatus {
   RESOLVED
 }
 
+// Billing review reasons for trips flagged by dispatchers
+enum BillingReviewReason {
+  EXTRA_WAITING_TIME      // Extra waiting time at airport/location
+  EXTRA_STOPS             // Additional stops during trip
+  ROUTE_CHANGE            // Route changed during trip
+  TOLL_FEES               // Toll fees to add
+  PARKING_FEES            // Parking fees to add
+  GRATUITY_ADJUSTMENT     // Gratuity needs adjustment
+  PRICE_CORRECTION        // Price needs correction
+  NO_SHOW_CHARGE          // No-show charge applicable
+  CANCELLATION_FEE        // Late cancellation fee
+  DAMAGE_CHARGE           // Damage/cleaning charge
+  AFFILIATE_BILLING       // Affiliate billing issue
+  OTHER                   // Other reason (requires notes)
+}
+
 // Fleet Vehicle Management
 enum VehicleType {
   SEDAN
@@ -164,6 +180,10 @@ model User {
   flagsCreated          AccountingFlag[]  @relation("FlaggedBy")
   flagsReviewed         AccountingFlag[]  @relation("ReviewedBy")
 
+  // Billing review relations
+  billingReviewsSubmitted BillingReview[]  @relation("BillingSubmittedBy")
+  billingReviewsReviewed  BillingReview[]  @relation("BillingReviewedBy")
+
   // Notification relations
   notifications         Notification[]
 
@@ -207,6 +227,7 @@ model Shift {
   requests   SchedulingRequest[]
   quotes     Quote[]
   drafts     ShiftReportDraft[]
+  billingReviews BillingReview[]
 
   // Missed confirmation accountability
   missedConfirmations MissedConfirmationAccountability[]
@@ -270,6 +291,9 @@ model ShiftReport {
 
   // Retail lead tracking
   retailLeads RetailLead[]
+
+  // Billing reviews
+  billingReviews BillingReview[]
 
   @@index([userId, createdAt])
   @@index([status])
@@ -952,6 +976,51 @@ model AccountingFlag {
   @@index([status])
   @@index([shiftReportId])
   @@index([flaggedById])
+}
+
+// Trip billing review requests - dispatchers can flag trips for accounting review
+model BillingReview {
+  id                String              @id @default(cuid())
+
+  // Trip identification
+  tripNumber        String              // Trip/confirmation number
+  passengerName     String?             // Optional passenger name for context
+  tripDate          DateTime?           // Optional trip date
+
+  // Review details
+  reason            BillingReviewReason
+  reasonOther       String?             @db.Text  // If reason is OTHER
+  amount            Float?              // Suggested amount to add/adjust
+  notes             String?             @db.Text  // Additional context
+
+  // Submitted by (dispatcher)
+  submittedById     String
+  submittedBy       User                @relation("BillingSubmittedBy", fields: [submittedById], references: [id])
+
+  // Optional link to shift (for context)
+  shiftId           String?
+  shift             Shift?              @relation(fields: [shiftId], references: [id])
+
+  // Optional link to shift report
+  shiftReportId     String?
+  shiftReport       ShiftReport?        @relation(fields: [shiftReportId], references: [id])
+
+  // Review status
+  status            AccountingFlagStatus @default(PENDING)
+  reviewedById      String?
+  reviewedBy        User?               @relation("BillingReviewedBy", fields: [reviewedById], references: [id])
+  reviewedAt        DateTime?
+  accountingNotes   String?             @db.Text
+  resolution        String?             @db.Text
+  resolvedAmount    Float?              // Final amount applied
+
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([status])
+  @@index([tripNumber])
+  @@index([submittedById])
+  @@index([createdAt])
 }
 
 // Pricing grid for FARM_IN affiliates - flat rates by service type
