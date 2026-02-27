@@ -207,6 +207,15 @@ export interface ShiftReportDraft {
         lostReasonOther?: string;
         notes?: string;
     }>;
+    billingReviews?: Array<{
+        tripNumber: string;
+        passengerName?: string;
+        tripDate?: string;
+        reason: string;
+        reasonOther?: string;
+        amount?: number;
+        notes?: string;
+    }>;
     handoffNotes: string;
     metrics: {
         calls: number;

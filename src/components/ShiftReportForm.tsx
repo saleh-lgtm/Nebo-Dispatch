@@ -4,7 +4,10 @@ import { useState, memo, useEffect, useMemo, useCallback } from "react";
 import { Plus, Trash2, ClipboardCheck, Send, AlertCircle, Bookmark, Phone, Mail, FileText, TrendingUp, MessageSquare, Lightbulb, Clock, CheckCircle, Minus, X, DollarSign, User, Flag, PhoneCall, ThumbsUp, ThumbsDown, AlertOctagon, Cloud, CloudOff, Save, RefreshCw } from "lucide-react";
 import { toggleTask, saveShiftReport, saveShiftReportDraft, deleteShiftReportDraft, type ShiftReportDraft } from "@/lib/actions";
 import { createQuote } from "@/lib/quoteActions";
+import { createBillingReviews } from "@/lib/billingReviewActions";
 import { useAutoSave } from "@/hooks/useAutoSave";
+import BillingReviewSection, { type BillingReviewEntry } from "./shift-report/BillingReviewSection";
+import { BillingReviewReason } from "@prisma/client";
 
 interface ReservationEntry {
     id: string;
@@ -53,6 +56,9 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
     const [modified, setModified] = useState<ReservationEntry[]>(initialDraft?.modified || []);
     const [cancelled, setCancelled] = useState<ReservationEntry[]>(initialDraft?.cancelled || []);
     const [retailLeads, setRetailLeads] = useState<RetailLeadEntry[]>(initialDraft?.retailLeads || []);
+    const [billingReviews, setBillingReviews] = useState<BillingReviewEntry[]>(
+        (initialDraft?.billingReviews || []).map((r: { tripNumber: string; reason: string; passengerName?: string; tripDate?: string; reasonOther?: string; amount?: number; notes?: string }) => ({ ...r, reason: r.reason as BillingReviewReason }))
+    );
     const [handoffNotes, setHandoffNotes] = useState(initialDraft?.handoffNotes || "");
     const [metrics, setMetrics] = useState<Metrics>(initialDraft?.metrics || {
         calls: 0,
@@ -78,10 +84,11 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
         modified,
         cancelled,
         retailLeads,
+        billingReviews,
         handoffNotes,
         metrics,
         narrative,
-    }), [activeShift?.id, accepted, modified, cancelled, retailLeads, handoffNotes, metrics, narrative]);
+    }), [activeShift?.id, accepted, modified, cancelled, retailLeads, billingReviews, handoffNotes, metrics, narrative]);
 
     // Server save handler
     const handleServerSave = useCallback(async (data: ShiftReportDraft) => {
@@ -118,6 +125,7 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
             setModified(draft.modified || []);
             setCancelled(draft.cancelled || []);
             setRetailLeads(draft.retailLeads || []);
+            setBillingReviews((draft.billingReviews || []).map(r => ({ ...r, reason: r.reason as BillingReviewReason })));
             setHandoffNotes(draft.handoffNotes || "");
             setMetrics(draft.metrics || { calls: 0, emails: 0, totalReservationsHandled: 0 });
             setNarrative(draft.narrative || { comments: "", incidents: "", ideas: "" });
@@ -239,6 +247,25 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
             };
 
             await saveShiftReport(data);
+
+            // Save billing reviews if any
+            if (billingReviews.length > 0) {
+                const validReviews = billingReviews.filter(r => r.tripNumber.trim());
+                if (validReviews.length > 0) {
+                    await createBillingReviews(
+                        validReviews.map(r => ({
+                            tripNumber: r.tripNumber,
+                            passengerName: r.passengerName,
+                            tripDate: r.tripDate ? new Date(r.tripDate) : undefined,
+                            reason: r.reason,
+                            reasonOther: r.reasonOther,
+                            amount: r.amount,
+                            notes: r.notes,
+                        })),
+                        activeShift.id
+                    );
+                }
+            }
 
             // Clear draft after successful submission
             clearDraft();
@@ -648,6 +675,18 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
                             </div>
                         )}
                     </section>
+
+                    {/* Billing Review Section */}
+                    <BillingReviewSection
+                        reviews={billingReviews}
+                        onAdd={() => setBillingReviews([...billingReviews, { tripNumber: "", reason: "EXTRA_WAITING_TIME" as const }])}
+                        onUpdate={(index, updates) => {
+                            const updated = [...billingReviews];
+                            updated[index] = { ...updated[index], ...updates };
+                            setBillingReviews(updated);
+                        }}
+                        onRemove={(index) => setBillingReviews(billingReviews.filter((_, i) => i !== index))}
+                    />
 
                     {/* Notes Section */}
                     <section className="report-card">
