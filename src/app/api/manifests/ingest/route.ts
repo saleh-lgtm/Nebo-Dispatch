@@ -113,13 +113,8 @@ export async function POST(request: NextRequest) {
         }
     }
 
-    // Method 3: URL param (fallback)
-    if (!isAuthenticated) {
-        const paramSecret = request.nextUrl.searchParams.get("secret");
-        if (paramSecret === manifestSecret) {
-            isAuthenticated = true;
-        }
-    }
+    // SECURITY: URL parameter authentication REMOVED - secrets in URLs are logged
+    // in server logs, browser history, and proxy logs. Use Basic Auth or headers only.
 
     if (!isAuthenticated) {
         console.warn(`Unauthorized manifest ingest attempt from IP: ${ip}`);

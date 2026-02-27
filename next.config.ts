@@ -33,7 +33,9 @@ const securityHeaders = [
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      // SECURITY: Removed 'unsafe-eval' - prevents eval() and Function() XSS attacks
+      // 'unsafe-inline' is still needed for Next.js hydration scripts
+      "script-src 'self' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data: https://fonts.gstatic.com",
@@ -41,6 +43,7 @@ const securityHeaders = [
       "frame-ancestors 'self'",
       "form-action 'self'",
       "base-uri 'self'",
+      "upgrade-insecure-requests",
     ].join('; ')
   }
 ];

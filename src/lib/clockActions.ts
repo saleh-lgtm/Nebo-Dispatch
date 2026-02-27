@@ -261,10 +261,27 @@ export async function clockOut(forceWithoutReport = false): Promise<{
         },
     });
 
-    // Reset all task completions for this dispatcher (Option A)
-    // Admin tasks persist, but completions are reset for the next shift
+    // Reset task completions for this specific shift only
+    // SECURITY FIX: Previously deleted ALL completions for user across all shifts
+    // Now scoped to only tasks that were assigned during this shift
+    const shiftTasks = await prisma.shiftTask.findMany({
+        where: { shiftId: activeShift.id, isAdminTask: true },
+        select: { content: true },
+    });
+
+    // Get admin task IDs that match tasks from this shift
+    const adminTaskTitles = shiftTasks.map(t => t.content);
+    const matchingAdminTasks = await prisma.adminTask.findMany({
+        where: { title: { in: adminTaskTitles } },
+        select: { id: true },
+    });
+    const adminTaskIds = matchingAdminTasks.map(t => t.id);
+
     const deletedCompletions = await prisma.adminTaskCompletion.deleteMany({
-        where: { userId },
+        where: {
+            userId,
+            taskId: { in: adminTaskIds },
+        },
     });
 
     if (deletedCompletions.count > 0) {

@@ -7,6 +7,14 @@ import crypto from "crypto";
 // Token expires in 1 hour
 const TOKEN_EXPIRY_HOURS = 1;
 
+/**
+ * SECURITY: Hash tokens before storage to prevent leaks in logs/database
+ * Uses SHA-256 for fast, consistent hashing (not bcrypt - we need to lookup by hash)
+ */
+function hashToken(token: string): string {
+    return crypto.createHash("sha256").update(token).digest("hex");
+}
+
 interface RequestResetResult {
     success: boolean;
     message: string;
@@ -53,21 +61,25 @@ export async function requestPasswordReset(email: string): Promise<RequestResetR
 
             // Generate secure random token
             const token = crypto.randomBytes(32).toString("hex");
+            const tokenHash = hashToken(token); // SECURITY: Store hash, not plaintext
             const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
 
-            // Create new token
+            // Create new token - store HASH in database for security
             await prisma.passwordResetToken.create({
                 data: {
-                    token,
+                    token: tokenHash, // Store hash, not plaintext
                     userId: user.id,
                     expiresAt,
                 },
             });
 
             // TODO: Send email with reset link
+            // The RAW token goes in the email, NOT the hash
             // For now, log the token (remove in production)
-            console.log(`[DEV] Password reset token for ${normalizedEmail}: ${token}`);
-            console.log(`[DEV] Reset link: /reset-password?token=${token}`);
+            if (process.env.NODE_ENV === "development") {
+                console.log(`[DEV] Password reset token for ${normalizedEmail}: ${token}`);
+                console.log(`[DEV] Reset link: /reset-password?token=${token}`);
+            }
 
             // In production, you would send an email here:
             // await sendPasswordResetEmail(user.email, user.name, token);
@@ -91,8 +103,11 @@ export async function requestPasswordReset(email: string): Promise<RequestResetR
  */
 export async function validateResetToken(token: string): Promise<ValidateTokenResult> {
     try {
+        // SECURITY: Hash the incoming token to compare with stored hash
+        const tokenHash = hashToken(token);
+
         const resetToken = await prisma.passwordResetToken.findUnique({
-            where: { token },
+            where: { token: tokenHash },
             include: { user: true },
         });
 
@@ -144,9 +159,12 @@ export async function resetPassword(token: string, newPassword: string): Promise
             return { success: false, message: "Password must contain at least one number" };
         }
 
+        // SECURITY: Hash the incoming token to compare with stored hash
+        const tokenHash = hashToken(token);
+
         // Validate token
         const resetToken = await prisma.passwordResetToken.findUnique({
-            where: { token },
+            where: { token: tokenHash },
             include: { user: true },
         });
 

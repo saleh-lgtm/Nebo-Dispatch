@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import twilio from "twilio";
 import prisma from "@/lib/prisma";
 
+/**
+ * Escape XML special characters to prevent TwiML injection attacks.
+ * This is CRITICAL for security when embedding user content in TwiML responses.
+ */
+function escapeXml(text: string): string {
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&apos;");
+}
+
 // Normalize phone number to E.164 format for consistent conversation threading
 function normalizePhoneNumber(phone: string): string {
     const digits = phone.replace(/\D/g, "");
@@ -18,12 +31,21 @@ function normalizePhoneNumber(phone: string): string {
 }
 
 // Twilio webhook validation - ENFORCED for security
-// Set TWILIO_SKIP_SIGNATURE_VALIDATION=true ONLY in development
+// SECURITY: Validation can ONLY be skipped in development mode with explicit flag
 function validateTwilioRequest(req: NextRequest, body: string): { valid: boolean; error?: string } {
-    // Allow skipping validation only in development with explicit flag
-    if (process.env.TWILIO_SKIP_SIGNATURE_VALIDATION === "true") {
-        console.warn("⚠️ Twilio signature validation SKIPPED - only use in development!");
+    // SECURITY FIX: Both conditions must be true to skip validation
+    // This prevents accidental deployment with validation disabled
+    const isDevelopment = process.env.NODE_ENV === "development";
+    const skipFlagSet = process.env.TWILIO_SKIP_SIGNATURE_VALIDATION === "true";
+
+    if (isDevelopment && skipFlagSet) {
+        console.warn("⚠️ Twilio signature validation SKIPPED - development mode only!");
         return { valid: true };
+    }
+
+    // In production, ALWAYS validate - even if skip flag is accidentally set
+    if (!isDevelopment && skipFlagSet) {
+        console.error("🚨 SECURITY: TWILIO_SKIP_SIGNATURE_VALIDATION ignored in production!");
     }
 
     const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -154,10 +176,11 @@ export async function POST(req: NextRequest) {
         console.log(`Received SMS from ${from}: ${messageBody.substring(0, 50)}...`);
 
         // Return TwiML response with optional auto-reply
+        // SECURITY: Always escape auto-reply content to prevent TwiML injection
         const twimlResponse = autoReply
             ? `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Message>${autoReply}</Message>
+    <Message>${escapeXml(autoReply)}</Message>
 </Response>`
             : `<?xml version="1.0" encoding="UTF-8"?>
 <Response></Response>`;

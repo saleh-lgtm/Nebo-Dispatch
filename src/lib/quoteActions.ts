@@ -413,6 +413,13 @@ export async function updateQuoteStatus(quoteId: string, status: QuoteStatus) {
 
 export async function assignQuote(quoteId: string, userId: string) {
     const session = await requireAuth();
+
+    // SECURITY: Only admins can reassign quotes to other users
+    const allowedRoles = ["SUPER_ADMIN", "ADMIN"];
+    if (!allowedRoles.includes(session.user.role || "")) {
+        throw new Error("Unauthorized: Only administrators can reassign quotes");
+    }
+
     const now = new Date();
 
     const assignee = await prisma.user.findUnique({

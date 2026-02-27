@@ -206,6 +206,11 @@ model User {
 
   // Missed confirmation accountability (when on duty but confirmation expired)
   missedConfirmations    MissedConfirmationAccountability[] @relation("MissedConfirmations")
+
+  // CRITICAL INDEXES for performance
+  @@index([email])                      // Auth queries on every request
+  @@index([role, isActive, createdAt])  // Admin dashboards, user listings
+  @@index([approvalStatus])             // Approval workflows
 }
 
 model Shift {
@@ -235,6 +240,10 @@ model Shift {
 
   // Missed confirmation accountability
   missedConfirmations MissedConfirmationAccountability[]
+
+  // CRITICAL INDEXES for performance
+  @@index([userId, clockOut])  // Active shift lookups - called on every page load
+  @@index([userId, clockIn])   // Time-based shift queries
 }
 
 model ShiftReport {
@@ -379,6 +388,9 @@ model ShiftTask {
   assignedBy    User?    @relation("TaskAssigner", fields: [assignedById], references: [id])
   isAdminTask   Boolean  @default(false)
   priority      Int      @default(0)
+
+  // CRITICAL INDEX for performance
+  @@index([shiftId])  // Fetch tasks for shift page
 }
 
 model CourtReport {
@@ -644,6 +656,9 @@ model Quote {
   @@index([expiresAt])
   @@index([isFlagged])
   @@index([lastActionAt])
+  // CRITICAL INDEXES for performance
+  @@index([createdById, status, createdAt])  // User's quote list with status
+  @@index([assignedToId, status])            // "My quotes" dashboard
 }
 
 // Track all actions/updates on a quote
@@ -1477,13 +1492,15 @@ enum ConfirmationStatus {
 
 // Trip confirmation tasks generated from manifest emails
 model TripConfirmation {
-  id              String             @id @default(cuid())
-  tripNumber      String             // e.g., "43273"
-  pickupAt        DateTime           // Actual pickup date/time
-  dueAt           DateTime           // 2 hours before pickup (when confirmation is due)
-  passengerName   String
-  driverName      String
-  accountName     String?            // Account code from manifest (e.g., "LL-SAT")
+  id                String             @id @default(cuid())
+  tripNumber        String             // e.g., "43273"
+  reservationNumber String?            // LimoAnywhere reservation number
+  pickupAt          DateTime           // Actual pickup date/time
+  dueAt             DateTime           // 2 hours before pickup (when confirmation is due)
+  passengerName     String
+  driverName        String
+  accountName       String?            // Account name/code from manifest (e.g., "LL-SAT")
+  accountNumber     String?            // Account number from LimoAnywhere
 
   // Status tracking
   status          ConfirmationStatus @default(PENDING)

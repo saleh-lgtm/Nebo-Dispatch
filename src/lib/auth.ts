@@ -7,10 +7,70 @@ import { compare } from "bcryptjs";
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MINUTES = 15;
 
+// IP-based rate limiting for distributed brute force protection
+const IP_RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
+const IP_RATE_LIMIT_MAX_ATTEMPTS = 20; // Max attempts per IP in window
+const ipAttempts = new Map<string, { count: number; resetAt: number }>();
+
+function checkIpRateLimit(ip: string): { allowed: boolean; remainingAttempts: number } {
+    const now = Date.now();
+    const entry = ipAttempts.get(ip);
+
+    // Cleanup expired entries periodically
+    if (ipAttempts.size > 10000) {
+        for (const [key, val] of ipAttempts.entries()) {
+            if (now > val.resetAt) ipAttempts.delete(key);
+        }
+    }
+
+    if (!entry || now > entry.resetAt) {
+        ipAttempts.set(ip, { count: 1, resetAt: now + IP_RATE_LIMIT_WINDOW });
+        return { allowed: true, remainingAttempts: IP_RATE_LIMIT_MAX_ATTEMPTS - 1 };
+    }
+
+    if (entry.count >= IP_RATE_LIMIT_MAX_ATTEMPTS) {
+        return { allowed: false, remainingAttempts: 0 };
+    }
+
+    entry.count++;
+    return { allowed: true, remainingAttempts: IP_RATE_LIMIT_MAX_ATTEMPTS - entry.count };
+}
+
+// Store IP from request context (set via middleware or headers)
+let currentRequestIp: string | null = null;
+export function setRequestIp(ip: string) {
+    currentRequestIp = ip;
+}
+
 export const authOptions: NextAuthOptions = {
     session: {
         strategy: "jwt",
         maxAge: 8 * 60 * 60, // 8 hours
+    },
+    // SECURITY: Explicit cookie configuration for CSRF protection
+    cookies: {
+        sessionToken: {
+            name: process.env.NODE_ENV === "production"
+                ? "__Secure-next-auth.session-token"
+                : "next-auth.session-token",
+            options: {
+                httpOnly: true,
+                sameSite: "lax",
+                path: "/",
+                secure: process.env.NODE_ENV === "production",
+            },
+        },
+        csrfToken: {
+            name: process.env.NODE_ENV === "production"
+                ? "__Host-next-auth.csrf-token"
+                : "next-auth.csrf-token",
+            options: {
+                httpOnly: true,
+                sameSite: "lax",
+                path: "/",
+                secure: process.env.NODE_ENV === "production",
+            },
+        },
     },
     providers: [
         CredentialsProvider({
@@ -23,9 +83,20 @@ export const authOptions: NextAuthOptions = {
                 },
                 password: { label: "Password", type: "password" },
             },
-            async authorize(credentials) {
+            async authorize(credentials, req) {
                 if (!credentials?.email || !credentials.password) {
                     return null;
+                }
+
+                // IP-based rate limiting for distributed brute force protection
+                const ip = currentRequestIp ||
+                    (req?.headers?.["x-forwarded-for"] as string)?.split(",")[0] ||
+                    (req?.headers?.["x-real-ip"] as string) ||
+                    "unknown";
+
+                const ipRateLimit = checkIpRateLimit(ip);
+                if (!ipRateLimit.allowed) {
+                    throw new Error("Too many login attempts from this location. Please try again in 15 minutes.");
                 }
 
                 const user = await prisma.user.findUnique({
