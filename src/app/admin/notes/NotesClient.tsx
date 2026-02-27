@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import {
-    StickyNote,
+    Bell,
     Plus,
     Edit3,
     Trash2,
@@ -10,36 +10,54 @@ import {
     Clock,
     User,
     AlertCircle,
+    Pin,
+    PinOff,
+    Calendar,
+    Eye,
 } from "lucide-react";
 import {
-    createGlobalNote,
-    updateGlobalNote,
-    deleteGlobalNote,
+    createAnnouncement,
+    updateAnnouncement,
+    deleteAnnouncement,
+    toggleAnnouncementPin,
 } from "@/lib/notesActions";
 
-interface Note {
+interface Announcement {
     id: string;
     title: string;
     content: string;
     createdAt: Date;
+    updatedAt: Date;
     author: { id: string; name: string | null };
+    isAnnouncement: boolean;
+    isPinned: boolean;
+    expiresAt: Date | null;
 }
 
 interface Props {
-    initialNotes: Note[];
+    initialNotes: Announcement[];
     currentUserId: string;
 }
 
 export default function NotesClient({ initialNotes, currentUserId }: Props) {
-    const [notes, setNotes] = useState<Note[]>(initialNotes);
+    // Filter to only show announcements
+    const [announcements, setAnnouncements] = useState<Announcement[]>(
+        initialNotes.filter((n) => n.isAnnouncement)
+    );
     const [showForm, setShowForm] = useState(false);
-    const [editingNote, setEditingNote] = useState<Note | null>(null);
-    const [formData, setFormData] = useState({ title: "", content: "" });
+    const [editingNote, setEditingNote] = useState<Announcement | null>(null);
+    const [formData, setFormData] = useState({
+        title: "",
+        content: "",
+        isPinned: false,
+        expiresAt: "",
+    });
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [pinningId, setPinningId] = useState<string | null>(null);
 
     const resetForm = () => {
-        setFormData({ title: "", content: "" });
+        setFormData({ title: "", content: "", isPinned: false, expiresAt: "" });
         setEditingNote(null);
         setShowForm(false);
     };
@@ -51,42 +69,81 @@ export default function NotesClient({ initialNotes, currentUserId }: Props) {
         setLoading(true);
 
         try {
+            const expiresAt = formData.expiresAt
+                ? new Date(formData.expiresAt)
+                : null;
+
             if (editingNote) {
-                const updated = await updateGlobalNote(editingNote.id, formData);
-                setNotes((prev) =>
-                    prev.map((n) => (n.id === editingNote.id ? updated : n))
+                const updated = await updateAnnouncement(editingNote.id, {
+                    title: formData.title,
+                    content: formData.content,
+                    isPinned: formData.isPinned,
+                    expiresAt,
+                });
+                setAnnouncements((prev) =>
+                    prev.map((n) =>
+                        n.id === editingNote.id ? (updated as Announcement) : n
+                    )
                 );
             } else {
-                const newNote = await createGlobalNote({
-                    authorId: currentUserId,
-                    ...formData,
+                const newAnnouncement = await createAnnouncement({
+                    title: formData.title,
+                    content: formData.content,
+                    isPinned: formData.isPinned,
+                    expiresAt,
                 });
-                setNotes((prev) => [newNote, ...prev]);
+                setAnnouncements((prev) => [
+                    newAnnouncement as Announcement,
+                    ...prev,
+                ]);
             }
             resetForm();
         } catch (error) {
-            console.error("Failed to save note:", error);
+            console.error("Failed to save announcement:", error);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleEdit = (note: Note) => {
+    const handleEdit = (note: Announcement) => {
         setEditingNote(note);
-        setFormData({ title: note.title, content: note.content });
+        setFormData({
+            title: note.title,
+            content: note.content,
+            isPinned: note.isPinned,
+            expiresAt: note.expiresAt
+                ? new Date(note.expiresAt).toISOString().slice(0, 16)
+                : "",
+        });
         setShowForm(true);
     };
 
     const handleDelete = async (id: string) => {
         setLoading(true);
         try {
-            await deleteGlobalNote(id);
-            setNotes((prev) => prev.filter((n) => n.id !== id));
+            await deleteAnnouncement(id);
+            setAnnouncements((prev) => prev.filter((n) => n.id !== id));
             setDeleteConfirm(null);
         } catch (error) {
-            console.error("Failed to delete note:", error);
+            console.error("Failed to delete announcement:", error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleTogglePin = async (id: string) => {
+        setPinningId(id);
+        try {
+            const updated = await toggleAnnouncementPin(id);
+            setAnnouncements((prev) =>
+                prev.map((n) =>
+                    n.id === id ? { ...n, isPinned: updated.isPinned } : n
+                )
+            );
+        } catch (error) {
+            console.error("Failed to toggle pin:", error);
+        } finally {
+            setPinningId(null);
         }
     };
 
@@ -100,18 +157,43 @@ export default function NotesClient({ initialNotes, currentUserId }: Props) {
         });
     };
 
+    const isExpired = (expiresAt: Date | null) => {
+        if (!expiresAt) return false;
+        return new Date(expiresAt) < new Date();
+    };
+
+    // Sort: pinned first, then by date
+    const sortedAnnouncements = [...announcements].sort((a, b) => {
+        if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+        return (
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+    });
+
     return (
-        <div className="flex flex-col gap-6 animate-fade-in" style={{ padding: "1.5rem" }}>
+        <div
+            className="flex flex-col gap-6 animate-fade-in"
+            style={{ padding: "1.5rem" }}
+        >
             {/* Header */}
             <header className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <StickyNote size={28} className="text-accent" />
+                    <Bell size={28} className="text-accent" />
                     <div>
-                        <h1 className="font-display" style={{ fontSize: "1.75rem" }}>
-                            Global Notes
+                        <h1
+                            className="font-display"
+                            style={{ fontSize: "1.75rem" }}
+                        >
+                            Company Announcements
                         </h1>
-                        <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>
+                        <p
+                            style={{
+                                color: "var(--text-secondary)",
+                                fontSize: "0.875rem",
+                            }}
+                        >
                             Create announcements visible to all dispatchers
+                            (require acknowledgment)
                         </p>
                     </div>
                 </div>
@@ -119,7 +201,7 @@ export default function NotesClient({ initialNotes, currentUserId }: Props) {
                     onClick={() => setShowForm(true)}
                     className="btn btn-primary"
                 >
-                    <Plus size={18} /> New Note
+                    <Plus size={18} /> New Announcement
                 </button>
             </header>
 
@@ -131,16 +213,51 @@ export default function NotesClient({ initialNotes, currentUserId }: Props) {
                     gap: "1.5rem",
                 }}
             >
-                {notes.map((note) => (
-                    <div key={note.id} className="glass-card flex flex-col gap-4">
+                {sortedAnnouncements.map((note) => (
+                    <div
+                        key={note.id}
+                        className="glass-card flex flex-col gap-4"
+                        style={{
+                            borderLeft: note.isPinned
+                                ? "4px solid var(--danger)"
+                                : "4px solid var(--warning)",
+                            opacity: isExpired(note.expiresAt) ? 0.6 : 1,
+                        }}
+                    >
                         <div className="flex justify-between items-start">
-                            <h3
-                                className="font-display"
-                                style={{ fontSize: "1.25rem", color: "var(--accent)" }}
-                            >
-                                {note.title}
-                            </h3>
+                            <div className="flex items-center gap-2">
+                                {note.isPinned && (
+                                    <Pin
+                                        size={14}
+                                        style={{ color: "var(--danger)" }}
+                                    />
+                                )}
+                                <h3
+                                    className="font-display"
+                                    style={{
+                                        fontSize: "1.25rem",
+                                        color: "var(--accent)",
+                                    }}
+                                >
+                                    {note.title}
+                                </h3>
+                            </div>
                             <div className="flex gap-1">
+                                <button
+                                    onClick={() => handleTogglePin(note.id)}
+                                    className="btn-icon"
+                                    style={{ width: "28px", height: "28px" }}
+                                    title={
+                                        note.isPinned ? "Unpin" : "Pin to top"
+                                    }
+                                    disabled={pinningId === note.id}
+                                >
+                                    {note.isPinned ? (
+                                        <PinOff size={14} />
+                                    ) : (
+                                        <Pin size={14} />
+                                    )}
+                                </button>
                                 <button
                                     onClick={() => handleEdit(note)}
                                     className="btn-icon"
@@ -174,6 +291,31 @@ export default function NotesClient({ initialNotes, currentUserId }: Props) {
                             {note.content}
                         </p>
 
+                        {note.expiresAt && (
+                            <div
+                                className="flex items-center gap-2"
+                                style={{
+                                    fontSize: "0.75rem",
+                                    color: isExpired(note.expiresAt)
+                                        ? "var(--danger)"
+                                        : "var(--warning)",
+                                    padding: "0.5rem",
+                                    background: isExpired(note.expiresAt)
+                                        ? "var(--danger-bg)"
+                                        : "var(--warning-bg)",
+                                    borderRadius: "var(--radius-sm)",
+                                }}
+                            >
+                                <Calendar size={12} />
+                                <span>
+                                    {isExpired(note.expiresAt)
+                                        ? "Expired"
+                                        : "Expires"}{" "}
+                                    {formatDate(note.expiresAt)}
+                                </span>
+                            </div>
+                        )}
+
                         <div
                             className="flex items-center gap-4"
                             style={{
@@ -196,7 +338,7 @@ export default function NotesClient({ initialNotes, currentUserId }: Props) {
                     </div>
                 ))}
 
-                {notes.length === 0 && (
+                {sortedAnnouncements.length === 0 && (
                     <div
                         className="glass-card"
                         style={{
@@ -205,13 +347,13 @@ export default function NotesClient({ initialNotes, currentUserId }: Props) {
                             padding: "3rem",
                         }}
                     >
-                        <StickyNote
+                        <Bell
                             size={48}
                             style={{ opacity: 0.3, margin: "0 auto 1rem" }}
                         />
                         <p style={{ color: "var(--text-secondary)" }}>
-                            No global notes yet. Create one to announce important information to
-                            all dispatchers.
+                            No announcements yet. Create one to announce
+                            important information to all dispatchers.
                         </p>
                     </div>
                 )}
@@ -228,9 +370,14 @@ export default function NotesClient({ initialNotes, currentUserId }: Props) {
                     <div className="glass-card w-full max-w-lg animate-scale-in">
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
-                                <StickyNote className="text-accent" />
-                                <h2 className="font-display" style={{ fontSize: "1.5rem" }}>
-                                    {editingNote ? "Edit Note" : "New Note"}
+                                <Bell className="text-accent" />
+                                <h2
+                                    className="font-display"
+                                    style={{ fontSize: "1.5rem" }}
+                                >
+                                    {editingNote
+                                        ? "Edit Announcement"
+                                        : "New Announcement"}
                                 </h2>
                             </div>
                             <button onClick={resetForm} className="btn-icon">
@@ -238,7 +385,10 @@ export default function NotesClient({ initialNotes, currentUserId }: Props) {
                             </button>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                        <form
+                            onSubmit={handleSubmit}
+                            className="flex flex-col gap-4"
+                        >
                             <div className="flex flex-col gap-1">
                                 <label
                                     className="text-xs uppercase tracking-wider font-bold"
@@ -250,10 +400,13 @@ export default function NotesClient({ initialNotes, currentUserId }: Props) {
                                     type="text"
                                     required
                                     className="input"
-                                    placeholder="Enter note title..."
+                                    placeholder="Enter announcement title..."
                                     value={formData.title}
                                     onChange={(e) =>
-                                        setFormData({ ...formData, title: e.target.value })
+                                        setFormData({
+                                            ...formData,
+                                            title: e.target.value,
+                                        })
                                     }
                                 />
                             </div>
@@ -272,19 +425,75 @@ export default function NotesClient({ initialNotes, currentUserId }: Props) {
                                     style={{ height: "150px", resize: "vertical" }}
                                     value={formData.content}
                                     onChange={(e) =>
-                                        setFormData({ ...formData, content: e.target.value })
+                                        setFormData({
+                                            ...formData,
+                                            content: e.target.value,
+                                        })
                                     }
                                 />
                             </div>
 
                             <div
+                                className="flex gap-4"
+                                style={{ flexWrap: "wrap" }}
+                            >
+                                <div className="flex flex-col gap-1 flex-1">
+                                    <label
+                                        className="text-xs uppercase tracking-wider font-bold"
+                                        style={{
+                                            color: "var(--text-secondary)",
+                                        }}
+                                    >
+                                        Expires At (Optional)
+                                    </label>
+                                    <input
+                                        type="datetime-local"
+                                        className="input"
+                                        value={formData.expiresAt}
+                                        onChange={(e) =>
+                                            setFormData({
+                                                ...formData,
+                                                expiresAt: e.target.value,
+                                            })
+                                        }
+                                    />
+                                </div>
+
+                                <label
+                                    className="flex items-center gap-2 cursor-pointer"
+                                    style={{ alignSelf: "flex-end" }}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.isPinned}
+                                        onChange={(e) =>
+                                            setFormData({
+                                                ...formData,
+                                                isPinned: e.target.checked,
+                                            })
+                                        }
+                                        style={{ width: "16px", height: "16px" }}
+                                    />
+                                    <span
+                                        className="flex items-center gap-1"
+                                        style={{ fontSize: "0.875rem" }}
+                                    >
+                                        <Pin size={14} /> Pin to top
+                                    </span>
+                                </label>
+                            </div>
+
+                            <div
                                 className="flex items-start gap-2 p-3 rounded-lg"
                                 style={{
-                                    background: "rgba(183, 175, 163, 0.1)",
-                                    border: "1px solid rgba(183, 175, 163, 0.2)",
+                                    background: "rgba(245, 158, 11, 0.1)",
+                                    border: "1px solid rgba(245, 158, 11, 0.2)",
                                 }}
                             >
-                                <AlertCircle size={14} className="text-accent mt-0.5" />
+                                <Eye
+                                    size={14}
+                                    className="text-warning mt-0.5"
+                                />
                                 <p
                                     style={{
                                         fontSize: "0.75rem",
@@ -292,8 +501,10 @@ export default function NotesClient({ initialNotes, currentUserId }: Props) {
                                         lineHeight: 1.5,
                                     }}
                                 >
-                                    This note will be visible to all dispatchers on their
-                                    dashboard.
+                                    This announcement will require
+                                    acknowledgment from all dispatchers.
+                                    Unacknowledged announcements will be
+                                    highlighted on their dashboard.
                                 </p>
                             </div>
 
@@ -313,8 +524,8 @@ export default function NotesClient({ initialNotes, currentUserId }: Props) {
                                     {loading
                                         ? "Saving..."
                                         : editingNote
-                                        ? "Update Note"
-                                        : "Create Note"}
+                                        ? "Update Announcement"
+                                        : "Create Announcement"}
                                 </button>
                             </div>
                         </form>
@@ -327,7 +538,8 @@ export default function NotesClient({ initialNotes, currentUserId }: Props) {
                 <div
                     className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
                     onClick={(e) => {
-                        if (e.target === e.currentTarget) setDeleteConfirm(null);
+                        if (e.target === e.currentTarget)
+                            setDeleteConfirm(null);
                     }}
                 >
                     <div className="glass-card w-full max-w-sm animate-scale-in text-center">
@@ -341,9 +553,12 @@ export default function NotesClient({ initialNotes, currentUserId }: Props) {
                         />
                         <h2
                             className="font-display"
-                            style={{ fontSize: "1.25rem", marginBottom: "0.5rem" }}
+                            style={{
+                                fontSize: "1.25rem",
+                                marginBottom: "0.5rem",
+                            }}
                         >
-                            Delete Note?
+                            Delete Announcement?
                         </h2>
                         <p
                             style={{
@@ -351,8 +566,8 @@ export default function NotesClient({ initialNotes, currentUserId }: Props) {
                                 marginBottom: "1.5rem",
                             }}
                         >
-                            This action cannot be undone. The note will be removed from all
-                            dispatcher dashboards.
+                            This action cannot be undone. The announcement will
+                            be removed from all dispatcher dashboards.
                         </p>
                         <div className="flex justify-center gap-3">
                             <button

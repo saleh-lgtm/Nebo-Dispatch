@@ -33,14 +33,27 @@ export default async function ShiftReportPage() {
         redirect("/dashboard?error=no-active-shift");
     }
 
-    // Fetch tasks, quotes, and draft in parallel
-    const [tasks, shiftQuotes, serverDraft] = await Promise.all([
+    // Fetch tasks, quotes, draft, and notes metrics in parallel
+    const [tasks, shiftQuotes, serverDraft, notesCreatedCount, announcementsReadCount] = await Promise.all([
         prisma.shiftTask.findMany({
             where: { shiftId: activeShift.id },
             orderBy: { id: "asc" },
         }),
         getShiftQuotes(activeShift.id),
         getShiftReportDraft(activeShift.id).catch(() => null),
+        // Count notes created during this shift
+        prisma.globalNote.count({
+            where: { shiftId: activeShift.id },
+        }),
+        // Count announcements acknowledged during this shift (between clockIn and now)
+        prisma.announcementRead.count({
+            where: {
+                userId: session.user.id,
+                acknowledgedAt: {
+                    gte: activeShift.clockIn,
+                },
+            },
+        }),
     ]);
 
     return (
@@ -50,6 +63,8 @@ export default async function ShiftReportPage() {
             initialTasks={tasks}
             initialQuotes={shiftQuotes}
             initialDraft={serverDraft}
+            notesCreated={notesCreatedCount}
+            announcementsRead={announcementsReadCount}
         />
     );
 }

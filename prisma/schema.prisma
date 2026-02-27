@@ -176,6 +176,9 @@ model User {
   sopVersions           SOPVersion[]
   sopQuizAttempts       SOPQuizAttempt[]
 
+  // Announcement acknowledgment tracking
+  announcementReads     AnnouncementRead[]
+
   // Accounting flag relations
   flagsCreated          AccountingFlag[]  @relation("FlaggedBy")
   flagsReviewed         AccountingFlag[]  @relation("ReviewedBy")
@@ -228,6 +231,7 @@ model Shift {
   quotes     Quote[]
   drafts     ShiftReportDraft[]
   billingReviews BillingReview[]
+  notes      GlobalNote[]  // Shift handoff notes
 
   // Missed confirmation accountability
   missedConfirmations MissedConfirmationAccountability[]
@@ -247,6 +251,10 @@ model ShiftReport {
   callsReceived Int @default(0)
   emailsSent    Int @default(0)
   quotesGiven   Int @default(0)
+
+  // Notes and announcements tracking
+  notesCreated          Int @default(0)  // Count of shift notes created during this shift
+  announcementsRead     Int @default(0)  // Count of announcements acknowledged during shift
 
   // Reservation tracking
   acceptedReservations     Json? // [{id: string, notes: string}]
@@ -503,6 +511,40 @@ model GlobalNote {
   title     String
   content   String   @db.Text
   createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  // Announcement vs Shift Note classification
+  isAnnouncement Boolean  @default(false)  // true = company announcement, false = shift note
+  isPinned       Boolean  @default(false)  // Pinned announcements appear first
+  expiresAt      DateTime?                 // Optional expiration for announcements
+
+  // Shift relation (for shift handoff notes)
+  shiftId        String?
+  shift          Shift?   @relation(fields: [shiftId], references: [id])
+
+  // Announcement acknowledgment tracking
+  reads          AnnouncementRead[]
+
+  @@index([isAnnouncement, isPinned, createdAt])
+  @@index([shiftId])
+  @@index([expiresAt])
+}
+
+// Track announcement acknowledgments (similar to SOPRead pattern)
+model AnnouncementRead {
+  id             String     @id @default(cuid())
+  announcementId String
+  announcement   GlobalNote @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User       @relation(fields: [userId], references: [id])
+
+  readAt         DateTime   @default(now())
+  acknowledged   Boolean    @default(false)
+  acknowledgedAt DateTime?
+
+  @@unique([announcementId, userId])
+  @@index([announcementId])
+  @@index([userId])
 }
 
 model AuditLog {

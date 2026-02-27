@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
-import { getGlobalNotes } from "@/lib/notesActions";
+import { getDashboardNotes } from "@/lib/notesActions";
 import { getPendingQuotes } from "@/lib/quoteActions";
 import { getOnlineUsers, getActiveShiftUsers } from "@/lib/presenceActions";
 import { getUpcomingEvents } from "@/lib/eventActions";
@@ -97,7 +97,7 @@ export default async function DashboardPage() {
     const [
         userCount,
         activeShift,
-        globalNotes,
+        dashboardNotes,
         pendingQuotes,
         onlineUsers,
         activeShiftUsers,
@@ -118,8 +118,8 @@ export default async function DashboardPage() {
                 where: { userId: session.user.id, clockOut: null },
             }),
 
-        // Global notes
-        getGlobalNotes(),
+        // Dashboard notes (announcements + shift notes)
+        getDashboardNotes(session.user.id),
 
         // Pending quotes (for follow-up panel)
         getPendingQuotes(),
@@ -166,7 +166,7 @@ export default async function DashboardPage() {
     return (
         <DashboardClient
             initialStats={stats}
-            globalNotes={globalNotes}
+            dashboardNotes={dashboardNotes}
             pendingQuotes={pendingQuotes as never}
             onlineUsers={onlineUsers}
             activeShiftUsers={activeShiftUsers}

@@ -7,8 +7,6 @@ import {
     Calendar,
     Shield,
     TrendingUp,
-    StickyNote,
-    User,
     Crown,
     ArrowRight,
     PlayCircle,
@@ -22,15 +20,10 @@ import EventsPanel from "@/components/EventsPanel";
 import TasksPanel from "@/components/TasksPanel";
 import AdminTaskProgressPanel from "@/components/AdminTaskProgressPanel";
 import ConfirmationWidget from "@/components/ConfirmationWidget";
+import AnnouncementsCard from "@/components/AnnouncementsCard";
+import ShiftNotesCard from "@/components/ShiftNotesCard";
+import type { DashboardNotesData } from "@/types/note";
 import styles from "./Dashboard.module.css";
-
-interface GlobalNote {
-    id: string;
-    title: string;
-    content: string;
-    createdAt: Date;
-    author: { id: string; name: string | null };
-}
 
 interface Quote {
     id: string;
@@ -178,7 +171,7 @@ interface Props {
         activeShift: { id: string } | null;
         isSuperAdmin: boolean;
     };
-    globalNotes: GlobalNote[];
+    dashboardNotes: DashboardNotesData;
     pendingQuotes: Quote[];
     onlineUsers: OnlineUser[];
     activeShiftUsers: OnlineUser[];
@@ -195,7 +188,7 @@ interface Props {
 
 export default function DashboardClient({
     initialStats,
-    globalNotes,
+    dashboardNotes,
     pendingQuotes,
     onlineUsers,
     activeShiftUsers,
@@ -226,15 +219,6 @@ export default function DashboardClient({
             router.refresh();
         }
         setLoading(false);
-    };
-
-    const formatDate = (date: Date) => {
-        return new Date(date).toLocaleDateString(undefined, {
-            month: "short",
-            day: "numeric",
-            hour: "numeric",
-            minute: "2-digit",
-        });
     };
 
     return (
@@ -413,36 +397,17 @@ export default function DashboardClient({
                     {/* My Tasks - Priority */}
                     {myTasks.length > 0 && <TasksPanel tasks={myTasks} />}
 
-                    {/* Global Notes - Important announcements */}
-                    <div className={styles.notesCard}>
-                        <div className={styles.cardHeader}>
-                            <StickyNote size={18} className={styles.headerIcon} />
-                            <h3 className={styles.cardTitle}>Global Notes</h3>
-                        </div>
-                        <div className={styles.notesList}>
-                            {globalNotes.length > 0 ? (
-                                globalNotes.slice(0, 5).map((note) => (
-                                    <div key={note.id} className={styles.noteItem}>
-                                        <h4 className={styles.noteTitle}>{note.title}</h4>
-                                        <p className={styles.noteContent}>
-                                            {note.content.length > 120
-                                                ? `${note.content.slice(0, 120)}...`
-                                                : note.content}
-                                        </p>
-                                        <div className={styles.noteMeta}>
-                                            <span><User size={10} /> {note.author.name || "Admin"}</span>
-                                            <span>{formatDate(note.createdAt)}</span>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className={styles.emptyState}>
-                                    <StickyNote size={32} />
-                                    <p>No announcements</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                    {/* Company Announcements */}
+                    <AnnouncementsCard
+                        announcements={dashboardNotes.announcements}
+                        unacknowledgedCount={dashboardNotes.unacknowledgedCount}
+                    />
+
+                    {/* Active Shift Notes (Handoffs) */}
+                    <ShiftNotesCard
+                        notes={dashboardNotes.shiftNotes}
+                        hasActiveShift={hasActiveShift}
+                    />
 
                     <QuotesPanel quotes={pendingQuotes} />
                 </div>

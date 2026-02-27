@@ -15,7 +15,9 @@ import {
     PhoneCall,
     AlertTriangle,
     ArrowRight,
+    Trophy,
 } from "lucide-react";
+import EngagementLeaderboard from "@/components/EngagementLeaderboard";
 import Link from "next/link";
 import {
     AreaChart,
@@ -104,7 +106,7 @@ export default function AnalyticsClient({
     initialEndDate,
     confirmationSummary,
 }: Props) {
-    const [activeTab, setActiveTab] = useState<"performance" | "hours">("performance");
+    const [activeTab, setActiveTab] = useState<"performance" | "hours" | "engagement">("performance");
     const [metrics, setMetrics] = useState(initialMetrics);
     const [comparison, setComparison] = useState(initialComparison);
     const [dailyTrend, setDailyTrend] = useState(initialDailyTrend);
@@ -324,6 +326,23 @@ export default function AnalyticsClient({
                     }}
                 >
                     <Clock size={18} /> Hours Tracking
+                </button>
+                <button
+                    onClick={() => setActiveTab("engagement")}
+                    style={{
+                        padding: "0.75rem 1rem",
+                        background: "none",
+                        border: "none",
+                        borderBottom: activeTab === "engagement" ? "2px solid var(--accent)" : "2px solid transparent",
+                        color: activeTab === "engagement" ? "var(--accent)" : "var(--text-secondary)",
+                        fontWeight: activeTab === "engagement" ? 600 : 400,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                    }}
+                >
+                    <Trophy size={18} /> Engagement
                 </button>
             </div>
 
@@ -896,6 +915,11 @@ export default function AnalyticsClient({
                         </div>
                     )}
                 </>
+            )}
+
+            {/* Engagement Tab */}
+            {activeTab === "engagement" && (
+                <EngagementLeaderboard initialDays={7} />
             )}
         </div>
     );
