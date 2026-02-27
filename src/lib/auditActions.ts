@@ -32,6 +32,7 @@ export type AuditEntity =
     | "ShiftReport"
     | "Affiliate"
     | "GlobalNote"
+    | "ShiftNote"
     | "SchedulingRequest"
     | "Shift"
     | "Quote"
