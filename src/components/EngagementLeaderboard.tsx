@@ -24,9 +24,9 @@ import {
 import {
     getEngagementReport,
     getDailyEngagementTrend,
-    ENGAGEMENT_POINTS,
     type DispatcherEngagement,
 } from "@/lib/engagementActions";
+import { ENGAGEMENT_POINTS } from "@/lib/engagementTypes";
 
 interface ChartData {
     date: string;
