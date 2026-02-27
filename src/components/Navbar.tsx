@@ -198,15 +198,28 @@ export default function Navbar() {
                 if (result.hasActiveShift && !result.hasSubmittedReport) {
                     router.push("/reports/shift");
                 }
+                setIsLoggingOut(false);
                 return;
             }
 
-            await signOut();
+            // Clear any session-specific data before logout
+            if (typeof window !== "undefined") {
+                // Clear shift report draft dismissal flags
+                Object.keys(sessionStorage).forEach((key) => {
+                    if (key.includes("shift-report-draft") || key.includes("-dismissed")) {
+                        sessionStorage.removeItem(key);
+                    }
+                });
+            }
+
+            // Properly configure signOut with redirect
+            await signOut({
+                callbackUrl: "/login",
+                redirect: true
+            });
         } catch (error) {
-            console.error("Logout check failed:", error);
-            // On error, allow logout anyway
-            await signOut();
-        } finally {
+            console.error("Logout failed:", error);
+            setLogoutError("Failed to logout. Please try again.");
             setIsLoggingOut(false);
         }
     }, [isLoggingOut, router]);

@@ -189,6 +189,9 @@ export async function saveShiftReport(data: Record<string, unknown> & {
 
     revalidatePath("/dashboard");
     revalidatePath("/reports/shift");
+    revalidatePath("/admin/hours");
+
+    return { success: true, reportId: report.id };
 }
 
 /**

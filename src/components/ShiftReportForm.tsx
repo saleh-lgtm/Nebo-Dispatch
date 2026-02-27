@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, memo, useEffect, useMemo, useCallback } from "react";
-import { Plus, Trash2, ClipboardCheck, Send, AlertCircle, Bookmark, Phone, Mail, FileText, TrendingUp, MessageSquare, Lightbulb, Clock, CheckCircle, Minus, X, DollarSign, User, Flag, PhoneCall, ThumbsUp, ThumbsDown, AlertOctagon, Cloud, CloudOff, Save, RefreshCw } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, Trash2, ClipboardCheck, Send, AlertCircle, Bookmark, Phone, Mail, FileText, TrendingUp, MessageSquare, Lightbulb, Clock, CheckCircle, Minus, X, DollarSign, User, Flag, PhoneCall, ThumbsUp, ThumbsDown, AlertOctagon, Cloud, CloudOff, RefreshCw, StickyNote, Bell } from "lucide-react";
 import { toggleTask, saveShiftReport, saveShiftReportDraft, deleteShiftReportDraft, type ShiftReportDraft } from "@/lib/actions";
 import { createQuote } from "@/lib/quoteActions";
 import { createBillingReviews } from "@/lib/billingReviewActions";
@@ -51,7 +52,8 @@ interface Narrative {
     ideas: string;
 }
 
-export default function ShiftReportPage({ session, activeShift, initialTasks, initialQuotes = [], initialDraft }: any) {
+export default function ShiftReportPage({ session, activeShift, initialTasks, initialQuotes = [], initialDraft, notesCreated = 0, announcementsRead = 0 }: any) {
+    const router = useRouter();
     const [accepted, setAccepted] = useState<ReservationEntry[]>(initialDraft?.accepted || []);
     const [modified, setModified] = useState<ReservationEntry[]>(initialDraft?.modified || []);
     const [cancelled, setCancelled] = useState<ReservationEntry[]>(initialDraft?.cancelled || []);
@@ -100,14 +102,15 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
         }
     }, [activeShift?.id]);
 
-    // Auto-save hook
-    const { state: saveState, restoreDraft, clearDraft } = useAutoSave({
+    // Auto-save hook - silent mode enabled by default (no visual notifications)
+    const { state: saveState, restoreDraft, clearDraft, dismissDraft } = useAutoSave({
         storageKey: `shift-report-draft-${activeShift?.id || "unknown"}`,
         data: formData,
-        debounceMs: 1500,
-        serverSaveIntervalMs: 30000,
+        debounceMs: 3000,
+        serverSaveIntervalMs: 60000,
         onServerSave: handleServerSave,
         enabled: !!activeShift?.id,
+        silentMode: true, // Don't show saving/saved notifications
     });
 
     // Check for draft on mount (only if user hasn't already made a decision)
@@ -135,10 +138,10 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
     }, [restoreDraft]);
 
     const handleDiscardDraft = useCallback(() => {
-        clearDraft();
+        dismissDraft(); // Use dismissDraft to mark as dismissed for this session
         setDraftDecisionMade(true);
         setShowDraftRecovery(false);
-    }, [clearDraft]);
+    }, [dismissDraft]);
 
     const addReservation = (setter: any) => {
         setter((prev: any) => [...prev, { id: "", notes: "" }]);
@@ -246,7 +249,11 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
                 clockOut: true
             };
 
-            await saveShiftReport(data);
+            const result = await saveShiftReport(data);
+
+            if (!result?.success) {
+                throw new Error("Failed to save shift report");
+            }
 
             // Save billing reviews if any
             if (billingReviews.length > 0) {
@@ -275,7 +282,8 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
                 // Ignore draft deletion errors
             }
 
-            window.location.href = "/dashboard";
+            // Use Next.js router for proper navigation
+            router.push("/dashboard?submitted=true");
         } catch (error) {
             console.error("Failed to save shift report:", error);
             setIsSubmitting(false);
@@ -330,30 +338,18 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
                     </div>
                 </div>
                 <div className="header-actions">
-                    {/* Save Status Indicator */}
-                    <div className={`save-status ${saveState.status}`}>
-                        {saveState.status === "saving" && (
-                            <>
-                                <Cloud size={16} className="pulse" />
-                                <span>Saving...</span>
-                            </>
-                        )}
-                        {saveState.status === "saved" && (
-                            <>
-                                <Cloud size={16} />
-                                <span>Saved {formatLastSaved(saveState.lastSaved)}</span>
-                            </>
-                        )}
+                    {/* Save Status Indicator - Only shows errors or last saved time on hover */}
+                    <div className={`save-status ${saveState.status}`} title={saveState.lastSaved ? `Last saved: ${formatLastSaved(saveState.lastSaved)}` : undefined}>
                         {saveState.status === "error" && (
                             <>
                                 <CloudOff size={16} />
                                 <span>Save failed</span>
                             </>
                         )}
-                        {saveState.status === "idle" && saveState.hasUnsavedChanges && (
+                        {saveState.status !== "error" && saveState.lastSaved && (
                             <>
-                                <Save size={16} />
-                                <span>Unsaved changes</span>
+                                <Cloud size={16} />
+                                <span className="save-status-subtle">Auto-saved</span>
                             </>
                         )}
                     </div>
@@ -398,6 +394,37 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
                                 color="purple"
                             />
                         </div>
+                    </section>
+
+                    {/* Notes & Announcements - Read-only metrics */}
+                    <section className="report-card">
+                        <div className="card-header">
+                            <div className="card-icon card-icon-amber">
+                                <StickyNote size={18} />
+                            </div>
+                            <h2 className="card-title">Notes & Announcements</h2>
+                        </div>
+                        <div className="metrics-row">
+                            <div className="readonly-metric">
+                                <div className="readonly-metric-icon" style={{ background: "var(--primary-soft)", color: "var(--primary)" }}>
+                                    <StickyNote size={20} />
+                                </div>
+                                <div className="readonly-metric-info">
+                                    <span className="readonly-metric-value">{notesCreated}</span>
+                                    <span className="readonly-metric-label">Notes Created</span>
+                                </div>
+                            </div>
+                            <div className="readonly-metric">
+                                <div className="readonly-metric-icon" style={{ background: "var(--warning-bg)", color: "var(--warning)" }}>
+                                    <Bell size={20} />
+                                </div>
+                                <div className="readonly-metric-info">
+                                    <span className="readonly-metric-value">{announcementsRead}</span>
+                                    <span className="readonly-metric-label">Announcements Acknowledged</span>
+                                </div>
+                            </div>
+                        </div>
+                        <p className="metrics-hint">These counts are tracked automatically when you create shift notes or acknowledge announcements on the dashboard.</p>
                     </section>
 
                     {/* Quotes */}
@@ -909,6 +936,20 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
                     animation: pulse 1.5s ease-in-out infinite;
                 }
 
+                /* Subtle auto-saved indicator */
+                .save-status-subtle {
+                    opacity: 0.7;
+                    font-size: 0.75rem;
+                }
+
+                .save-status.idle {
+                    opacity: 0.6;
+                }
+
+                .save-status.idle:hover {
+                    opacity: 1;
+                }
+
                 @keyframes pulse {
                     0%, 100% { opacity: 1; }
                     50% { opacity: 0.5; }
@@ -1119,6 +1160,52 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
                     display: grid;
                     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
                     gap: 1rem;
+                }
+
+                .readonly-metric {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.875rem;
+                    padding: 1rem;
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-md);
+                }
+
+                .readonly-metric-icon {
+                    width: 44px;
+                    height: 44px;
+                    border-radius: var(--radius-md);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    flex-shrink: 0;
+                }
+
+                .readonly-metric-info {
+                    display: flex;
+                    flex-direction: column;
+                }
+
+                .readonly-metric-value {
+                    font-size: 1.375rem;
+                    font-weight: 700;
+                    color: var(--text-primary);
+                    line-height: 1.2;
+                }
+
+                .readonly-metric-label {
+                    font-size: 0.75rem;
+                    color: var(--text-muted);
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                }
+
+                .metrics-hint {
+                    margin-top: 0.75rem;
+                    font-size: 0.75rem;
+                    color: var(--text-muted);
+                    font-style: italic;
                 }
 
                 .reservations-grid {
