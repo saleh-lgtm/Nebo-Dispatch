@@ -1,0 +1,966 @@
+/* ============================================
+   DISPATCH COMMAND CENTER - Scheduler Redesign
+   ============================================ */
+
+/* Google Fonts import */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+/* CSS Variables */
+:root {
+    --cmd-bg-deep: #05070a;
+    --cmd-bg-primary: #0a0d12;
+    --cmd-bg-secondary: #0f1318;
+    --cmd-bg-elevated: #141a22;
+    --cmd-bg-hover: #1a222d;
+
+    --cmd-border: rgba(0, 240, 255, 0.08);
+    --cmd-border-bright: rgba(0, 240, 255, 0.2);
+    --cmd-border-glow: rgba(0, 240, 255, 0.4);
+
+    --cmd-cyan: #00f0ff;
+    --cmd-cyan-dim: #00a8b3;
+    --cmd-cyan-glow: rgba(0, 240, 255, 0.15);
+    --cmd-amber: #f59e0b;
+    --cmd-amber-dim: #b97a08;
+    --cmd-green: #10b981;
+    --cmd-red: #ef4444;
+    --cmd-purple: #a855f7;
+
+    --cmd-text-primary: #e8edf5;
+    --cmd-text-secondary: #6b7a8f;
+    --cmd-text-dim: #3d4654;
+
+    --cmd-font-mono: 'JetBrains Mono', monospace;
+    --cmd-font-display: 'Outfit', sans-serif;
+
+    --cmd-radius-sm: 4px;
+    --cmd-radius-md: 8px;
+    --cmd-radius-lg: 12px;
+}
+
+/* Base Container */
+.cmd-scheduler {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 60px);
+    background: var(--cmd-bg-deep);
+    font-family: var(--cmd-font-display);
+    color: var(--cmd-text-primary);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Animated background grid */
+.cmd-scheduler::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(var(--cmd-border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--cmd-border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* Scan line effect */
+.cmd-scheduler::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.03) 2px,
+        rgba(0, 0, 0, 0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 100;
+}
+
+/* ============================================
+   HEADER / COMMAND BAR
+   ============================================ */
+.cmd-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(180deg, var(--cmd-bg-secondary) 0%, var(--cmd-bg-primary) 100%);
+    border-bottom: 1px solid var(--cmd-border-bright);
+    position: relative;
+    z-index: 50;
+    flex-shrink: 0;
+}
+
+/* Glow line under header */
+.cmd-header::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--cmd-cyan), transparent);
+    opacity: 0.5;
+}
+
+.cmd-header__brand {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.cmd-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.cmd-logo__icon {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, var(--cmd-cyan) 0%, var(--cmd-cyan-dim) 100%);
+    border-radius: var(--cmd-radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 20px var(--cmd-cyan-glow);
+}
+
+.cmd-logo__icon svg {
+    width: 18px;
+    height: 18px;
+    color: var(--cmd-bg-deep);
+}
+
+.cmd-logo__text {
+    font-family: var(--cmd-font-display);
+    font-weight: 700;
+    font-size: 1.1rem;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, var(--cmd-text-primary) 0%, var(--cmd-cyan) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.cmd-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.75rem;
+    background: var(--cmd-bg-elevated);
+    border: 1px solid var(--cmd-border);
+    border-radius: 50px;
+    font-family: var(--cmd-font-mono);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--cmd-text-secondary);
+}
+
+.cmd-status--live {
+    color: var(--cmd-green);
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+.cmd-status__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+/* Week Navigation */
+.cmd-header__nav {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.cmd-nav-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--cmd-bg-elevated);
+    border: 1px solid var(--cmd-border);
+    border-radius: var(--cmd-radius-sm);
+    color: var(--cmd-text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.cmd-nav-btn:hover {
+    background: var(--cmd-bg-hover);
+    border-color: var(--cmd-cyan);
+    color: var(--cmd-cyan);
+    box-shadow: 0 0 12px var(--cmd-cyan-glow);
+}
+
+.cmd-week-display {
+    min-width: 220px;
+    text-align: center;
+    padding: 0.5rem 1.25rem;
+    background: var(--cmd-bg-primary);
+    border: 1px solid var(--cmd-border);
+    border-radius: var(--cmd-radius-md);
+}
+
+.cmd-week-display__label {
+    display: block;
+    font-family: var(--cmd-font-mono);
+    font-size: 0.55rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--cmd-text-dim);
+    margin-bottom: 2px;
+}
+
+.cmd-week-display__range {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--cmd-text-primary);
+}
+
+.cmd-today-btn {
+    padding: 0.5rem 1rem;
+    background: transparent;
+    border: 1px solid var(--cmd-border);
+    border-radius: var(--cmd-radius-sm);
+    color: var(--cmd-cyan);
+    font-family: var(--cmd-font-mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.cmd-today-btn:hover {
+    background: var(--cmd-cyan-glow);
+    border-color: var(--cmd-cyan);
+}
+
+/* Header Actions */
+.cmd-header__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.cmd-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: var(--cmd-radius-sm);
+    font-family: var(--cmd-font-mono);
+    font-size: 0.7rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+}
+
+.cmd-btn--ghost {
+    background: transparent;
+    border-color: var(--cmd-border);
+    color: var(--cmd-text-secondary);
+}
+
+.cmd-btn--ghost:hover {
+    background: var(--cmd-bg-hover);
+    border-color: var(--cmd-border-bright);
+    color: var(--cmd-text-primary);
+}
+
+.cmd-btn--primary {
+    background: linear-gradient(135deg, var(--cmd-cyan) 0%, var(--cmd-cyan-dim) 100%);
+    color: var(--cmd-bg-deep);
+    font-weight: 600;
+    box-shadow: 0 0 20px var(--cmd-cyan-glow);
+}
+
+.cmd-btn--primary:hover {
+    box-shadow: 0 0 30px var(--cmd-cyan-glow), 0 4px 12px rgba(0, 240, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.cmd-btn--warning {
+    background: transparent;
+    border-color: var(--cmd-amber);
+    color: var(--cmd-amber);
+}
+
+.cmd-btn--warning:hover {
+    background: rgba(245, 158, 11, 0.1);
+}
+
+/* ============================================
+   MAIN LAYOUT
+   ============================================ */
+.cmd-main {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    z-index: 10;
+}
+
+/* ============================================
+   SIDEBAR - DISPATCH PANEL
+   ============================================ */
+.cmd-sidebar {
+    width: 280px;
+    min-width: 280px;
+    background: var(--cmd-bg-secondary);
+    border-right: 1px solid var(--cmd-border-bright);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.cmd-sidebar__header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--cmd-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.cmd-sidebar__title {
+    font-family: var(--cmd-font-mono);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--cmd-cyan);
+}
+
+.cmd-sidebar__count {
+    font-family: var(--cmd-font-mono);
+    font-size: 0.7rem;
+    color: var(--cmd-text-dim);
+}
+
+/* Dispatcher Cards */
+.cmd-dispatchers {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.75rem;
+}
+
+.cmd-dispatcher {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background: var(--cmd-bg-primary);
+    border: 1px solid var(--cmd-border);
+    border-radius: var(--cmd-radius-md);
+    cursor: grab;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+}
+
+.cmd-dispatcher::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--dispatcher-color, var(--cmd-cyan));
+}
+
+.cmd-dispatcher:hover {
+    background: var(--cmd-bg-elevated);
+    border-color: var(--cmd-border-bright);
+    transform: translateX(4px);
+}
+
+.cmd-dispatcher:active {
+    cursor: grabbing;
+}
+
+.cmd-dispatcher__avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: var(--cmd-radius-sm);
+    background: var(--dispatcher-color, var(--cmd-cyan));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: var(--cmd-bg-deep);
+    flex-shrink: 0;
+    box-shadow: 0 0 12px color-mix(in srgb, var(--dispatcher-color, var(--cmd-cyan)) 30%, transparent);
+}
+
+.cmd-dispatcher__info {
+    flex: 1;
+    min-width: 0;
+}
+
+.cmd-dispatcher__name {
+    font-weight: 600;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+}
+
+.cmd-dispatcher__meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--cmd-font-mono);
+    font-size: 0.65rem;
+    color: var(--cmd-text-secondary);
+}
+
+.cmd-dispatcher__hours {
+    color: var(--cmd-cyan);
+}
+
+.cmd-dispatcher__grip {
+    color: var(--cmd-text-dim);
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.cmd-dispatcher:hover .cmd-dispatcher__grip {
+    opacity: 1;
+}
+
+/* Sidebar Sections */
+.cmd-sidebar__section {
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--cmd-border);
+}
+
+.cmd-section-title {
+    font-family: var(--cmd-font-mono);
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--cmd-text-dim);
+    margin-bottom: 0.75rem;
+}
+
+/* Duration Control */
+.cmd-duration {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--cmd-bg-primary);
+    border: 1px solid var(--cmd-border);
+    border-radius: var(--cmd-radius-md);
+    padding: 0.5rem;
+}
+
+.cmd-duration__btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--cmd-bg-elevated);
+    border: 1px solid var(--cmd-border);
+    border-radius: var(--cmd-radius-sm);
+    color: var(--cmd-text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.cmd-duration__btn:hover {
+    background: var(--cmd-cyan-glow);
+    border-color: var(--cmd-cyan);
+    color: var(--cmd-cyan);
+}
+
+.cmd-duration__value {
+    font-family: var(--cmd-font-mono);
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--cmd-cyan);
+    text-shadow: 0 0 20px var(--cmd-cyan-glow);
+}
+
+.cmd-duration__unit {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: var(--cmd-text-secondary);
+    margin-left: 2px;
+}
+
+/* Coverage Gauge */
+.cmd-coverage {
+    text-align: center;
+}
+
+.cmd-gauge {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 1rem;
+}
+
+.cmd-gauge__ring {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.cmd-gauge__bg {
+    fill: none;
+    stroke: var(--cmd-bg-elevated);
+    stroke-width: 8;
+}
+
+.cmd-gauge__fill {
+    fill: none;
+    stroke: var(--cmd-cyan);
+    stroke-width: 8;
+    stroke-linecap: round;
+    stroke-dasharray: 314;
+    stroke-dashoffset: calc(314 - (314 * var(--coverage, 0) / 100));
+    transition: stroke-dashoffset 0.6s ease;
+    filter: drop-shadow(0 0 6px var(--cmd-cyan));
+}
+
+.cmd-gauge__center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.cmd-gauge__value {
+    font-family: var(--cmd-font-mono);
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--cmd-text-primary);
+    line-height: 1;
+}
+
+.cmd-gauge__label {
+    font-family: var(--cmd-font-mono);
+    font-size: 0.55rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--cmd-text-dim);
+    margin-top: 4px;
+}
+
+.cmd-coverage-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.cmd-stat {
+    background: var(--cmd-bg-primary);
+    border: 1px solid var(--cmd-border);
+    border-radius: var(--cmd-radius-sm);
+    padding: 0.5rem;
+    text-align: center;
+}
+
+.cmd-stat__value {
+    font-family: var(--cmd-font-mono);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--cmd-text-primary);
+}
+
+.cmd-stat__label {
+    font-size: 0.55rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--cmd-text-dim);
+    margin-top: 2px;
+}
+
+.cmd-stat--success .cmd-stat__value {
+    color: var(--cmd-green);
+}
+
+.cmd-stat--warning .cmd-stat__value {
+    color: var(--cmd-amber);
+}
+
+/* ============================================
+   GRID AREA
+   ============================================ */
+.cmd-grid-container {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 1rem;
+}
+
+.cmd-grid-wrapper {
+    flex: 1;
+    position: relative;
+    overflow: auto;
+    background: var(--cmd-bg-primary);
+    border: 1px solid var(--cmd-border-bright);
+    border-radius: var(--cmd-radius-lg);
+    box-shadow:
+        0 4px 24px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+/* Grid Structure */
+.cmd-grid {
+    display: grid;
+    grid-template-columns: 64px repeat(7, 1fr);
+    grid-template-rows: 48px repeat(24, 28px);
+    min-width: 900px;
+    position: relative;
+}
+
+/* Corner Cell */
+.cmd-grid__corner {
+    position: sticky;
+    top: 0;
+    left: 0;
+    z-index: 30;
+    background: var(--cmd-bg-secondary);
+    border-bottom: 1px solid var(--cmd-border-bright);
+    border-right: 1px solid var(--cmd-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cmd-grid__corner-icon {
+    color: var(--cmd-cyan);
+    opacity: 0.5;
+}
+
+/* Day Headers */
+.cmd-day-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: linear-gradient(180deg, var(--cmd-bg-secondary) 0%, var(--cmd-bg-primary) 100%);
+    border-bottom: 1px solid var(--cmd-border-bright);
+    border-right: 1px solid var(--cmd-border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    transition: all 0.2s;
+}
+
+.cmd-day-header--today {
+    background: linear-gradient(180deg, rgba(0, 240, 255, 0.1) 0%, rgba(0, 240, 255, 0.02) 100%);
+}
+
+.cmd-day-header--today::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 10%;
+    right: 10%;
+    height: 2px;
+    background: var(--cmd-cyan);
+    box-shadow: 0 0 10px var(--cmd-cyan);
+}
+
+.cmd-day-header__name {
+    font-family: var(--cmd-font-mono);
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--cmd-text-dim);
+}
+
+.cmd-day-header__date {
+    font-weight: 700;
+    font-size: 1.25rem;
+    color: var(--cmd-text-primary);
+    line-height: 1.2;
+}
+
+.cmd-day-header--today .cmd-day-header__date {
+    color: var(--cmd-cyan);
+    text-shadow: 0 0 12px var(--cmd-cyan-glow);
+}
+
+/* Time Labels */
+.cmd-time-label {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background: var(--cmd-bg-secondary);
+    border-right: 1px solid var(--cmd-border);
+    border-bottom: 1px solid rgba(0, 240, 255, 0.03);
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    padding: 2px 8px 0 0;
+    font-family: var(--cmd-font-mono);
+    font-size: 0.6rem;
+    color: var(--cmd-text-dim);
+}
+
+.cmd-time-label--shift-start {
+    color: var(--cmd-cyan);
+    font-weight: 600;
+    background: linear-gradient(90deg, rgba(0, 240, 255, 0.08) 0%, var(--cmd-bg-secondary) 100%);
+}
+
+/* Grid Cells */
+.cmd-cell {
+    border-right: 1px solid rgba(0, 240, 255, 0.03);
+    border-bottom: 1px solid rgba(0, 240, 255, 0.03);
+    position: relative;
+    transition: background 0.15s;
+}
+
+.cmd-cell:hover {
+    background: rgba(0, 240, 255, 0.03);
+}
+
+.cmd-cell--highlight {
+    background: rgba(0, 240, 255, 0.08) !important;
+    box-shadow: inset 0 0 0 1px var(--cmd-cyan);
+}
+
+.cmd-cell--shift-boundary {
+    border-top: 1px solid rgba(0, 240, 255, 0.12);
+}
+
+/* Hour markers every 6 hours */
+.cmd-cell:nth-child(6n+2) {
+    border-bottom: 1px solid rgba(0, 240, 255, 0.06);
+}
+
+/* ============================================
+   SHIFT BLOCKS
+   ============================================ */
+.cmd-shifts-overlay {
+    position: absolute;
+    top: 0;
+    left: 64px;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+}
+
+.cmd-shift {
+    position: absolute;
+    border-radius: var(--cmd-radius-sm);
+    padding: 4px 8px;
+    cursor: grab;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+    transition: all 0.2s;
+
+    /* Glowing block effect */
+    background: linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--shift-color) 90%, white) 0%,
+        var(--shift-color) 50%,
+        color-mix(in srgb, var(--shift-color) 85%, black) 100%
+    );
+    border: 1px solid color-mix(in srgb, var(--shift-color) 60%, white);
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.3),
+        0 0 20px color-mix(in srgb, var(--shift-color) 25%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--shift-color) 40%, white);
+}
+
+.cmd-shift:hover {
+    transform: scale(1.02) translateY(-1px);
+    z-index: 10;
+    box-shadow:
+        0 4px 16px rgba(0, 0, 0, 0.4),
+        0 0 30px color-mix(in srgb, var(--shift-color) 40%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--shift-color) 50%, white);
+}
+
+.cmd-shift:active {
+    cursor: grabbing;
+}
+
+.cmd-shift__name {
+    font-weight: 600;
+    font-size: 0.72rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.cmd-shift__time {
+    font-family: var(--cmd-font-mono);
+    font-size: 0.55rem;
+    opacity: 0.85;
+    white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.cmd-shift__delete {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: all 0.2s;
+}
+
+.cmd-shift:hover .cmd-shift__delete {
+    opacity: 1;
+}
+
+.cmd-shift__delete:hover {
+    background: var(--cmd-red);
+}
+
+/* Cross-midnight styling */
+.cmd-shift--cross-midnight {
+    border-right: 2px dashed rgba(255, 255, 255, 0.5);
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.cmd-shift--continuation {
+    border-left: 2px dashed rgba(255, 255, 255, 0.5);
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    opacity: 0.85;
+}
+
+/* Overlapping shifts */
+.cmd-shift--overlap {
+    border-left: 2px solid rgba(255, 255, 255, 0.4);
+    border-right: 2px solid rgba(255, 255, 255, 0.4);
+}
+
+/* ============================================
+   GHOST BLOCK (Drag Preview)
+   ============================================ */
+.cmd-ghost {
+    position: fixed;
+    z-index: 1000;
+    padding: 8px 14px;
+    border-radius: var(--cmd-radius-md);
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: linear-gradient(135deg, var(--ghost-color) 0%, color-mix(in srgb, var(--ghost-color) 80%, black) 100%);
+    border: 1px solid color-mix(in srgb, var(--ghost-color) 60%, white);
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.5),
+        0 0 40px color-mix(in srgb, var(--ghost-color) 40%, transparent);
+    opacity: 0.95;
+}
+
+.cmd-ghost__name {
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.cmd-ghost__time {
+    font-family: var(--cmd-font-mono);
+    font-size: 0.7rem;
+    opacity: 0.85;
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+@keyframes fade-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in {
+    from { opacity: 0; transform: translateX(-12px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes glow-pulse {
+    0%, 100% { box-shadow: 0 0 20px var(--cmd-cyan-glow); }
+    50% { box-shadow: 0 0 30px var(--cmd-cyan-glow), 0 0 40px var(--cmd-cyan-glow); }
+}
+
+.cmd-scheduler {
+    animation: fade-in 0.4s ease;
+}
+
+.cmd-dispatcher {
+    animation: slide-in 0.3s ease backwards;
+}
+
+.cmd-dispatcher:nth-child(1) { animation-delay: 0.05s; }
+.cmd-dispatcher:nth-child(2) { animation-delay: 0.1s; }
+.cmd-dispatcher:nth-child(3) { animation-delay: 0.15s; }
+.cmd-dispatcher:nth-child(4) { animation-delay: 0.2s; }
+.cmd-dispatcher:nth-child(5) { animation-delay: 0.25s; }
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 1024px) {
+    .cmd-sidebar {
+        width: 240px;
+        min-width: 240px;
+    }
+}
+
+@media (max-width: 768px) {
+    .cmd-sidebar {
+        display: none;
+    }
+
+    .cmd-header {
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        padding: 1rem;
+    }
+
+    .cmd-header__nav {
+        order: 3;
+        width: 100%;
+        justify-content: center;
+    }
+}

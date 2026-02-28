@@ -4,17 +4,39 @@ import { redirect } from "next/navigation";
 import { getDispatchers, getWeekSchedules } from "@/lib/schedulerActions";
 import dynamic from "next/dynamic";
 
-const NewSchedulerClient = dynamic(() => import("./NewSchedulerClient"), {
+const CommandSchedulerClient = dynamic(() => import("./CommandSchedulerClient"), {
     loading: () => <SchedulerLoading />,
 });
 
 function SchedulerLoading() {
     return (
-        <div className="page-container">
-            <div className="page-header">
-                <h1 className="page-title">Dispatcher Scheduler</h1>
-            </div>
-            <div className="skeleton-card" style={{ height: "500px" }} />
+        <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            height: 'calc(100vh - 60px)',
+            background: '#05070a',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '1rem',
+        }}>
+            <div style={{
+                width: '48px',
+                height: '48px',
+                border: '3px solid rgba(0, 240, 255, 0.1)',
+                borderTopColor: '#00f0ff',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+            }} />
+            <span style={{
+                fontFamily: 'monospace',
+                fontSize: '0.75rem',
+                color: '#6b7a8f',
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em',
+            }}>
+                Loading Command Center...
+            </span>
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
     );
 }
@@ -44,7 +66,7 @@ export default async function SchedulerPage() {
     const schedules = await getWeekSchedules(currentWeekStart);
 
     return (
-        <NewSchedulerClient
+        <CommandSchedulerClient
             dispatchers={dispatchers}
             initialSchedules={schedules}
             initialWeekStart={currentWeekStart.toISOString()}

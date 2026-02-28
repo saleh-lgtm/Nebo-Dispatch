@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireAdmin, requireAuth } from "./auth-helpers";
 import { createAuditLog } from "./auditActions";
+import { notifySchedulePublished } from "./notificationActions";
 
 // Helper to get start of week (Sunday 00:00:00 UTC) - internal use only
 function getWeekStartInternal(date: Date): Date {
@@ -148,6 +149,9 @@ export async function publishWeekSchedules(weekStart: Date) {
         undefined,
         { action: "publish_week", weekStart: weekStart.toISOString() }
     );
+
+    // Notify all dispatchers with shifts this week
+    await notifySchedulePublished(weekStart);
 
     revalidatePath("/admin/scheduler");
     revalidatePath("/schedule");

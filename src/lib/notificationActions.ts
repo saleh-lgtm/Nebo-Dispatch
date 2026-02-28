@@ -310,26 +310,68 @@ export async function notifyTaskAssignedToAll(
 
 // Schedule Notifications
 export async function notifySchedulePublished(weekStart: Date) {
+    // Calculate week end
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+
     // Get all users who have schedules for this week
     const schedules = await prisma.schedule.findMany({
-        where: { weekStart },
+        where: {
+            shiftStart: {
+                gte: weekStart,
+                lt: weekEnd,
+            },
+            isPublished: true,
+        },
         select: { userId: true },
         distinct: ["userId"],
     });
 
     const userIds = schedules.map((s) => s.userId);
 
+    if (userIds.length === 0) {
+        return { count: 0 };
+    }
+
     const formattedDate = weekStart.toLocaleDateString(undefined, {
         month: "short",
         day: "numeric",
     });
 
-    return createNotificationsForUsers(userIds, {
-        type: "SCHEDULE_PUBLISHED",
-        title: "Schedule Published",
-        message: `The schedule for week of ${formattedDate} has been published.`,
-        actionUrl: "/scheduler",
+    // Get shift counts per user for personalized message
+    const shiftCounts = await prisma.schedule.groupBy({
+        by: ["userId"],
+        where: {
+            shiftStart: {
+                gte: weekStart,
+                lt: weekEnd,
+            },
+            isPublished: true,
+        },
+        _count: { id: true },
     });
+
+    const countMap = new Map(shiftCounts.map((s) => [s.userId, s._count.id]));
+
+    // Create personalized notifications for each user
+    const notifications = userIds.map((userId) => {
+        const shiftCount = countMap.get(userId) || 0;
+        const shiftText = shiftCount === 1 ? "1 shift" : `${shiftCount} shifts`;
+        return {
+            userId,
+            type: "SCHEDULE_PUBLISHED" as const,
+            title: "New Schedule Published",
+            message: `Your schedule for the week of ${formattedDate} is ready. You have ${shiftText} scheduled.`,
+            actionUrl: "/schedule",
+        };
+    });
+
+    // Create all notifications
+    await prisma.notification.createMany({
+        data: notifications,
+    });
+
+    return { count: userIds.length };
 }
 
 // SOP Notifications
