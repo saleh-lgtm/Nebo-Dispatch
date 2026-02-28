@@ -362,11 +362,57 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
         e.dataTransfer.effectAllowed = "move";
     };
 
+    // Calculate cell from mouse position (for drops on shifts overlay)
+    const getCellFromPosition = (e: React.DragEvent): { day: number; hour: number } | null => {
+        if (!gridRef.current) return null;
+
+        const rect = gridRef.current.getBoundingClientRect();
+        const scrollLeft = gridRef.current.scrollLeft;
+        const scrollTop = gridRef.current.scrollTop;
+
+        // Account for time column (64px) and header (48px)
+        const x = e.clientX - rect.left + scrollLeft - 64;
+        const y = e.clientY - rect.top + scrollTop - 48;
+
+        if (x < 0 || y < 0) return null;
+
+        const cellWidth = (gridRef.current.scrollWidth - 64) / 7;
+        const cellHeight = 28;
+
+        const day = Math.floor(x / cellWidth);
+        const rowIndex = Math.floor(y / cellHeight);
+
+        if (day < 0 || day >= 7 || rowIndex < 0 || rowIndex >= 24) return null;
+
+        const hour = GRID_HOURS[rowIndex];
+        return { day, hour };
+    };
+
     const handleCellDragOver = (day: number, hour: number, e: React.DragEvent) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = dragState?.type === "new" ? "copy" : "move";
         setHighlightCell({ day, hour });
         setGhostPosition({ x: e.clientX, y: e.clientY });
+    };
+
+    // Handle drag over shifts overlay (for drops on existing shifts)
+    const handleOverlayDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = dragState?.type === "new" ? "copy" : "move";
+        const cell = getCellFromPosition(e);
+        if (cell) {
+            setHighlightCell(cell);
+        }
+        setGhostPosition({ x: e.clientX, y: e.clientY });
+    };
+
+    // Handle drop on shifts overlay
+    const handleOverlayDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        const cell = getCellFromPosition(e);
+        if (cell) {
+            await handleCellDrop(cell.day, cell.hour);
+        }
     };
 
     const handleCellDrop = async (day: number, hour: number) => {
@@ -667,8 +713,12 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                             ))}
                         </div>
 
-                        {/* Shift blocks overlay */}
-                        <div className="cmd-shifts-overlay">
+                        {/* Shift blocks overlay - handles drops on existing shifts */}
+                        <div
+                            className="cmd-shifts-overlay"
+                            onDragOver={handleOverlayDragOver}
+                            onDrop={handleOverlayDrop}
+                        >
                             {shifts.map((shift) => {
                                 const rowIndex = HOUR_TO_ROW[shift.startHour];
                                 const top = rowIndex * 28 + 48; // 28px row height + 48px header

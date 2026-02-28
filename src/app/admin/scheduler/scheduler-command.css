@@ -768,7 +768,8 @@
     left: 64px;
     right: 0;
     bottom: 0;
-    pointer-events: none;
+    /* Allow drag events so we can drop dispatchers on top of existing shifts */
+    pointer-events: auto;
 }
 
 .cmd-shift {
