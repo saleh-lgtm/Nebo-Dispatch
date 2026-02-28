@@ -663,17 +663,21 @@ function isDaylightSavingTime(date: Date): boolean {
  */
 export async function parseManifestEmail(emailBody: string): Promise<Array<{
     tripNumber: string;
+    reservationNumber?: string;
     pickupAt: Date;
     passengerName: string;
     driverName: string;
     accountName?: string;
+    accountNumber?: string;
 }>> {
     const trips: Array<{
         tripNumber: string;
+        reservationNumber?: string;
         pickupAt: Date;
         passengerName: string;
         driverName: string;
         accountName?: string;
+        accountNumber?: string;
     }> = [];
 
     // Convert HTML to plain text if needed
@@ -759,12 +763,28 @@ export async function parseManifestEmail(emailBody: string): Promise<Array<{
             accountName = accountMatch[1].trim();
         }
 
+        // Extract account number - look for "Account #" or "Acct #" or "Account Number"
+        let accountNumber: string | undefined;
+        const accountNumMatch = section.match(/(?:Account\s*#|Acct\s*#|Account\s+Number)[:\s]*(\d+)/i);
+        if (accountNumMatch) {
+            accountNumber = accountNumMatch[1].trim();
+        }
+
+        // Extract reservation number - look for "Res #" or "Reservation #" or "Confirmation #"
+        let reservationNumber: string | undefined;
+        const resNumMatch = section.match(/(?:Res(?:ervation)?\s*#|Confirmation\s*#|Booking\s*#)[:\s]*([A-Za-z0-9-]+)/i);
+        if (resNumMatch) {
+            reservationNumber = resNumMatch[1].trim();
+        }
+
         trips.push({
             tripNumber,
+            reservationNumber,
             pickupAt,
             passengerName,
             driverName,
             accountName,
+            accountNumber,
         });
     }
 
@@ -778,10 +798,12 @@ export async function parseManifestEmail(emailBody: string): Promise<Array<{
 export async function ingestManifestTrips(
     trips: Array<{
         tripNumber: string;
+        reservationNumber?: string;
         pickupAt: Date;
         passengerName: string;
         driverName: string;
         accountName?: string;
+        accountNumber?: string;
     }>,
     sourceEmail?: string,
     fromEmail?: string,
@@ -821,11 +843,13 @@ export async function ingestManifestTrips(
             await prisma.tripConfirmation.create({
                 data: {
                     tripNumber: trip.tripNumber,
+                    reservationNumber: trip.reservationNumber,
                     pickupAt: trip.pickupAt,
                     dueAt,
                     passengerName: trip.passengerName,
                     driverName: trip.driverName,
                     accountName: trip.accountName,
+                    accountNumber: trip.accountNumber,
                     manifestDate: today,
                     sourceEmail: sourceEmail,
                 },
