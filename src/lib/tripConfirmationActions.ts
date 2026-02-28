@@ -973,12 +973,26 @@ export async function getAllConfirmations(options?: {
         ];
     }
 
-    const [confirmations, total] = await Promise.all([
+    const now = new Date();
+
+    // Fetch upcoming confirmations (pickupAt >= now) sorted by pickupAt ASC (soonest first)
+    const upcomingWhere = { ...where, pickupAt: { ...(where.pickupAt as Record<string, Date> || {}), gte: now } };
+    // Fetch past confirmations (pickupAt < now) sorted by pickupAt DESC (most recent first)
+    const pastWhere = { ...where, pickupAt: { ...(where.pickupAt as Record<string, Date> || {}), lt: now } };
+
+    const [upcomingConfirmations, pastConfirmations, total] = await Promise.all([
         prisma.tripConfirmation.findMany({
-            where,
-            orderBy: { pickupAt: "desc" },
-            take: limit,
-            skip: offset,
+            where: upcomingWhere,
+            orderBy: { pickupAt: "asc" }, // Upcoming: soonest first
+            include: {
+                completedBy: {
+                    select: { id: true, name: true },
+                },
+            },
+        }),
+        prisma.tripConfirmation.findMany({
+            where: pastWhere,
+            orderBy: { pickupAt: "desc" }, // Past: most recent first
             include: {
                 completedBy: {
                     select: { id: true, name: true },
@@ -988,10 +1002,19 @@ export async function getAllConfirmations(options?: {
         prisma.tripConfirmation.count({ where }),
     ]);
 
+    // Combine: upcoming first, then past
+    const allConfirmations = [...upcomingConfirmations, ...pastConfirmations];
+
+    // Apply pagination to the combined result
+    const confirmations = allConfirmations.slice(offset, offset + limit);
+
     return {
         confirmations,
         total,
         hasMore: offset + confirmations.length < total,
+        // Include counts for UI to show upcoming vs past sections
+        upcomingCount: upcomingConfirmations.length,
+        pastCount: pastConfirmations.length,
     };
 }
 

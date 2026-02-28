@@ -243,8 +243,10 @@ export default function ConfirmationsClient({
         .slice(0, 3);
 
     // Filter and sort confirmations locally for immediate UI response
+    // Default sort: Upcoming trips first (by pickupAt ASC), then past trips (by pickupAt DESC)
     const filteredAndSortedConfirmations = useMemo(() => {
         let filtered = [...confirmations];
+        const currentTime = Date.now();
 
         // Apply search filter
         if (searchQuery) {
@@ -268,7 +270,29 @@ export default function ConfirmationsClient({
             filtered = filtered.filter((c) => c.completedBy?.id === dispatcherFilter);
         }
 
-        // Apply sorting
+        // Smart default sorting: upcoming first, then past
+        // Only apply smart sort when using default pickupAt sort with desc direction
+        if (sortField === "pickupAt" && sortDirection === "desc") {
+            // Separate into upcoming and past
+            const upcoming = filtered.filter((c) => new Date(c.pickupAt).getTime() >= currentTime);
+            const past = filtered.filter((c) => new Date(c.pickupAt).getTime() < currentTime);
+
+            // Sort upcoming by pickupAt ASC (soonest first)
+            upcoming.sort((a, b) => new Date(a.pickupAt).getTime() - new Date(b.pickupAt).getTime());
+
+            // Sort past by pickupAt DESC (most recent first)
+            past.sort((a, b) => new Date(b.pickupAt).getTime() - new Date(a.pickupAt).getTime());
+
+            // Mark section boundaries for UI
+            if (upcoming.length > 0 && past.length > 0) {
+                // Add a marker to identify section break
+                (upcoming[upcoming.length - 1] as TripConfirmation & { _isLastUpcoming?: boolean })._isLastUpcoming = true;
+            }
+
+            return [...upcoming, ...past];
+        }
+
+        // Apply standard sorting for other cases
         filtered.sort((a, b) => {
             let aVal: string | number | null = null;
             let bVal: string | number | null = null;
@@ -308,6 +332,16 @@ export default function ConfirmationsClient({
 
         return filtered;
     }, [confirmations, searchQuery, statusFilter, dispatcherFilter, sortField, sortDirection]);
+
+    // Calculate upcoming vs past counts for UI display
+    const upcomingCount = useMemo(() => {
+        const currentTime = Date.now();
+        return filteredAndSortedConfirmations.filter((c) => new Date(c.pickupAt).getTime() >= currentTime).length;
+    }, [filteredAndSortedConfirmations]);
+
+    const pastCount = useMemo(() => {
+        return filteredAndSortedConfirmations.length - upcomingCount;
+    }, [filteredAndSortedConfirmations, upcomingCount]);
 
     // Pagination
     const paginatedConfirmations = useMemo(() => {
@@ -535,6 +569,16 @@ export default function ConfirmationsClient({
                             Showing <strong>{paginatedConfirmations.length}</strong> of{" "}
                             <strong>{filteredAndSortedConfirmations.length}</strong> trips
                         </span>
+                        <div className="section-counts">
+                            <span className="upcoming-count">
+                                <Clock size={12} />
+                                {upcomingCount} upcoming
+                            </span>
+                            <span className="past-count">
+                                <CheckCircle size={12} />
+                                {pastCount} past
+                            </span>
+                        </div>
                         {hasActiveFilters && (
                             <span className="filtered-indicator">
                                 (filtered from {totalCount} total)
@@ -1474,6 +1518,34 @@ export default function ConfirmationsClient({
 
                 .filtered-indicator {
                     color: var(--text-muted);
+                }
+
+                .section-counts {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    margin-left: auto;
+                }
+
+                .upcoming-count,
+                .past-count {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.25rem;
+                    padding: 0.25rem 0.5rem;
+                    border-radius: 6px;
+                    font-size: 0.75rem;
+                    font-weight: 500;
+                }
+
+                .upcoming-count {
+                    background: var(--info-bg, rgba(96, 165, 250, 0.12));
+                    color: var(--info, #60a5fa);
+                }
+
+                .past-count {
+                    background: var(--success-bg, rgba(74, 222, 128, 0.12));
+                    color: var(--success, #4ade80);
                 }
 
                 /* Data Table */

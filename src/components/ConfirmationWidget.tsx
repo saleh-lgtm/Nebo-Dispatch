@@ -137,15 +137,17 @@ export default function ConfirmationWidget({ confirmations, onRefresh }: Props) 
     if (confirmations.length === 0) {
         return (
             <div className="confirmation-widget">
-                <div className="widget-header">
+                <div className="widget-header queue-header">
                     <div className="widget-title">
                         <Phone size={18} />
-                        <span>2-Hour Confirmations</span>
+                        <span>Dispatcher Queue</span>
                     </div>
+                    <span className="queue-label">Confirmations</span>
                 </div>
                 <div className="empty-state">
                     <CheckCircle size={32} />
-                    <p>No confirmations due</p>
+                    <p>Queue is clear</p>
+                    <span className="empty-sub">No confirmations needed right now</span>
                 </div>
                 <style jsx>{styles}</style>
             </div>
@@ -153,19 +155,27 @@ export default function ConfirmationWidget({ confirmations, onRefresh }: Props) 
     }
 
     return (
-        <div className="confirmation-widget">
-            <div className="widget-header">
+        <div className="confirmation-widget queue-mode">
+            <div className="widget-header queue-header">
                 <div className="widget-title">
                     <Phone size={18} />
-                    <span>2-Hour Confirmations</span>
+                    <span>Dispatcher Queue</span>
                 </div>
-                <span className="count-badge">{confirmations.length}</span>
+                <div className="queue-info">
+                    <span className="queue-label">Next {confirmations.length} trips</span>
+                    <span className="count-badge urgent-pulse">{confirmations.length}</span>
+                </div>
+            </div>
+            <div className="queue-priority-banner">
+                <AlertTriangle size={14} />
+                <span>Action Required — Confirm these trips now</span>
             </div>
 
             <div className="confirmations-list">
-                {confirmations.map((conf) => {
+                {confirmations.map((conf, index) => {
                     const overdue = isOverdue(conf.dueAt);
                     const urgent = isUrgent(conf.dueAt);
+                    const position = index + 1;
 
                     return (
                         <div
@@ -173,6 +183,11 @@ export default function ConfirmationWidget({ confirmations, onRefresh }: Props) 
                             className={`confirmation-item ${overdue ? "overdue" : ""} ${urgent && !overdue ? "urgent" : ""}`}
                             onClick={() => setSelectedConfirmation(conf)}
                         >
+                            <div className="queue-position">
+                                <span className={`position-number ${position === 1 ? "first" : ""}`}>
+                                    {position}
+                                </span>
+                            </div>
                             <div className="conf-main">
                                 <div className="conf-trip">
                                     <span className="trip-number">#{conf.tripNumber}</span>
@@ -284,6 +299,11 @@ const styles = `
         overflow: hidden;
     }
 
+    .confirmation-widget.queue-mode {
+        border-color: var(--warning, #f59e0b);
+        box-shadow: 0 0 0 1px var(--warning, #f59e0b), 0 4px 12px rgba(245, 158, 11, 0.15);
+    }
+
     .widget-header {
         display: flex;
         align-items: center;
@@ -291,6 +311,10 @@ const styles = `
         padding: 1rem;
         border-bottom: 1px solid var(--border);
         background: var(--bg-secondary);
+    }
+
+    .widget-header.queue-header {
+        background: linear-gradient(135deg, var(--bg-secondary), rgba(245, 158, 11, 0.08));
     }
 
     .widget-title {
@@ -305,6 +329,18 @@ const styles = `
         color: var(--accent);
     }
 
+    .queue-info {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .queue-label {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        font-weight: 500;
+    }
+
     .count-badge {
         background: var(--danger);
         color: white;
@@ -312,6 +348,29 @@ const styles = `
         border-radius: 9999px;
         font-size: 0.75rem;
         font-weight: 600;
+    }
+
+    .count-badge.urgent-pulse {
+        animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.1); opacity: 0.85; }
+    }
+
+    .queue-priority-banner {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        background: var(--warning-bg, rgba(245, 158, 11, 0.12));
+        color: var(--warning, #f59e0b);
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
     }
 
     .empty-state {
@@ -324,8 +383,13 @@ const styles = `
     }
 
     .empty-state svg {
-        color: var(--accent);
-        opacity: 0.5;
+        color: var(--success, #4ade80);
+        opacity: 0.7;
+    }
+
+    .empty-sub {
+        font-size: 0.75rem;
+        color: var(--text-muted);
     }
 
     .confirmations-list {
@@ -357,6 +421,34 @@ const styles = `
 
     .confirmation-item.urgent {
         background: var(--warning-bg);
+    }
+
+    .queue-position {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 0.75rem;
+    }
+
+    .position-number {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border);
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: var(--text-secondary);
+    }
+
+    .position-number.first {
+        background: var(--warning, #f59e0b);
+        border-color: var(--warning, #f59e0b);
+        color: white;
+        animation: pulse 2s ease-in-out infinite;
     }
 
     .conf-main {
