@@ -31,7 +31,8 @@ import {
     ChevronRight,
     ListFilter,
 } from "lucide-react";
-import { getAllConfirmations } from "@/lib/tripConfirmationActions";
+import { getAllConfirmations, completeConfirmation } from "@/lib/tripConfirmationActions";
+import { useRouter } from "next/navigation";
 
 interface Stats {
     total: number;
@@ -164,6 +165,10 @@ export default function ConfirmationsClient({
     const [isLoading, setIsLoading] = useState(false);
     const [dateFrom, setDateFrom] = useState<string>("");
     const [dateTo, setDateTo] = useState<string>("");
+    const [selectedTrip, setSelectedTrip] = useState<TripConfirmation | null>(null);
+    const [completing, setCompleting] = useState<string | null>(null);
+    const [actionNotes, setActionNotes] = useState("");
+    const router = useRouter();
 
     const ITEMS_PER_PAGE = 25;
 
@@ -392,6 +397,22 @@ export default function ConfirmationsClient({
 
     const hasActiveFilters = searchQuery || statusFilter !== "ALL" || dispatcherFilter !== "ALL" || dateFrom || dateTo;
 
+    const handleStatusChange = async (tripId: string, newStatus: "CONFIRMED" | "NO_ANSWER" | "CANCELLED" | "RESCHEDULED", notes?: string) => {
+        setCompleting(tripId);
+        try {
+            await completeConfirmation(tripId, newStatus, notes || "");
+            setSelectedTrip(null);
+            setActionNotes("");
+            router.refresh();
+            // Refresh the confirmations list
+            await fetchConfirmations();
+        } catch (error) {
+            console.error("Failed to update confirmation:", error);
+        } finally {
+            setCompleting(null);
+        }
+    };
+
     const SortIcon = ({ field }: { field: SortField }) => {
         if (sortField !== field) return <ArrowUpDown size={14} className="sort-icon inactive" />;
         return sortDirection === "asc" ? (
@@ -612,12 +633,13 @@ export default function ConfirmationsClient({
                                         <SortIcon field="completedAt" />
                                     </th>
                                     <th className="col-dispatcher">By</th>
+                                    <th className="col-actions">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {paginatedConfirmations.length === 0 ? (
                                     <tr className="empty-row">
-                                        <td colSpan={9}>
+                                        <td colSpan={10}>
                                             <div className="empty-state">
                                                 <Calendar size={40} />
                                                 <p>No trips found</p>
@@ -720,6 +742,19 @@ export default function ConfirmationsClient({
                                                         <span className="empty-cell">—</span>
                                                     )}
                                                 </td>
+                                                <td className="col-actions">
+                                                    {isPending ? (
+                                                        <button
+                                                            className="action-btn"
+                                                            onClick={() => setSelectedTrip(trip)}
+                                                            disabled={completing === trip.id}
+                                                        >
+                                                            {completing === trip.id ? "..." : "Update"}
+                                                        </button>
+                                                    ) : (
+                                                        <span className="empty-cell">—</span>
+                                                    )}
+                                                </td>
                                             </tr>
                                         );
                                     })
@@ -770,6 +805,84 @@ export default function ConfirmationsClient({
                             </button>
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* Status Change Modal */}
+            {selectedTrip && (
+                <div className="modal-overlay" onClick={() => setSelectedTrip(null)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3>Update Confirmation Status</h3>
+                            <span className="trip-badge">#{selectedTrip.tripNumber}</span>
+                        </div>
+                        <div className="modal-body">
+                            <div className="modal-info">
+                                <div className="info-row">
+                                    <User size={14} />
+                                    <span>{selectedTrip.passengerName}</span>
+                                </div>
+                                <div className="info-row">
+                                    <Car size={14} />
+                                    <span>{selectedTrip.driverName}</span>
+                                </div>
+                                <div className="info-row">
+                                    <Clock size={14} />
+                                    <span>Pickup: {formatTime(selectedTrip.pickupAt)}</span>
+                                </div>
+                            </div>
+                            <div className="status-options">
+                                <label>Select Status:</label>
+                                <div className="options-grid">
+                                    <button
+                                        className="status-btn status-confirmed"
+                                        onClick={() => handleStatusChange(selectedTrip.id, "CONFIRMED", actionNotes)}
+                                        disabled={completing !== null}
+                                    >
+                                        <CheckCircle size={18} />
+                                        <span>Confirmed</span>
+                                    </button>
+                                    <button
+                                        className="status-btn status-no-answer"
+                                        onClick={() => handleStatusChange(selectedTrip.id, "NO_ANSWER", actionNotes)}
+                                        disabled={completing !== null}
+                                    >
+                                        <PhoneOff size={18} />
+                                        <span>No Answer</span>
+                                    </button>
+                                    <button
+                                        className="status-btn status-cancelled"
+                                        onClick={() => handleStatusChange(selectedTrip.id, "CANCELLED", actionNotes)}
+                                        disabled={completing !== null}
+                                    >
+                                        <XCircle size={18} />
+                                        <span>Cancelled</span>
+                                    </button>
+                                    <button
+                                        className="status-btn status-rescheduled"
+                                        onClick={() => handleStatusChange(selectedTrip.id, "RESCHEDULED", actionNotes)}
+                                        disabled={completing !== null}
+                                    >
+                                        <RotateCcw size={18} />
+                                        <span>Rescheduled</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="notes-field">
+                                <label>Notes (optional):</label>
+                                <textarea
+                                    value={actionNotes}
+                                    onChange={(e) => setActionNotes(e.target.value)}
+                                    placeholder="Add any notes about the call..."
+                                />
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button className="cancel-btn" onClick={() => setSelectedTrip(null)}>
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -2425,6 +2538,226 @@ export default function ConfirmationsClient({
                         flex-direction: column;
                     }
 
+                /* ===== MODAL STYLES ===== */
+                .modal-overlay {
+                    position: fixed;
+                    inset: 0;
+                    background: rgba(0, 0, 0, 0.8);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 1000;
+                    padding: 1rem;
+                }
+
+                .modal {
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    border-radius: 16px;
+                    width: 100%;
+                    max-width: 420px;
+                    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+                }
+
+                .modal-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 1.25rem;
+                    border-bottom: 1px solid var(--border);
+                }
+
+                .modal-header h3 {
+                    font-size: 1.125rem;
+                    font-weight: 600;
+                    color: var(--text-primary);
+                    margin: 0;
+                }
+
+                .trip-badge {
+                    background: var(--accent);
+                    color: white;
+                    padding: 0.25rem 0.75rem;
+                    border-radius: 6px;
+                    font-size: 0.875rem;
+                    font-weight: 700;
+                    font-family: 'JetBrains Mono', monospace;
+                }
+
+                .modal-body {
+                    padding: 1.25rem;
+                }
+
+                .modal-info {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.5rem;
+                    padding: 0.875rem;
+                    background: var(--bg-secondary);
+                    border-radius: 10px;
+                    margin-bottom: 1.25rem;
+                }
+
+                .info-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.625rem;
+                    font-size: 0.875rem;
+                    color: var(--text-secondary);
+                }
+
+                .info-row :global(svg) {
+                    color: var(--accent);
+                    flex-shrink: 0;
+                }
+
+                .status-options {
+                    margin-bottom: 1.25rem;
+                }
+
+                .status-options label {
+                    display: block;
+                    font-size: 0.8125rem;
+                    font-weight: 600;
+                    color: var(--text-secondary);
+                    margin-bottom: 0.625rem;
+                    text-transform: uppercase;
+                    letter-spacing: 0.03em;
+                }
+
+                .options-grid {
+                    display: grid;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 0.625rem;
+                }
+
+                .status-btn {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 0.375rem;
+                    padding: 1rem;
+                    border: 1px solid;
+                    border-radius: 12px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    font-size: 0.8125rem;
+                    font-weight: 600;
+                }
+
+                .status-btn:hover:not(:disabled) {
+                    transform: translateY(-2px);
+                    filter: brightness(1.1);
+                }
+
+                .status-btn:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                }
+
+                .status-btn.status-confirmed {
+                    background: var(--success-soft, rgba(74, 222, 128, 0.1));
+                    border-color: var(--success, #4ade80);
+                    color: var(--success, #4ade80);
+                }
+
+                .status-btn.status-no-answer {
+                    background: var(--warning-soft, rgba(251, 191, 36, 0.1));
+                    border-color: var(--warning, #fbbf24);
+                    color: var(--warning, #fbbf24);
+                }
+
+                .status-btn.status-cancelled {
+                    background: var(--danger-soft, rgba(248, 113, 113, 0.1));
+                    border-color: var(--danger, #f87171);
+                    color: var(--danger, #f87171);
+                }
+
+                .status-btn.status-rescheduled {
+                    background: rgba(167, 139, 250, 0.1);
+                    border-color: #a78bfa;
+                    color: #a78bfa;
+                }
+
+                .notes-field {
+                    margin-bottom: 0.5rem;
+                }
+
+                .notes-field label {
+                    display: block;
+                    font-size: 0.8125rem;
+                    font-weight: 600;
+                    color: var(--text-secondary);
+                    margin-bottom: 0.5rem;
+                }
+
+                .notes-field textarea {
+                    width: 100%;
+                    padding: 0.75rem;
+                    border: 1px solid var(--border);
+                    border-radius: 10px;
+                    background: var(--bg-secondary);
+                    color: var(--text-primary);
+                    font-size: 0.875rem;
+                    font-family: inherit;
+                    resize: vertical;
+                    min-height: 70px;
+                }
+
+                .notes-field textarea:focus {
+                    outline: none;
+                    border-color: var(--accent);
+                }
+
+                .modal-footer {
+                    padding: 1rem 1.25rem;
+                    border-top: 1px solid var(--border);
+                    display: flex;
+                    justify-content: flex-end;
+                }
+
+                .cancel-btn {
+                    padding: 0.625rem 1.25rem;
+                    border: 1px solid var(--border);
+                    border-radius: 8px;
+                    background: transparent;
+                    color: var(--text-secondary);
+                    font-size: 0.875rem;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+
+                .cancel-btn:hover {
+                    background: var(--bg-hover);
+                    color: var(--text-primary);
+                }
+
+                /* Action Button */
+                .action-btn {
+                    padding: 0.5rem 1rem;
+                    background: var(--accent);
+                    border: none;
+                    border-radius: 6px;
+                    color: white;
+                    font-size: 0.8125rem;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+
+                .action-btn:hover:not(:disabled) {
+                    transform: translateY(-1px);
+                    filter: brightness(1.1);
+                }
+
+                .action-btn:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                }
+
+                /* ===== MEDIA QUERIES ===== */
+                @media (max-width: 768px) {
                     .search-box {
                         max-width: none;
                     }
