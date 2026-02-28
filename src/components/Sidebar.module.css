@@ -1,0 +1,530 @@
+/**
+ * Sidebar CSS Module - Corporate Modern Design
+ *
+ * Clean, professional navigation with function-based grouping
+ * Collapsible with smooth transitions and background highlight active states
+ */
+
+/* ============================================
+   Sidebar Container
+   ============================================ */
+
+.sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 260px;
+    background: var(--bg-surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+    transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+.sidebar.collapsed {
+    width: 72px;
+}
+
+.sidebar.mobile {
+    transform: translateX(-100%);
+    width: 280px;
+    box-shadow: none;
+}
+
+.sidebar.mobile.open {
+    transform: translateX(0);
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.5);
+}
+
+/* ============================================
+   Header / Branding
+   ============================================ */
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1rem;
+    border-bottom: 1px solid var(--border);
+    min-height: 68px;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    overflow: hidden;
+}
+
+.brandText {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, var(--accent), #ff7a50);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    white-space: nowrap;
+    transition: opacity 0.2s ease;
+}
+
+.collapsed .brandText {
+    opacity: 0;
+    width: 0;
+}
+
+.collapseBtn {
+    width: 32px;
+    height: 32px;
+    background: var(--bg-hover);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+}
+
+.collapseBtn:hover {
+    background: var(--bg-active);
+    color: var(--text-primary);
+    border-color: var(--border-hover);
+}
+
+.collapsed .header {
+    justify-content: center;
+    padding: 1.25rem 0.75rem;
+}
+
+.collapsed .collapseBtn {
+    margin: 0;
+}
+
+/* ============================================
+   User Card
+   ============================================ */
+
+.userCard {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-elevated);
+    transition: padding 0.25s ease;
+}
+
+.userAvatar {
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 0.9375rem;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.userInfo {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    transition: opacity 0.2s ease, width 0.25s ease;
+}
+
+.userName {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.userRole {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.userActions {
+    flex-shrink: 0;
+    transition: opacity 0.2s ease;
+}
+
+.collapsed .userCard {
+    justify-content: center;
+    padding: 0.875rem;
+}
+
+.collapsed .userInfo,
+.collapsed .userActions {
+    display: none;
+}
+
+/* ============================================
+   Navigation
+   ============================================ */
+
+.nav {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0.75rem 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+/* Custom scrollbar */
+.nav::-webkit-scrollbar {
+    width: 4px;
+}
+
+.nav::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.nav::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
+}
+
+.nav::-webkit-scrollbar-thumb:hover {
+    background: var(--border-hover);
+}
+
+/* ============================================
+   Navigation Group
+   ============================================ */
+
+.navGroup {
+    margin-bottom: 0.5rem;
+}
+
+.navGroupTitle {
+    display: block;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.75rem 0.875rem 0.5rem;
+    transition: opacity 0.2s ease;
+}
+
+.navGroupDivider {
+    height: 1px;
+    background: var(--border);
+    margin: 0.5rem 0.75rem;
+}
+
+.navGroupItems {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* ============================================
+   Navigation Item
+   ============================================ */
+
+.navItem {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0.875rem;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-size: 0.8125rem;
+    text-decoration: none;
+    transition: all 0.15s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.navItem:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+/* Active state - Background highlight */
+.navItemActive {
+    color: var(--accent) !important;
+    background: var(--accent-soft) !important;
+    font-weight: 600;
+}
+
+.navItemActive::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 60%;
+    background: var(--accent);
+    border-radius: 0 2px 2px 0;
+    opacity: 0;
+}
+
+.navIcon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    opacity: 0.8;
+    transition: opacity 0.15s ease;
+}
+
+.navItem:hover .navIcon,
+.navItemActive .navIcon {
+    opacity: 1;
+}
+
+.navLabel {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: opacity 0.2s ease, width 0.25s ease;
+}
+
+/* Collapsed state */
+.collapsed .navItem {
+    justify-content: center;
+    padding: 0.75rem;
+}
+
+.collapsed .navLabel {
+    display: none;
+}
+
+.collapsed .navGroupTitle {
+    display: none;
+}
+
+/* ============================================
+   Clock Button Wrapper
+   ============================================ */
+
+.clockWrapper {
+    padding: 0.25rem 0.5rem;
+}
+
+.collapsed .clockWrapper {
+    padding: 0.25rem;
+    display: flex;
+    justify-content: center;
+}
+
+/* ============================================
+   Footer
+   ============================================ */
+
+.footer {
+    padding: 0.75rem;
+    border-top: 1px solid var(--border);
+    background: var(--bg-surface);
+}
+
+.logoutBtn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-size: 0.8125rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s ease;
+}
+
+.logoutBtn:hover {
+    color: var(--danger);
+    background: var(--danger-soft);
+}
+
+.collapsed .logoutBtn {
+    justify-content: center;
+}
+
+.collapsed .logoutBtn span {
+    display: none;
+}
+
+/* ============================================
+   Mobile Styles
+   ============================================ */
+
+.mobileToggle {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 150;
+    width: 44px;
+    height: 44px;
+    background: var(--bg-card-solid);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-md);
+    transition: all 0.15s ease;
+}
+
+.mobileToggle:hover {
+    background: var(--bg-elevated);
+    border-color: var(--border-hover);
+}
+
+.mobileOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(14, 9, 24, 0.75);
+    backdrop-filter: blur(4px);
+    z-index: 90;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* ============================================
+   Layout Integration
+   ============================================ */
+
+/* Main content offset when sidebar is visible */
+:global(.sa-main-wrapper) {
+    margin-left: 260px;
+    transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:global(.sidebar-collapsed) .sa-main-wrapper {
+    margin-left: 72px;
+}
+
+@media (max-width: 1023px) {
+    :global(.sa-main-wrapper) {
+        margin-left: 0;
+        padding-top: 60px;
+    }
+}
+
+/* ============================================
+   Responsive Adjustments
+   ============================================ */
+
+@media (max-width: 1023px) {
+    .sidebar:not(.mobile) {
+        display: none;
+    }
+}
+
+/* Larger screens - slightly wider sidebar */
+@media (min-width: 1400px) {
+    .sidebar:not(.collapsed) {
+        width: 280px;
+    }
+
+    :global(.sa-main-wrapper) {
+        margin-left: 280px;
+    }
+}
+
+/* ============================================
+   Tooltip for collapsed icons
+   ============================================ */
+
+.collapsed .navItem[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    left: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--bg-card-solid);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    white-space: nowrap;
+    box-shadow: var(--shadow-md);
+    z-index: 200;
+    animation: tooltipFade 0.15s ease;
+}
+
+@keyframes tooltipFade {
+    from {
+        opacity: 0;
+        transform: translateY(-50%) translateX(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(-50%) translateX(0);
+    }
+}
+
+/* ============================================
+   Focus States (Accessibility)
+   ============================================ */
+
+.navItem:focus-visible,
+.collapseBtn:focus-visible,
+.logoutBtn:focus-visible,
+.mobileToggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* ============================================
+   Reduced Motion
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+    .sidebar,
+    .navItem,
+    .collapseBtn,
+    .logoutBtn,
+    .brandText,
+    .userInfo,
+    .userActions,
+    .navLabel {
+        transition: none;
+    }
+
+    .mobileOverlay,
+    .collapsed .navItem[title]:hover::after {
+        animation: none;
+    }
+}

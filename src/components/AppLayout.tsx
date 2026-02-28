@@ -9,7 +9,7 @@ const Navbar = dynamic(() => import("./Navbar"), {
     ssr: false,
 });
 
-const SuperAdminSidebar = dynamic(() => import("./SuperAdminSidebar"), {
+const Sidebar = dynamic(() => import("./Sidebar"), {
     loading: () => <SidebarSkeleton />,
     ssr: false,
 });
@@ -75,7 +75,7 @@ export default function AppLayout({ children }: Props) {
     // All authenticated users get sidebar layout
     return (
         <>
-            <SuperAdminSidebar user={session.user} />
+            <Sidebar user={session.user} />
             <div className="sa-main-wrapper">
                 <main className="sa-main-content animate-fade-in">
                     {children}
