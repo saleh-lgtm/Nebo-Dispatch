@@ -907,3 +907,127 @@ export async function getPendingConfirmationCount() {
 
     return count;
 }
+
+/**
+ * Get all confirmations with optional filters for admin view
+ * Shows ALL trips (pending, completed, expired) with full details
+ */
+export async function getAllConfirmations(options?: {
+    status?: ConfirmationStatus | "ALL";
+    dateFrom?: Date;
+    dateTo?: Date;
+    dispatcherId?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+}) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+        throw new Error("Unauthorized");
+    }
+
+    const isAdmin = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"].includes(
+        session.user.role || ""
+    );
+    if (!isAdmin) {
+        throw new Error("Admin access required");
+    }
+
+    const {
+        status = "ALL",
+        dateFrom,
+        dateTo,
+        dispatcherId,
+        search,
+        limit = 100,
+        offset = 0,
+    } = options || {};
+
+    // Build where clause
+    const where: Record<string, unknown> = {};
+
+    if (status && status !== "ALL") {
+        where.status = status;
+    }
+
+    if (dateFrom || dateTo) {
+        where.pickupAt = {};
+        if (dateFrom) {
+            (where.pickupAt as Record<string, Date>).gte = dateFrom;
+        }
+        if (dateTo) {
+            (where.pickupAt as Record<string, Date>).lte = dateTo;
+        }
+    }
+
+    if (dispatcherId) {
+        where.completedById = dispatcherId;
+    }
+
+    if (search) {
+        where.OR = [
+            { tripNumber: { contains: search, mode: "insensitive" } },
+            { passengerName: { contains: search, mode: "insensitive" } },
+            { driverName: { contains: search, mode: "insensitive" } },
+            { accountName: { contains: search, mode: "insensitive" } },
+        ];
+    }
+
+    const [confirmations, total] = await Promise.all([
+        prisma.tripConfirmation.findMany({
+            where,
+            orderBy: { pickupAt: "desc" },
+            take: limit,
+            skip: offset,
+            include: {
+                completedBy: {
+                    select: { id: true, name: true },
+                },
+            },
+        }),
+        prisma.tripConfirmation.count({ where }),
+    ]);
+
+    return {
+        confirmations,
+        total,
+        hasMore: offset + confirmations.length < total,
+    };
+}
+
+/**
+ * Get unique dispatchers who have completed confirmations
+ * For filter dropdown
+ */
+export async function getConfirmationDispatchers() {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+        throw new Error("Unauthorized");
+    }
+
+    const dispatchers = await prisma.user.findMany({
+        where: {
+            confirmationsCompleted: {
+                some: {},
+            },
+        },
+        select: {
+            id: true,
+            name: true,
+            _count: {
+                select: { confirmationsCompleted: true },
+            },
+        },
+        orderBy: {
+            confirmationsCompleted: {
+                _count: "desc",
+            },
+        },
+    });
+
+    return dispatchers.map((d) => ({
+        id: d.id,
+        name: d.name || "Unknown",
+        count: d._count.confirmationsCompleted,
+    }));
+}

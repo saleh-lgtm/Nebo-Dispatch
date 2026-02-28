@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
     Phone,
     Clock,
@@ -16,11 +16,22 @@ import {
     BarChart3,
     Users,
     Calendar,
-    ArrowRight,
     ShieldAlert,
     ChevronDown,
     ChevronUp,
+    Search,
+    Filter,
+    ArrowUpDown,
+    ArrowUp,
+    ArrowDown,
+    Car,
+    Building2,
+    X,
+    ChevronLeft,
+    ChevronRight,
+    ListFilter,
 } from "lucide-react";
+import { getAllConfirmations } from "@/lib/tripConfirmationActions";
 
 interface Stats {
     total: number;
@@ -45,16 +56,23 @@ interface DispatcherMetric {
     byStatus: Record<string, number>;
 }
 
-interface Confirmation {
+interface TripConfirmation {
     id: string;
     tripNumber: string;
+    reservationNumber?: string | null;
     pickupAt: Date | string;
     dueAt: Date | string;
     passengerName: string;
     driverName: string;
+    accountName?: string | null;
+    accountNumber?: string | null;
     status: string;
     completedAt: Date | string | null;
     completedBy: { id: string; name: string | null } | null;
+    minutesBeforeDue?: number | null;
+    notes?: string | null;
+    manifestDate: Date | string;
+    createdAt: Date | string;
 }
 
 interface AccountabilityMetric {
@@ -85,24 +103,37 @@ interface MissedConfirmation {
     }>;
 }
 
+interface Dispatcher {
+    id: string;
+    name: string;
+    count: number;
+}
+
 interface Props {
     stats: Stats;
     dispatcherMetrics: DispatcherMetric[];
-    todayConfirmations: Confirmation[];
+    todayConfirmations: TripConfirmation[];
     accountabilityMetrics?: AccountabilityMetric[];
     missedConfirmations?: MissedConfirmation[];
+    allConfirmations: TripConfirmation[];
+    totalConfirmations: number;
+    dispatchers: Dispatcher[];
 }
+
+type SortField = "pickupAt" | "dueAt" | "status" | "tripNumber" | "createdAt" | "completedAt";
+type SortDirection = "asc" | "desc";
+type StatusFilter = "ALL" | "PENDING" | "CONFIRMED" | "NO_ANSWER" | "CANCELLED" | "RESCHEDULED" | "EXPIRED";
 
 const STATUS_CONFIG: Record<
     string,
-    { label: string; icon: typeof CheckCircle; color: string }
+    { label: string; icon: typeof CheckCircle; color: string; bgColor: string }
 > = {
-    PENDING: { label: "Pending", icon: Clock, color: "#60a5fa" },
-    CONFIRMED: { label: "Confirmed", icon: CheckCircle, color: "#4ade80" },
-    NO_ANSWER: { label: "No Answer", icon: PhoneOff, color: "#fbbf24" },
-    CANCELLED: { label: "Cancelled", icon: XCircle, color: "#f87171" },
-    RESCHEDULED: { label: "Rescheduled", icon: RotateCcw, color: "#60a5fa" },
-    EXPIRED: { label: "Expired", icon: AlertTriangle, color: "#ef4444" },
+    PENDING: { label: "Pending", icon: Clock, color: "#60a5fa", bgColor: "rgba(96, 165, 250, 0.12)" },
+    CONFIRMED: { label: "Confirmed", icon: CheckCircle, color: "#4ade80", bgColor: "rgba(74, 222, 128, 0.12)" },
+    NO_ANSWER: { label: "No Answer", icon: PhoneOff, color: "#fbbf24", bgColor: "rgba(251, 191, 36, 0.12)" },
+    CANCELLED: { label: "Cancelled", icon: XCircle, color: "#f87171", bgColor: "rgba(248, 113, 113, 0.12)" },
+    RESCHEDULED: { label: "Rescheduled", icon: RotateCcw, color: "#a78bfa", bgColor: "rgba(167, 139, 250, 0.12)" },
+    EXPIRED: { label: "Expired", icon: AlertTriangle, color: "#ef4444", bgColor: "rgba(239, 68, 68, 0.12)" },
 };
 
 export default function ConfirmationsClient({
@@ -111,24 +142,77 @@ export default function ConfirmationsClient({
     todayConfirmations,
     accountabilityMetrics = [],
     missedConfirmations = [],
+    allConfirmations: initialConfirmations,
+    totalConfirmations: initialTotal,
+    dispatchers,
 }: Props) {
     const [selectedTab, setSelectedTab] = useState<
-        "overview" | "dispatchers" | "today" | "accountability"
-    >("overview");
+        "trips" | "overview" | "dispatchers" | "accountability"
+    >("trips");
     const [expandedMissed, setExpandedMissed] = useState<Set<string>>(new Set());
 
-    const formatTime = (date: Date | string) => {
-        return new Date(date).toLocaleTimeString([], {
+    // Trip list state
+    const [confirmations, setConfirmations] = useState<TripConfirmation[]>(initialConfirmations);
+    const [totalCount, setTotalCount] = useState(initialTotal);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+    const [dispatcherFilter, setDispatcherFilter] = useState<string>("ALL");
+    const [sortField, setSortField] = useState<SortField>("pickupAt");
+    const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+    const [showFilters, setShowFilters] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [isLoading, setIsLoading] = useState(false);
+    const [dateFrom, setDateFrom] = useState<string>("");
+    const [dateTo, setDateTo] = useState<string>("");
+
+    const ITEMS_PER_PAGE = 25;
+
+    const formatDateTime = (date: Date | string) => {
+        const d = new Date(date);
+        return d.toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
             hour: "numeric",
             minute: "2-digit",
+            hour12: true,
+            timeZone: "America/Chicago",
         });
     };
 
-    // Capture current time once per render to avoid impure Date.now() calls
+    const formatDate = (date: Date | string) => {
+        return new Date(date).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            timeZone: "America/Chicago",
+        });
+    };
+
+    const formatTime = (date: Date | string) => {
+        return new Date(date).toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+            timeZone: "America/Chicago",
+        });
+    };
+
     const now = useMemo(() => Date.now(), []);
 
     const isOverdue = (dueAt: Date | string) => {
         return new Date(dueAt).getTime() < now;
+    };
+
+    const getTimeDiff = (target: Date | string) => {
+        const diff = new Date(target).getTime() - now;
+        const mins = Math.abs(Math.round(diff / 60000));
+        const hours = Math.floor(mins / 60);
+        const remainingMins = mins % 60;
+
+        if (hours > 0) {
+            return `${hours}h ${remainingMins}m`;
+        }
+        return `${mins}m`;
     };
 
     const pendingCount = todayConfirmations.filter((c) => c.status === "PENDING").length;
@@ -158,27 +242,178 @@ export default function ConfirmationsClient({
         .filter((m) => m.confirmationsMissedWhileOnDuty > 0)
         .slice(0, 3);
 
+    // Filter and sort confirmations locally for immediate UI response
+    const filteredAndSortedConfirmations = useMemo(() => {
+        let filtered = [...confirmations];
+
+        // Apply search filter
+        if (searchQuery) {
+            const query = searchQuery.toLowerCase();
+            filtered = filtered.filter(
+                (c) =>
+                    c.tripNumber.toLowerCase().includes(query) ||
+                    c.passengerName.toLowerCase().includes(query) ||
+                    c.driverName.toLowerCase().includes(query) ||
+                    (c.accountName && c.accountName.toLowerCase().includes(query))
+            );
+        }
+
+        // Apply status filter
+        if (statusFilter !== "ALL") {
+            filtered = filtered.filter((c) => c.status === statusFilter);
+        }
+
+        // Apply dispatcher filter
+        if (dispatcherFilter !== "ALL") {
+            filtered = filtered.filter((c) => c.completedBy?.id === dispatcherFilter);
+        }
+
+        // Apply sorting
+        filtered.sort((a, b) => {
+            let aVal: string | number | null = null;
+            let bVal: string | number | null = null;
+
+            switch (sortField) {
+                case "pickupAt":
+                    aVal = new Date(a.pickupAt).getTime();
+                    bVal = new Date(b.pickupAt).getTime();
+                    break;
+                case "dueAt":
+                    aVal = new Date(a.dueAt).getTime();
+                    bVal = new Date(b.dueAt).getTime();
+                    break;
+                case "createdAt":
+                    aVal = new Date(a.createdAt).getTime();
+                    bVal = new Date(b.createdAt).getTime();
+                    break;
+                case "completedAt":
+                    aVal = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+                    bVal = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+                    break;
+                case "tripNumber":
+                    aVal = parseInt(a.tripNumber) || 0;
+                    bVal = parseInt(b.tripNumber) || 0;
+                    break;
+                case "status":
+                    aVal = a.status;
+                    bVal = b.status;
+                    break;
+            }
+
+            if (aVal === null || bVal === null) return 0;
+            if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
+            if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
+            return 0;
+        });
+
+        return filtered;
+    }, [confirmations, searchQuery, statusFilter, dispatcherFilter, sortField, sortDirection]);
+
+    // Pagination
+    const paginatedConfirmations = useMemo(() => {
+        const start = (currentPage - 1) * ITEMS_PER_PAGE;
+        return filteredAndSortedConfirmations.slice(start, start + ITEMS_PER_PAGE);
+    }, [filteredAndSortedConfirmations, currentPage]);
+
+    const totalPages = Math.ceil(filteredAndSortedConfirmations.length / ITEMS_PER_PAGE);
+
+    const handleSort = (field: SortField) => {
+        if (sortField === field) {
+            setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+        } else {
+            setSortField(field);
+            setSortDirection("desc");
+        }
+    };
+
+    const fetchConfirmations = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const result = await getAllConfirmations({
+                status: statusFilter === "ALL" ? undefined : statusFilter as never,
+                dateFrom: dateFrom ? new Date(dateFrom) : undefined,
+                dateTo: dateTo ? new Date(dateTo) : undefined,
+                dispatcherId: dispatcherFilter === "ALL" ? undefined : dispatcherFilter,
+                search: searchQuery || undefined,
+                limit: 500,
+            });
+            setConfirmations(result.confirmations as TripConfirmation[]);
+            setTotalCount(result.total);
+            setCurrentPage(1);
+        } catch (error) {
+            console.error("Failed to fetch confirmations:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [statusFilter, dateFrom, dateTo, dispatcherFilter, searchQuery]);
+
+    const clearFilters = () => {
+        setSearchQuery("");
+        setStatusFilter("ALL");
+        setDispatcherFilter("ALL");
+        setDateFrom("");
+        setDateTo("");
+        setCurrentPage(1);
+    };
+
+    const hasActiveFilters = searchQuery || statusFilter !== "ALL" || dispatcherFilter !== "ALL" || dateFrom || dateTo;
+
+    const SortIcon = ({ field }: { field: SortField }) => {
+        if (sortField !== field) return <ArrowUpDown size={14} className="sort-icon inactive" />;
+        return sortDirection === "asc" ? (
+            <ArrowUp size={14} className="sort-icon active" />
+        ) : (
+            <ArrowDown size={14} className="sort-icon active" />
+        );
+    };
+
     return (
         <div className="confirmations-page">
             {/* Header */}
             <header className="page-header">
-                <div>
-                    <h1>
-                        <Phone size={24} />
-                        2-Hour Confirmation Metrics
-                    </h1>
-                    <p>Track dispatcher performance on trip confirmations</p>
+                <div className="header-content">
+                    <div className="header-title">
+                        <div className="title-icon">
+                            <Phone size={20} />
+                        </div>
+                        <div>
+                            <h1>Trip Confirmations</h1>
+                            <p>Command Center • 2-Hour Confirmation System</p>
+                        </div>
+                    </div>
+                    <div className="header-stats">
+                        <div className="header-stat">
+                            <span className="stat-number">{stats.total}</span>
+                            <span className="stat-label">Total</span>
+                        </div>
+                        <div className="header-stat success">
+                            <span className="stat-number">{stats.onTimeRate}%</span>
+                            <span className="stat-label">On-Time</span>
+                        </div>
+                        <div className="header-stat warning">
+                            <span className="stat-number">{pendingCount}</span>
+                            <span className="stat-label">Pending</span>
+                        </div>
+                    </div>
                 </div>
             </header>
 
             {/* Tab Navigation */}
-            <div className="tab-nav">
+            <nav className="tab-nav">
+                <button
+                    className={`tab-btn ${selectedTab === "trips" ? "active" : ""}`}
+                    onClick={() => setSelectedTab("trips")}
+                >
+                    <ListFilter size={16} />
+                    All Trips
+                    <span className="tab-count">{totalCount}</span>
+                </button>
                 <button
                     className={`tab-btn ${selectedTab === "overview" ? "active" : ""}`}
                     onClick={() => setSelectedTab("overview")}
                 >
                     <BarChart3 size={16} />
-                    Overview
+                    Analytics
                 </button>
                 <button
                     className={`tab-btn ${selectedTab === "dispatchers" ? "active" : ""}`}
@@ -188,28 +423,313 @@ export default function ConfirmationsClient({
                     Dispatchers
                 </button>
                 <button
-                    className={`tab-btn ${selectedTab === "today" ? "active" : ""}`}
-                    onClick={() => setSelectedTab("today")}
-                >
-                    <Calendar size={16} />
-                    Today
-                    {pendingCount > 0 && (
-                        <span className="pending-badge">{pendingCount}</span>
-                    )}
-                </button>
-                <button
                     className={`tab-btn ${selectedTab === "accountability" ? "active" : ""}`}
                     onClick={() => setSelectedTab("accountability")}
                 >
                     <ShieldAlert size={16} />
                     Accountability
-                    {totalMissed > 0 && (
-                        <span className="missed-badge">{totalMissed}</span>
-                    )}
+                    {totalMissed > 0 && <span className="missed-badge">{totalMissed}</span>}
                 </button>
-            </div>
+            </nav>
 
-            {/* Overview Tab */}
+            {/* ALL TRIPS TAB */}
+            {selectedTab === "trips" && (
+                <div className="trips-content">
+                    {/* Search and Filters Bar */}
+                    <div className="toolbar">
+                        <div className="search-box">
+                            <Search size={16} />
+                            <input
+                                type="text"
+                                placeholder="Search trip #, passenger, driver, account..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                            {searchQuery && (
+                                <button className="clear-search" onClick={() => setSearchQuery("")}>
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="toolbar-actions">
+                            <button
+                                className={`filter-toggle ${showFilters ? "active" : ""} ${hasActiveFilters ? "has-filters" : ""}`}
+                                onClick={() => setShowFilters(!showFilters)}
+                            >
+                                <Filter size={16} />
+                                Filters
+                                {hasActiveFilters && <span className="filter-dot" />}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Expanded Filters Panel */}
+                    {showFilters && (
+                        <div className="filters-panel">
+                            <div className="filter-group">
+                                <label>Status</label>
+                                <select
+                                    value={statusFilter}
+                                    onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                                >
+                                    <option value="ALL">All Statuses</option>
+                                    <option value="PENDING">Pending</option>
+                                    <option value="CONFIRMED">Confirmed</option>
+                                    <option value="NO_ANSWER">No Answer</option>
+                                    <option value="CANCELLED">Cancelled</option>
+                                    <option value="RESCHEDULED">Rescheduled</option>
+                                    <option value="EXPIRED">Expired</option>
+                                </select>
+                            </div>
+
+                            <div className="filter-group">
+                                <label>Completed By</label>
+                                <select
+                                    value={dispatcherFilter}
+                                    onChange={(e) => setDispatcherFilter(e.target.value)}
+                                >
+                                    <option value="ALL">All Dispatchers</option>
+                                    {dispatchers.map((d) => (
+                                        <option key={d.id} value={d.id}>
+                                            {d.name} ({d.count})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="filter-group">
+                                <label>Date From</label>
+                                <input
+                                    type="date"
+                                    value={dateFrom}
+                                    onChange={(e) => setDateFrom(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="filter-group">
+                                <label>Date To</label>
+                                <input
+                                    type="date"
+                                    value={dateTo}
+                                    onChange={(e) => setDateTo(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="filter-actions">
+                                <button className="apply-btn" onClick={fetchConfirmations} disabled={isLoading}>
+                                    {isLoading ? "Loading..." : "Apply Filters"}
+                                </button>
+                                {hasActiveFilters && (
+                                    <button className="clear-btn" onClick={clearFilters}>
+                                        Clear All
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Results Summary */}
+                    <div className="results-summary">
+                        <span className="results-count">
+                            Showing <strong>{paginatedConfirmations.length}</strong> of{" "}
+                            <strong>{filteredAndSortedConfirmations.length}</strong> trips
+                        </span>
+                        {hasActiveFilters && (
+                            <span className="filtered-indicator">
+                                (filtered from {totalCount} total)
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Data Table */}
+                    <div className="table-container">
+                        <table className="trips-table">
+                            <thead>
+                                <tr>
+                                    <th className="col-status">Status</th>
+                                    <th className="col-trip sortable" onClick={() => handleSort("tripNumber")}>
+                                        <span>Trip #</span>
+                                        <SortIcon field="tripNumber" />
+                                    </th>
+                                    <th className="col-passenger">Passenger</th>
+                                    <th className="col-driver">Driver</th>
+                                    <th className="col-account">Account</th>
+                                    <th className="col-pickup sortable" onClick={() => handleSort("pickupAt")}>
+                                        <span>Pickup</span>
+                                        <SortIcon field="pickupAt" />
+                                    </th>
+                                    <th className="col-due sortable" onClick={() => handleSort("dueAt")}>
+                                        <span>Due</span>
+                                        <SortIcon field="dueAt" />
+                                    </th>
+                                    <th className="col-completed sortable" onClick={() => handleSort("completedAt")}>
+                                        <span>Completed</span>
+                                        <SortIcon field="completedAt" />
+                                    </th>
+                                    <th className="col-dispatcher">By</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {paginatedConfirmations.length === 0 ? (
+                                    <tr className="empty-row">
+                                        <td colSpan={9}>
+                                            <div className="empty-state">
+                                                <Calendar size={40} />
+                                                <p>No trips found</p>
+                                                <span>Try adjusting your filters</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    paginatedConfirmations.map((trip) => {
+                                        const config = STATUS_CONFIG[trip.status] || STATUS_CONFIG.PENDING;
+                                        const Icon = config.icon;
+                                        const isPending = trip.status === "PENDING";
+                                        const overdue = isPending && isOverdue(trip.dueAt);
+
+                                        return (
+                                            <tr key={trip.id} className={overdue ? "overdue" : ""}>
+                                                <td className="col-status">
+                                                    <div
+                                                        className="status-badge"
+                                                        style={{
+                                                            color: config.color,
+                                                            background: config.bgColor,
+                                                        }}
+                                                    >
+                                                        <Icon size={12} />
+                                                        <span>{config.label}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="col-trip">
+                                                    <div className="trip-info">
+                                                        <span className="trip-number">#{trip.tripNumber}</span>
+                                                        {trip.reservationNumber && (
+                                                            <span className="res-number">
+                                                                Res: {trip.reservationNumber}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="col-passenger">
+                                                    <div className="person-cell">
+                                                        <User size={14} />
+                                                        <span>{trip.passengerName}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="col-driver">
+                                                    <div className="person-cell">
+                                                        <Car size={14} />
+                                                        <span>{trip.driverName}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="col-account">
+                                                    {trip.accountName ? (
+                                                        <div className="account-cell">
+                                                            <Building2 size={14} />
+                                                            <span>{trip.accountName}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="empty-cell">—</span>
+                                                    )}
+                                                </td>
+                                                <td className="col-pickup">
+                                                    <div className="datetime-cell">
+                                                        <span className="date">{formatDate(trip.pickupAt)}</span>
+                                                        <span className="time">{formatTime(trip.pickupAt)}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="col-due">
+                                                    <div className={`due-cell ${overdue ? "overdue" : ""}`}>
+                                                        <span className="time">{formatTime(trip.dueAt)}</span>
+                                                        {isPending && (
+                                                            <span className={`time-diff ${overdue ? "overdue" : ""}`}>
+                                                                {overdue ? "+" : "-"}{getTimeDiff(trip.dueAt)}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="col-completed">
+                                                    {trip.completedAt ? (
+                                                        <div className="completed-cell">
+                                                            <span className="datetime">{formatDateTime(trip.completedAt)}</span>
+                                                            {trip.minutesBeforeDue != null && (
+                                                                <span className={`lead-time ${trip.minutesBeforeDue > 0 ? "early" : "late"}`}>
+                                                                    {trip.minutesBeforeDue > 0 ? "+" : ""}{trip.minutesBeforeDue}m
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="empty-cell awaiting">Awaiting</span>
+                                                    )}
+                                                </td>
+                                                <td className="col-dispatcher">
+                                                    {trip.completedBy ? (
+                                                        <div className="dispatcher-cell">
+                                                            <div className="avatar">
+                                                                {(trip.completedBy.name || "?").charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <span className="name">{trip.completedBy.name}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="empty-cell">—</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                        <div className="pagination">
+                            <button
+                                className="page-btn"
+                                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                            >
+                                <ChevronLeft size={16} />
+                            </button>
+                            <div className="page-numbers">
+                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                    let pageNum: number;
+                                    if (totalPages <= 5) {
+                                        pageNum = i + 1;
+                                    } else if (currentPage <= 3) {
+                                        pageNum = i + 1;
+                                    } else if (currentPage >= totalPages - 2) {
+                                        pageNum = totalPages - 4 + i;
+                                    } else {
+                                        pageNum = currentPage - 2 + i;
+                                    }
+                                    return (
+                                        <button
+                                            key={pageNum}
+                                            className={`page-num ${currentPage === pageNum ? "active" : ""}`}
+                                            onClick={() => setCurrentPage(pageNum)}
+                                        >
+                                            {pageNum}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <button
+                                className="page-btn"
+                                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                disabled={currentPage === totalPages}
+                            >
+                                <ChevronRight size={16} />
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ANALYTICS TAB */}
             {selectedTab === "overview" && (
                 <div className="overview-content">
                     {/* Key Stats Cards */}
@@ -255,9 +775,7 @@ export default function ConfirmationsClient({
                             </div>
                             <div className="stat-content">
                                 <span className="stat-label">Late/Expired</span>
-                                <span className="stat-value">
-                                    {stats.late + stats.expired}
-                                </span>
+                                <span className="stat-value">{stats.late + stats.expired}</span>
                                 <span className="stat-sub">{stats.late} late, {stats.expired} expired</span>
                             </div>
                         </div>
@@ -272,6 +790,7 @@ export default function ConfirmationsClient({
                                     label: status,
                                     icon: Clock,
                                     color: "#64748b",
+                                    bgColor: "rgba(100, 116, 139, 0.12)",
                                 };
                                 const Icon = config.icon;
                                 const percentage = stats.total > 0
@@ -281,10 +800,7 @@ export default function ConfirmationsClient({
                                 return (
                                     <div key={status} className="status-row">
                                         <div className="status-info">
-                                            <div
-                                                className="status-icon"
-                                                style={{ color: config.color }}
-                                            >
+                                            <div className="status-icon" style={{ color: config.color }}>
                                                 <Icon size={16} />
                                             </div>
                                             <span className="status-name">{config.label}</span>
@@ -309,10 +825,32 @@ export default function ConfirmationsClient({
                             })}
                         </div>
                     </div>
+
+                    {/* Today's Activity */}
+                    <div className="card">
+                        <h3>
+                            <Calendar size={18} />
+                            Today&apos;s Activity
+                        </h3>
+                        <div className="today-grid">
+                            <div className="today-stat">
+                                <span className="value">{todayConfirmations.length}</span>
+                                <span className="label">Total</span>
+                            </div>
+                            <div className="today-stat success">
+                                <span className="value">{completedToday}</span>
+                                <span className="label">Done</span>
+                            </div>
+                            <div className="today-stat warning">
+                                <span className="value">{pendingCount}</span>
+                                <span className="label">Pending</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 
-            {/* Dispatchers Tab */}
+            {/* DISPATCHERS TAB */}
             {selectedTab === "dispatchers" && (
                 <div className="dispatchers-content">
                     <div className="card">
@@ -355,91 +893,7 @@ export default function ConfirmationsClient({
                 </div>
             )}
 
-            {/* Today Tab */}
-            {selectedTab === "today" && (
-                <div className="today-content">
-                    {/* Today Summary */}
-                    <div className="today-summary">
-                        <div className="summary-stat">
-                            <span className="label">Total Today</span>
-                            <span className="value">{todayConfirmations.length}</span>
-                        </div>
-                        <div className="summary-stat success">
-                            <span className="label">Completed</span>
-                            <span className="value">{completedToday}</span>
-                        </div>
-                        <div className="summary-stat warning">
-                            <span className="label">Pending</span>
-                            <span className="value">{pendingCount}</span>
-                        </div>
-                    </div>
-
-                    {/* Today's Confirmations List */}
-                    <div className="card">
-                        <h3>Today&apos;s Confirmations</h3>
-
-                        {todayConfirmations.length === 0 ? (
-                            <div className="empty-state">
-                                <Calendar size={48} />
-                                <p>No confirmations for today</p>
-                            </div>
-                        ) : (
-                            <div className="confirmations-list">
-                                {todayConfirmations.map((conf) => {
-                                    const config = STATUS_CONFIG[conf.status] || STATUS_CONFIG.PENDING;
-                                    const Icon = config.icon;
-                                    const overdue = conf.status === "PENDING" && isOverdue(conf.dueAt);
-
-                                    return (
-                                        <div
-                                            key={conf.id}
-                                            className={`confirmation-row ${overdue ? "overdue" : ""}`}
-                                        >
-                                            <div className="conf-status">
-                                                <div
-                                                    className="status-badge"
-                                                    style={{ color: config.color }}
-                                                >
-                                                    <Icon size={14} />
-                                                    <span>{config.label}</span>
-                                                </div>
-                                            </div>
-                                            <div className="conf-trip">
-                                                <span className="trip-number">
-                                                    #{conf.tripNumber}
-                                                </span>
-                                                <span className="pickup-time">
-                                                    <Clock size={12} />
-                                                    PU: {formatTime(conf.pickupAt)}
-                                                </span>
-                                            </div>
-                                            <div className="conf-people">
-                                                <span className="person">
-                                                    <User size={12} />
-                                                    {conf.passengerName}
-                                                </span>
-                                            </div>
-                                            <div className="conf-completed">
-                                                {conf.completedBy ? (
-                                                    <span className="completed-by">
-                                                        {conf.completedBy.name}
-                                                        <ArrowRight size={12} />
-                                                        {formatTime(conf.completedAt!)}
-                                                    </span>
-                                                ) : (
-                                                    <span className="awaiting">Awaiting call</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Accountability Tab */}
+            {/* ACCOUNTABILITY TAB */}
             {selectedTab === "accountability" && (
                 <div className="accountability-content">
                     {/* Summary Stats */}
@@ -542,17 +996,11 @@ export default function ConfirmationsClient({
                                             </div>
                                         </div>
                                         <span className="col-shifts">{m.totalShifts}</span>
-                                        <span className="col-completed">
-                                            {m.confirmationsCompleted}
-                                        </span>
-                                        <span className="col-ontime success">
-                                            {m.confirmationsOnTime}
-                                        </span>
+                                        <span className="col-completed">{m.confirmationsCompleted}</span>
+                                        <span className="col-ontime success">{m.confirmationsOnTime}</span>
                                         <span
                                             className={`col-missed ${
-                                                m.confirmationsMissedWhileOnDuty > 0
-                                                    ? "danger"
-                                                    : ""
+                                                m.confirmationsMissedWhileOnDuty > 0 ? "danger" : ""
                                             }`}
                                         >
                                             {m.confirmationsMissedWhileOnDuty}
@@ -595,12 +1043,8 @@ export default function ConfirmationsClient({
                                             onClick={() => toggleMissedExpand(conf.id)}
                                         >
                                             <div className="missed-info">
-                                                <span className="trip-number">
-                                                    #{conf.tripNumber}
-                                                </span>
-                                                <span className="passenger">
-                                                    {conf.passengerName}
-                                                </span>
+                                                <span className="trip-number">#{conf.tripNumber}</span>
+                                                <span className="passenger">{conf.passengerName}</span>
                                             </div>
                                             <div className="missed-meta">
                                                 <span className="due-time">
@@ -634,36 +1078,23 @@ export default function ConfirmationsClient({
                                                     <span className="detail-label">Expired:</span>
                                                     <span>
                                                         {conf.expiredAt
-                                                            ? new Date(
-                                                                  conf.expiredAt
-                                                              ).toLocaleString()
+                                                            ? new Date(conf.expiredAt).toLocaleString()
                                                             : "N/A"}
                                                     </span>
                                                 </div>
                                                 <div className="on-duty-section">
-                                                    <span className="detail-label">
-                                                        Dispatchers On Duty:
-                                                    </span>
+                                                    <span className="detail-label">Dispatchers On Duty:</span>
                                                     <div className="on-duty-list">
                                                         {conf.onDutyDispatchers.map((d) => (
-                                                            <div
-                                                                key={d.id}
-                                                                className="on-duty-dispatcher"
-                                                            >
+                                                            <div key={d.id} className="on-duty-dispatcher">
                                                                 <div className="dispatcher-avatar small">
-                                                                    {(d.name || "?")
-                                                                        .charAt(0)
-                                                                        .toUpperCase()}
+                                                                    {(d.name || "?").charAt(0).toUpperCase()}
                                                                 </div>
-                                                                <span className="name">
-                                                                    {d.name || "Unknown"}
-                                                                </span>
+                                                                <span className="name">{d.name || "Unknown"}</span>
                                                                 <span className="shift-time">
                                                                     {formatTime(d.shiftStart)}
                                                                     {d.shiftEnd
-                                                                        ? ` - ${formatTime(
-                                                                              d.shiftEnd
-                                                                          )}`
+                                                                        ? ` - ${formatTime(d.shiftEnd)}`
                                                                         : " (active)"}
                                                                 </span>
                                                             </div>
@@ -681,57 +1112,121 @@ export default function ConfirmationsClient({
             )}
 
             <style jsx>{`
+                /* ========================================
+                   CONFIRMATIONS PAGE - COMMAND CENTER
+                   ======================================== */
+
                 .confirmations-page {
                     padding: 1.5rem;
-                    max-width: 1400px;
+                    max-width: 1600px;
                     margin: 0 auto;
+                    font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
                 }
 
+                /* ===== HEADER ===== */
                 .page-header {
                     margin-bottom: 1.5rem;
                 }
 
-                .page-header h1 {
+                .header-content {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    gap: 2rem;
+                    flex-wrap: wrap;
+                }
+
+                .header-title {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 1rem;
+                }
+
+                .title-icon {
+                    width: 48px;
+                    height: 48px;
+                    border-radius: 12px;
+                    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
                     display: flex;
                     align-items: center;
-                    gap: 0.75rem;
-                    font-size: 1.5rem;
-                    font-weight: 600;
+                    justify-content: center;
+                    color: white;
+                    box-shadow: 0 4px 20px var(--accent-glow);
+                }
+
+                .header-title h1 {
+                    font-size: 1.75rem;
+                    font-weight: 700;
                     color: var(--text-primary);
-                    margin-bottom: 0.25rem;
+                    margin: 0;
+                    letter-spacing: -0.02em;
                 }
 
-                .page-header h1 :global(svg) {
-                    color: var(--accent);
-                }
-
-                .page-header p {
-                    color: var(--text-secondary);
+                .header-title p {
+                    color: var(--text-muted);
                     font-size: 0.875rem;
+                    margin: 0.25rem 0 0;
+                    font-weight: 500;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
                 }
 
-                /* Tab Navigation */
+                .header-stats {
+                    display: flex;
+                    gap: 1.5rem;
+                }
+
+                .header-stat {
+                    text-align: center;
+                    padding: 0.75rem 1.25rem;
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    border-radius: 10px;
+                }
+
+                .header-stat .stat-number {
+                    display: block;
+                    font-size: 1.5rem;
+                    font-weight: 700;
+                    color: var(--text-primary);
+                    line-height: 1.2;
+                }
+
+                .header-stat .stat-label {
+                    font-size: 0.7rem;
+                    color: var(--text-muted);
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                }
+
+                .header-stat.success .stat-number { color: var(--success); }
+                .header-stat.warning .stat-number { color: var(--warning); }
+
+                /* ===== TAB NAVIGATION ===== */
                 .tab-nav {
                     display: flex;
-                    gap: 0.5rem;
+                    gap: 0.25rem;
                     margin-bottom: 1.5rem;
-                    border-bottom: 1px solid var(--border);
-                    padding-bottom: 0.5rem;
+                    padding: 0.25rem;
+                    background: var(--bg-surface);
+                    border-radius: 12px;
+                    border: 1px solid var(--border);
+                    width: fit-content;
                 }
 
                 .tab-btn {
                     display: flex;
                     align-items: center;
                     gap: 0.5rem;
-                    padding: 0.625rem 1rem;
+                    padding: 0.75rem 1.25rem;
                     background: transparent;
                     border: none;
                     border-radius: 8px;
                     color: var(--text-secondary);
                     font-size: 0.875rem;
-                    font-weight: 500;
+                    font-weight: 600;
                     cursor: pointer;
-                    transition: all 0.15s;
+                    transition: all 0.2s ease;
                 }
 
                 .tab-btn:hover {
@@ -740,25 +1235,567 @@ export default function ConfirmationsClient({
                 }
 
                 .tab-btn.active {
-                    background: var(--primary-soft);
-                    color: var(--primary);
+                    background: var(--accent);
+                    color: white;
+                    box-shadow: 0 2px 8px var(--accent-glow);
                 }
 
-                .pending-badge {
+                .tab-count {
+                    background: rgba(255,255,255,0.2);
+                    padding: 0.125rem 0.5rem;
+                    border-radius: 9999px;
+                    font-size: 0.75rem;
+                    font-weight: 700;
+                }
+
+                .tab-btn:not(.active) .tab-count {
+                    background: var(--bg-hover);
+                    color: var(--text-muted);
+                }
+
+                .missed-badge {
                     background: var(--danger);
                     color: white;
                     padding: 0.125rem 0.5rem;
                     border-radius: 9999px;
                     font-size: 0.75rem;
-                    font-weight: 600;
+                    font-weight: 700;
                 }
 
-                /* Stats Grid */
+                /* ===== TRIPS TAB ===== */
+                .trips-content {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1rem;
+                }
+
+                /* Toolbar */
+                .toolbar {
+                    display: flex;
+                    gap: 1rem;
+                    align-items: center;
+                    flex-wrap: wrap;
+                }
+
+                .search-box {
+                    flex: 1;
+                    min-width: 280px;
+                    max-width: 480px;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    padding: 0.75rem 1rem;
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    border-radius: 10px;
+                    transition: border-color 0.2s;
+                }
+
+                .search-box:focus-within {
+                    border-color: var(--accent);
+                    box-shadow: 0 0 0 3px var(--accent-soft);
+                }
+
+                .search-box :global(svg) {
+                    color: var(--text-muted);
+                    flex-shrink: 0;
+                }
+
+                .search-box input {
+                    flex: 1;
+                    background: transparent;
+                    border: none;
+                    color: var(--text-primary);
+                    font-size: 0.875rem;
+                    outline: none;
+                }
+
+                .search-box input::placeholder {
+                    color: var(--text-muted);
+                }
+
+                .clear-search {
+                    background: var(--bg-hover);
+                    border: none;
+                    border-radius: 4px;
+                    padding: 0.25rem;
+                    cursor: pointer;
+                    color: var(--text-muted);
+                    display: flex;
+                }
+
+                .clear-search:hover {
+                    color: var(--text-primary);
+                    background: var(--bg-active);
+                }
+
+                .toolbar-actions {
+                    display: flex;
+                    gap: 0.5rem;
+                }
+
+                .filter-toggle {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.75rem 1rem;
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    border-radius: 10px;
+                    color: var(--text-secondary);
+                    font-size: 0.875rem;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    position: relative;
+                }
+
+                .filter-toggle:hover {
+                    border-color: var(--text-muted);
+                    color: var(--text-primary);
+                }
+
+                .filter-toggle.active {
+                    background: var(--accent-soft);
+                    border-color: var(--accent);
+                    color: var(--accent);
+                }
+
+                .filter-dot {
+                    position: absolute;
+                    top: 8px;
+                    right: 8px;
+                    width: 6px;
+                    height: 6px;
+                    background: var(--accent);
+                    border-radius: 50%;
+                }
+
+                /* Filters Panel */
+                .filters-panel {
+                    display: flex;
+                    gap: 1rem;
+                    padding: 1rem;
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    border-radius: 12px;
+                    flex-wrap: wrap;
+                    align-items: flex-end;
+                }
+
+                .filter-group {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.375rem;
+                    min-width: 160px;
+                }
+
+                .filter-group label {
+                    font-size: 0.75rem;
+                    font-weight: 600;
+                    color: var(--text-muted);
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                }
+
+                .filter-group select,
+                .filter-group input {
+                    padding: 0.625rem 0.875rem;
+                    background: var(--bg-surface);
+                    border: 1px solid var(--border);
+                    border-radius: 8px;
+                    color: var(--text-primary);
+                    font-size: 0.875rem;
+                    cursor: pointer;
+                }
+
+                .filter-group select:focus,
+                .filter-group input:focus {
+                    outline: none;
+                    border-color: var(--accent);
+                }
+
+                .filter-actions {
+                    display: flex;
+                    gap: 0.5rem;
+                    margin-left: auto;
+                }
+
+                .apply-btn {
+                    padding: 0.625rem 1.25rem;
+                    background: var(--accent);
+                    border: none;
+                    border-radius: 8px;
+                    color: white;
+                    font-size: 0.875rem;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+
+                .apply-btn:hover:not(:disabled) {
+                    background: var(--accent-hover);
+                }
+
+                .apply-btn:disabled {
+                    opacity: 0.6;
+                    cursor: not-allowed;
+                }
+
+                .clear-btn {
+                    padding: 0.625rem 1rem;
+                    background: transparent;
+                    border: 1px solid var(--border);
+                    border-radius: 8px;
+                    color: var(--text-secondary);
+                    font-size: 0.875rem;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+
+                .clear-btn:hover {
+                    border-color: var(--danger);
+                    color: var(--danger);
+                }
+
+                /* Results Summary */
+                .results-summary {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.5rem 0;
+                    color: var(--text-secondary);
+                    font-size: 0.8125rem;
+                }
+
+                .results-summary strong {
+                    color: var(--text-primary);
+                }
+
+                .filtered-indicator {
+                    color: var(--text-muted);
+                }
+
+                /* Data Table */
+                .table-container {
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    border-radius: 12px;
+                    overflow: hidden;
+                }
+
+                .trips-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 0.8125rem;
+                }
+
+                .trips-table thead {
+                    background: var(--bg-surface);
+                    border-bottom: 1px solid var(--border);
+                }
+
+                .trips-table th {
+                    padding: 0.875rem 1rem;
+                    text-align: left;
+                    font-weight: 600;
+                    font-size: 0.7rem;
+                    color: var(--text-muted);
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                    white-space: nowrap;
+                }
+
+                .trips-table th.sortable {
+                    cursor: pointer;
+                    user-select: none;
+                }
+
+                .trips-table th.sortable:hover {
+                    color: var(--text-primary);
+                }
+
+                .trips-table th.sortable span {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.375rem;
+                }
+
+                .trips-table th :global(.sort-icon) {
+                    opacity: 0.3;
+                }
+
+                .trips-table th :global(.sort-icon.active) {
+                    opacity: 1;
+                    color: var(--accent);
+                }
+
+                .trips-table tbody tr {
+                    border-bottom: 1px solid var(--border);
+                    transition: background 0.15s;
+                }
+
+                .trips-table tbody tr:last-child {
+                    border-bottom: none;
+                }
+
+                .trips-table tbody tr:hover {
+                    background: var(--bg-hover);
+                }
+
+                .trips-table tbody tr.overdue {
+                    background: var(--danger-soft);
+                }
+
+                .trips-table tbody tr.overdue:hover {
+                    background: rgba(239, 68, 68, 0.12);
+                }
+
+                .trips-table td {
+                    padding: 0.875rem 1rem;
+                    vertical-align: middle;
+                }
+
+                /* Table Cell Styles */
+                .status-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.375rem;
+                    padding: 0.375rem 0.625rem;
+                    border-radius: 6px;
+                    font-size: 0.75rem;
+                    font-weight: 600;
+                    white-space: nowrap;
+                }
+
+                .trip-info {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.125rem;
+                }
+
+                .trip-number {
+                    font-weight: 700;
+                    color: var(--text-primary);
+                    font-family: 'JetBrains Mono', monospace;
+                }
+
+                .res-number {
+                    font-size: 0.7rem;
+                    color: var(--text-muted);
+                }
+
+                .person-cell,
+                .account-cell {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    color: var(--text-secondary);
+                }
+
+                .person-cell :global(svg),
+                .account-cell :global(svg) {
+                    color: var(--text-muted);
+                    flex-shrink: 0;
+                }
+
+                .datetime-cell {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.125rem;
+                }
+
+                .datetime-cell .date {
+                    font-weight: 500;
+                    color: var(--text-primary);
+                }
+
+                .datetime-cell .time {
+                    font-size: 0.75rem;
+                    color: var(--text-muted);
+                    font-family: 'JetBrains Mono', monospace;
+                }
+
+                .due-cell {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.125rem;
+                }
+
+                .due-cell .time {
+                    font-family: 'JetBrains Mono', monospace;
+                    color: var(--text-secondary);
+                }
+
+                .time-diff {
+                    font-size: 0.7rem;
+                    font-weight: 600;
+                    color: var(--success);
+                }
+
+                .time-diff.overdue {
+                    color: var(--danger);
+                }
+
+                .completed-cell {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.125rem;
+                }
+
+                .completed-cell .datetime {
+                    font-size: 0.75rem;
+                    color: var(--text-secondary);
+                }
+
+                .lead-time {
+                    font-size: 0.7rem;
+                    font-weight: 600;
+                    font-family: 'JetBrains Mono', monospace;
+                }
+
+                .lead-time.early {
+                    color: var(--success);
+                }
+
+                .lead-time.late {
+                    color: var(--danger);
+                }
+
+                .dispatcher-cell {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+
+                .dispatcher-cell .avatar {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 50%;
+                    background: var(--accent-soft);
+                    color: var(--accent);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 0.7rem;
+                    font-weight: 700;
+                }
+
+                .dispatcher-cell .name {
+                    color: var(--text-secondary);
+                    font-size: 0.8125rem;
+                }
+
+                .empty-cell {
+                    color: var(--text-muted);
+                }
+
+                .empty-cell.awaiting {
+                    color: var(--warning);
+                    font-weight: 500;
+                }
+
+                .empty-row td {
+                    padding: 3rem 1rem;
+                }
+
+                .empty-state {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 0.5rem;
+                    color: var(--text-muted);
+                    text-align: center;
+                }
+
+                .empty-state :global(svg) {
+                    opacity: 0.3;
+                }
+
+                .empty-state p {
+                    font-weight: 500;
+                    color: var(--text-secondary);
+                }
+
+                .empty-state span {
+                    font-size: 0.8125rem;
+                }
+
+                /* Pagination */
+                .pagination {
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 1rem 0;
+                }
+
+                .page-btn {
+                    width: 36px;
+                    height: 36px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    border-radius: 8px;
+                    color: var(--text-secondary);
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+
+                .page-btn:hover:not(:disabled) {
+                    border-color: var(--accent);
+                    color: var(--accent);
+                }
+
+                .page-btn:disabled {
+                    opacity: 0.4;
+                    cursor: not-allowed;
+                }
+
+                .page-numbers {
+                    display: flex;
+                    gap: 0.25rem;
+                }
+
+                .page-num {
+                    width: 36px;
+                    height: 36px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: transparent;
+                    border: 1px solid transparent;
+                    border-radius: 8px;
+                    color: var(--text-secondary);
+                    font-size: 0.875rem;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+
+                .page-num:hover {
+                    background: var(--bg-hover);
+                }
+
+                .page-num.active {
+                    background: var(--accent);
+                    color: white;
+                    font-weight: 700;
+                }
+
+                /* ===== OVERVIEW TAB ===== */
+                .overview-content {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1.5rem;
+                }
+
                 .stats-grid {
                     display: grid;
                     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
                     gap: 1rem;
-                    margin-bottom: 1.5rem;
                 }
 
                 .stat-card {
@@ -782,23 +1819,23 @@ export default function ConfirmationsClient({
                 }
 
                 .stat-icon.primary {
-                    background: var(--primary-soft);
-                    color: var(--primary);
+                    background: var(--accent-soft);
+                    color: var(--accent);
                 }
 
                 .stat-icon.success {
-                    background: rgba(34, 197, 94, 0.15);
-                    color: #4ade80;
+                    background: var(--success-soft);
+                    color: var(--success);
                 }
 
                 .stat-icon.warning {
-                    background: rgba(245, 158, 11, 0.15);
-                    color: #fbbf24;
+                    background: var(--warning-soft);
+                    color: var(--warning);
                 }
 
                 .stat-icon.danger {
-                    background: rgba(239, 68, 68, 0.15);
-                    color: #f87171;
+                    background: var(--danger-soft);
+                    color: var(--danger);
                 }
 
                 .stat-content {
@@ -811,12 +1848,14 @@ export default function ConfirmationsClient({
                     color: var(--text-muted);
                     text-transform: uppercase;
                     letter-spacing: 0.05em;
+                    font-weight: 600;
                 }
 
                 .stat-value {
-                    font-size: 1.5rem;
+                    font-size: 1.75rem;
                     font-weight: 700;
                     color: var(--text-primary);
+                    line-height: 1.2;
                 }
 
                 .stat-sub {
@@ -833,10 +1872,17 @@ export default function ConfirmationsClient({
                 }
 
                 .card h3 {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
                     font-size: 1rem;
                     font-weight: 600;
                     color: var(--text-primary);
                     margin-bottom: 0.25rem;
+                }
+
+                .card h3 :global(svg) {
+                    color: var(--accent);
                 }
 
                 .card-subtitle {
@@ -883,7 +1929,7 @@ export default function ConfirmationsClient({
 
                 .status-bar {
                     height: 8px;
-                    background: var(--bg-secondary);
+                    background: var(--bg-surface);
                     border-radius: 4px;
                     overflow: hidden;
                 }
@@ -891,7 +1937,7 @@ export default function ConfirmationsClient({
                 .status-bar-fill {
                     height: 100%;
                     border-radius: 4px;
-                    transition: width 0.3s ease;
+                    transition: width 0.5s ease;
                 }
 
                 .status-count {
@@ -901,7 +1947,7 @@ export default function ConfirmationsClient({
                 }
 
                 .status-count .count {
-                    font-weight: 600;
+                    font-weight: 700;
                     color: var(--text-primary);
                 }
 
@@ -911,7 +1957,44 @@ export default function ConfirmationsClient({
                     margin-left: 0.25rem;
                 }
 
-                /* Dispatcher Table */
+                /* Today Grid */
+                .today-grid {
+                    display: flex;
+                    gap: 1rem;
+                    margin-top: 1rem;
+                }
+
+                .today-stat {
+                    flex: 1;
+                    padding: 1rem;
+                    background: var(--bg-surface);
+                    border-radius: 10px;
+                    text-align: center;
+                }
+
+                .today-stat .value {
+                    display: block;
+                    font-size: 1.5rem;
+                    font-weight: 700;
+                    color: var(--text-primary);
+                }
+
+                .today-stat .label {
+                    font-size: 0.75rem;
+                    color: var(--text-muted);
+                    text-transform: uppercase;
+                }
+
+                .today-stat.success .value { color: var(--success); }
+                .today-stat.warning .value { color: var(--warning); }
+
+                /* ===== DISPATCHERS TAB ===== */
+                .dispatchers-content {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1.5rem;
+                }
+
                 .dispatcher-table {
                     margin-top: 1rem;
                 }
@@ -953,161 +2036,37 @@ export default function ConfirmationsClient({
                     width: 32px;
                     height: 32px;
                     border-radius: 50%;
-                    background: var(--primary-soft);
-                    color: var(--primary);
+                    background: var(--accent-soft);
+                    color: var(--accent);
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    font-weight: 600;
+                    font-weight: 700;
                     font-size: 0.875rem;
+                }
+
+                .dispatcher-avatar.small {
+                    width: 24px;
+                    height: 24px;
+                    font-size: 0.7rem;
                 }
 
                 .col-total,
                 .col-ontime,
                 .col-late,
-                .col-rate {
+                .col-rate,
+                .col-shifts,
+                .col-completed,
+                .col-missed {
                     font-size: 0.875rem;
                     text-align: center;
                 }
 
-                .success {
-                    color: #4ade80;
-                }
+                .success { color: var(--success); }
+                .warning { color: var(--warning); }
+                .danger { color: var(--danger); }
 
-                .warning {
-                    color: #fbbf24;
-                }
-
-                .danger {
-                    color: #f87171;
-                }
-
-                /* Today Summary */
-                .today-summary {
-                    display: flex;
-                    gap: 1rem;
-                    margin-bottom: 1.5rem;
-                }
-
-                .summary-stat {
-                    flex: 1;
-                    padding: 1rem;
-                    background: var(--bg-card);
-                    border: 1px solid var(--border);
-                    border-radius: 10px;
-                    text-align: center;
-                }
-
-                .summary-stat .label {
-                    display: block;
-                    font-size: 0.75rem;
-                    color: var(--text-muted);
-                    text-transform: uppercase;
-                    margin-bottom: 0.25rem;
-                }
-
-                .summary-stat .value {
-                    font-size: 1.5rem;
-                    font-weight: 700;
-                    color: var(--text-primary);
-                }
-
-                .summary-stat.success .value {
-                    color: #4ade80;
-                }
-
-                .summary-stat.warning .value {
-                    color: #fbbf24;
-                }
-
-                /* Confirmations List */
-                .confirmations-list {
-                    margin-top: 1rem;
-                }
-
-                .confirmation-row {
-                    display: grid;
-                    grid-template-columns: 140px 1fr 1fr 1fr;
-                    gap: 1rem;
-                    padding: 0.875rem 0;
-                    border-bottom: 1px solid var(--border);
-                    align-items: center;
-                }
-
-                .confirmation-row:last-child {
-                    border-bottom: none;
-                }
-
-                .confirmation-row.overdue {
-                    background: rgba(239, 68, 68, 0.08);
-                    margin: 0 -1.25rem;
-                    padding-left: 1.25rem;
-                    padding-right: 1.25rem;
-                }
-
-                .status-badge {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 0.375rem;
-                    font-size: 0.8125rem;
-                    font-weight: 500;
-                }
-
-                .conf-trip {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.75rem;
-                }
-
-                .trip-number {
-                    font-weight: 600;
-                    color: var(--text-primary);
-                }
-
-                .pickup-time {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.25rem;
-                    font-size: 0.75rem;
-                    color: var(--text-secondary);
-                }
-
-                .conf-people .person {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.375rem;
-                    font-size: 0.875rem;
-                    color: var(--text-secondary);
-                }
-
-                .conf-completed .completed-by {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.375rem;
-                    font-size: 0.8125rem;
-                    color: #4ade80;
-                }
-
-                .conf-completed .awaiting {
-                    font-size: 0.8125rem;
-                    color: var(--text-muted);
-                }
-
-                /* Empty State */
-                .empty-state {
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    gap: 0.75rem;
-                    padding: 3rem 0;
-                    color: var(--text-secondary);
-                }
-
-                .empty-state :global(svg) {
-                    opacity: 0.3;
-                }
-
-                /* Accountability Tab Styles */
+                /* ===== ACCOUNTABILITY TAB ===== */
                 .accountability-content {
                     display: flex;
                     flex-direction: column;
@@ -1117,48 +2076,46 @@ export default function ConfirmationsClient({
                 .accountability-summary {
                     display: flex;
                     gap: 1rem;
+                    flex-wrap: wrap;
                 }
 
-                .accountability-summary .summary-stat {
+                .summary-stat {
                     flex: 1;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
+                    min-width: 180px;
                     padding: 1.25rem;
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    border-radius: 12px;
+                    text-align: center;
                 }
 
-                .accountability-summary .summary-stat .sub {
+                .summary-stat .label {
+                    display: block;
                     font-size: 0.75rem;
                     color: var(--text-muted);
-                    margin-top: 0.25rem;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
                 }
 
-                .accountability-summary .summary-stat.danger {
-                    border-color: rgba(239, 68, 68, 0.3);
-                    background: rgba(239, 68, 68, 0.05);
+                .summary-stat .value {
+                    display: block;
+                    font-size: 2rem;
+                    font-weight: 700;
+                    color: var(--text-primary);
+                    margin: 0.25rem 0;
                 }
 
-                .accountability-summary .summary-stat.danger .value {
-                    color: #f87171;
-                }
-
-                .missed-badge {
-                    background: #f87171;
-                    color: white;
-                    padding: 0.125rem 0.5rem;
-                    border-radius: 9999px;
+                .summary-stat .sub {
                     font-size: 0.75rem;
-                    font-weight: 600;
+                    color: var(--text-secondary);
                 }
+
+                .summary-stat.success .value { color: var(--success); }
+                .summary-stat.warning .value { color: var(--warning); }
+                .summary-stat.danger .value { color: var(--danger); }
 
                 .top-issues-card h3 {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                }
-
-                .top-issues-card h3 :global(svg) {
-                    color: #fbbf24;
+                    color: var(--danger);
                 }
 
                 .top-issues {
@@ -1173,32 +2130,29 @@ export default function ConfirmationsClient({
                     align-items: center;
                     gap: 0.75rem;
                     padding: 0.75rem;
-                    background: var(--bg-secondary);
-                    border-radius: 8px;
+                    background: var(--bg-surface);
+                    border-radius: 10px;
                 }
 
                 .issue-avatar {
                     width: 36px;
                     height: 36px;
                     border-radius: 50%;
-                    background: rgba(239, 68, 68, 0.15);
-                    color: #f87171;
+                    background: var(--danger-soft);
+                    color: var(--danger);
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    font-weight: 600;
-                    font-size: 0.875rem;
-                    flex-shrink: 0;
+                    font-weight: 700;
                 }
 
                 .issue-info {
                     flex: 1;
-                    display: flex;
-                    flex-direction: column;
                 }
 
                 .issue-name {
-                    font-weight: 500;
+                    display: block;
+                    font-weight: 600;
                     color: var(--text-primary);
                 }
 
@@ -1208,42 +2162,23 @@ export default function ConfirmationsClient({
                 }
 
                 .issue-stats {
-                    display: flex;
-                    flex-direction: column;
-                    align-items: flex-end;
-                    gap: 0.125rem;
+                    text-align: right;
                 }
 
                 .missed-count {
-                    font-size: 0.8125rem;
-                    color: #f87171;
-                    font-weight: 500;
+                    display: block;
+                    font-weight: 600;
+                    color: var(--danger);
                 }
 
                 .issue-stats .rate {
                     font-size: 0.75rem;
-                    font-weight: 600;
                 }
 
-                /* Accountability Table */
-                .accountability-table {
-                    margin-top: 1rem;
-                }
-
+                .accountability-table,
                 .accountability-header,
                 .accountability-row {
-                    display: grid;
-                    grid-template-columns: 2fr 0.75fr 1fr 0.75fr 0.75fr 0.75fr;
-                    gap: 0.75rem;
-                    padding: 0.75rem 0;
-                    align-items: center;
-                }
-
-                .col-shifts,
-                .col-completed,
-                .col-missed {
-                    font-size: 0.875rem;
-                    text-align: center;
+                    grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;
                 }
 
                 .name-info {
@@ -1252,13 +2187,14 @@ export default function ConfirmationsClient({
                 }
 
                 .name-info .name {
-                    font-weight: 500;
+                    font-weight: 600;
                     color: var(--text-primary);
                 }
 
                 .name-info .role {
-                    font-size: 0.75rem;
+                    font-size: 0.7rem;
                     color: var(--text-muted);
+                    text-transform: uppercase;
                 }
 
                 /* Missed Confirmations List */
@@ -1271,8 +2207,9 @@ export default function ConfirmationsClient({
 
                 .missed-item {
                     border: 1px solid var(--border);
-                    border-radius: 8px;
+                    border-radius: 10px;
                     overflow: hidden;
+                    background: var(--bg-surface);
                 }
 
                 .missed-header {
@@ -1281,7 +2218,6 @@ export default function ConfirmationsClient({
                     gap: 1rem;
                     padding: 0.875rem 1rem;
                     cursor: pointer;
-                    background: var(--bg-secondary);
                     transition: background 0.15s;
                 }
 
@@ -1292,16 +2228,17 @@ export default function ConfirmationsClient({
                 .missed-info {
                     flex: 1;
                     display: flex;
-                    flex-direction: column;
+                    align-items: center;
+                    gap: 0.75rem;
                 }
 
                 .missed-info .trip-number {
-                    font-weight: 600;
-                    color: #f87171;
+                    font-weight: 700;
+                    color: var(--danger);
+                    font-family: 'JetBrains Mono', monospace;
                 }
 
                 .missed-info .passenger {
-                    font-size: 0.8125rem;
                     color: var(--text-secondary);
                 }
 
@@ -1313,8 +2250,8 @@ export default function ConfirmationsClient({
                 .missed-meta span {
                     display: flex;
                     align-items: center;
-                    gap: 0.25rem;
-                    font-size: 0.75rem;
+                    gap: 0.375rem;
+                    font-size: 0.8125rem;
                     color: var(--text-muted);
                 }
 
@@ -1330,13 +2267,14 @@ export default function ConfirmationsClient({
 
                 .detail-row {
                     display: flex;
-                    gap: 0.5rem;
-                    font-size: 0.8125rem;
-                    margin-bottom: 0.5rem;
+                    gap: 0.75rem;
+                    padding: 0.375rem 0;
                 }
 
                 .detail-label {
+                    font-weight: 600;
                     color: var(--text-muted);
+                    font-size: 0.8125rem;
                     min-width: 80px;
                 }
 
@@ -1358,26 +2296,31 @@ export default function ConfirmationsClient({
                     align-items: center;
                     gap: 0.5rem;
                     padding: 0.5rem;
-                    background: var(--bg-secondary);
-                    border-radius: 6px;
-                }
-
-                .dispatcher-avatar.small {
-                    width: 24px;
-                    height: 24px;
-                    font-size: 0.75rem;
+                    background: var(--bg-surface);
+                    border-radius: 8px;
                 }
 
                 .on-duty-dispatcher .name {
                     font-weight: 500;
                     color: var(--text-primary);
-                    font-size: 0.8125rem;
                 }
 
                 .on-duty-dispatcher .shift-time {
+                    margin-left: auto;
                     font-size: 0.75rem;
                     color: var(--text-muted);
-                    margin-left: auto;
+                    font-family: 'JetBrains Mono', monospace;
+                }
+
+                /* ===== RESPONSIVE ===== */
+                @media (max-width: 1024px) {
+                    .table-container {
+                        overflow-x: auto;
+                    }
+
+                    .trips-table {
+                        min-width: 900px;
+                    }
                 }
 
                 @media (max-width: 768px) {
@@ -1385,50 +2328,102 @@ export default function ConfirmationsClient({
                         padding: 1rem;
                     }
 
+                    .header-content {
+                        flex-direction: column;
+                        gap: 1rem;
+                    }
+
+                    .header-stats {
+                        width: 100%;
+                        justify-content: space-between;
+                    }
+
                     .tab-nav {
+                        width: 100%;
                         overflow-x: auto;
+                        -webkit-overflow-scrolling: touch;
+                    }
+
+                    .tab-btn {
+                        white-space: nowrap;
+                        padding: 0.625rem 1rem;
+                    }
+
+                    .toolbar {
+                        flex-direction: column;
+                    }
+
+                    .search-box {
+                        max-width: none;
+                    }
+
+                    .filters-panel {
+                        flex-direction: column;
+                    }
+
+                    .filter-group {
+                        width: 100%;
+                    }
+
+                    .filter-actions {
+                        margin-left: 0;
+                        width: 100%;
+                    }
+
+                    .apply-btn, .clear-btn {
+                        flex: 1;
                     }
 
                     .stats-grid {
-                        grid-template-columns: 1fr 1fr;
+                        grid-template-columns: repeat(2, 1fr);
                     }
 
                     .table-header,
                     .table-row {
-                        grid-template-columns: 1.5fr 1fr 1fr;
+                        grid-template-columns: 1.5fr 1fr 1fr 1fr;
                     }
 
-                    .col-ontime,
                     .col-late {
                         display: none;
-                    }
-
-                    .confirmation-row {
-                        grid-template-columns: 1fr;
-                        gap: 0.5rem;
-                    }
-
-                    .today-summary {
-                        flex-direction: column;
                     }
 
                     .accountability-summary {
                         flex-direction: column;
                     }
 
-                    .accountability-header,
-                    .accountability-row {
-                        grid-template-columns: 1.5fr 1fr 1fr;
+                    .summary-stat {
+                        min-width: auto;
+                    }
+                }
+
+                @media (max-width: 480px) {
+                    .header-title h1 {
+                        font-size: 1.25rem;
                     }
 
-                    .col-shifts,
-                    .col-completed {
-                        display: none;
+                    .title-icon {
+                        width: 40px;
+                        height: 40px;
                     }
 
-                    .missed-meta {
+                    .header-stat {
+                        padding: 0.5rem 0.75rem;
+                    }
+
+                    .header-stat .stat-number {
+                        font-size: 1.25rem;
+                    }
+
+                    .stats-grid {
+                        grid-template-columns: 1fr;
+                    }
+
+                    .stat-card {
+                        padding: 1rem;
+                    }
+
+                    .today-grid {
                         flex-direction: column;
-                        gap: 0.25rem;
                     }
                 }
             `}</style>

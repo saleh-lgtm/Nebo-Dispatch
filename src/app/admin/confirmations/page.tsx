@@ -7,11 +7,13 @@ import {
     getTodayConfirmations,
     getDispatcherAccountabilityMetrics,
     getMissedConfirmationReport,
+    getAllConfirmations,
+    getConfirmationDispatchers,
 } from "@/lib/tripConfirmationActions";
 import ConfirmationsClient from "./ConfirmationsClient";
 
 export const metadata = {
-    title: "Confirmation Metrics | Admin",
+    title: "Trip Confirmations | Command Center",
 };
 
 export default async function ConfirmationsPage() {
@@ -35,12 +37,16 @@ export default async function ConfirmationsPage() {
         todayConfirmations,
         accountabilityMetrics,
         missedConfirmations,
+        allConfirmationsData,
+        dispatchers,
     ] = await Promise.all([
         getConfirmationStats(30),
         getAllDispatcherMetrics(30),
         getTodayConfirmations(),
         getDispatcherAccountabilityMetrics(30),
         getMissedConfirmationReport(30),
+        getAllConfirmations({ limit: 100 }),
+        getConfirmationDispatchers(),
     ]);
 
     return (
@@ -50,6 +56,9 @@ export default async function ConfirmationsPage() {
             todayConfirmations={todayConfirmations}
             accountabilityMetrics={accountabilityMetrics}
             missedConfirmations={missedConfirmations}
+            allConfirmations={allConfirmationsData.confirmations}
+            totalConfirmations={allConfirmationsData.total}
+            dispatchers={dispatchers}
         />
     );
 }
