@@ -1536,6 +1536,9 @@ model TripConfirmation {
   @@index([completedById])
   @@index([manifestDate])
   @@index([archivedAt])
+  @@index([pickupAt])                    // For sorting/filtering by pickup time
+  @@index([status, archivedAt, pickupAt]) // For dashboard query (pending + not archived + future)
+  @@index([createdAt])                   // For stats queries
 }
 
 // Manifest ingestion log - track incoming manifests
