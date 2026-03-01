@@ -403,7 +403,7 @@ export default function ConfirmationsClient({
 
     const hasActiveFilters = searchQuery || statusFilter !== "ALL" || dispatcherFilter !== "ALL" || dateFrom || dateTo;
 
-    const handleStatusChange = async (tripId: string, newStatus: "CONFIRMED" | "NO_ANSWER" | "CANCELLED" | "RESCHEDULED", notes?: string) => {
+    const handleStatusChange = async (tripId: string, newStatus: "PENDING" | "CONFIRMED" | "NO_ANSWER" | "CANCELLED" | "RESCHEDULED", notes?: string) => {
         setCompleting(tripId);
         setError(null);
         try {
@@ -752,17 +752,13 @@ export default function ConfirmationsClient({
                                                     )}
                                                 </td>
                                                 <td className="col-actions">
-                                                    {isPending ? (
-                                                        <button
-                                                            className="action-btn"
-                                                            onClick={() => setSelectedTrip(trip)}
-                                                            disabled={completing === trip.id}
-                                                        >
-                                                            {completing === trip.id ? "..." : "Update"}
-                                                        </button>
-                                                    ) : (
-                                                        <span className="empty-cell">—</span>
-                                                    )}
+                                                    <button
+                                                        className="action-btn"
+                                                        onClick={() => setSelectedTrip(trip)}
+                                                        disabled={completing === trip.id}
+                                                    >
+                                                        {completing === trip.id ? "..." : "Edit"}
+                                                    </button>
                                                 </td>
                                             </tr>
                                         );
@@ -822,7 +818,7 @@ export default function ConfirmationsClient({
                 <div className="modal-overlay" onClick={() => setSelectedTrip(null)}>
                     <div className="modal" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h3>Update Confirmation Status</h3>
+                            <h3>Edit Confirmation</h3>
                             <span className="trip-badge">#{selectedTrip.tripNumber}</span>
                         </div>
                         <div className="modal-body">
@@ -848,38 +844,58 @@ export default function ConfirmationsClient({
                                     <Clock size={14} />
                                     <span>Pickup: {formatTime(selectedTrip.pickupAt)}</span>
                                 </div>
+                                <div className="info-row current-status">
+                                    {(() => {
+                                        const config = STATUS_CONFIG[selectedTrip.status] || STATUS_CONFIG.PENDING;
+                                        const Icon = config.icon;
+                                        return (
+                                            <>
+                                                <Icon size={14} style={{ color: config.color }} />
+                                                <span>Current: <strong style={{ color: config.color }}>{config.label}</strong></span>
+                                            </>
+                                        );
+                                    })()}
+                                </div>
                             </div>
                             <div className="status-options">
-                                <label>Select Status:</label>
+                                <label>Change Status To:</label>
                                 <div className="options-grid">
                                     <button
-                                        className="status-btn status-confirmed"
+                                        className={`status-btn status-pending ${selectedTrip.status === "PENDING" ? "current" : ""}`}
+                                        onClick={() => handleStatusChange(selectedTrip.id, "PENDING", actionNotes)}
+                                        disabled={completing !== null || selectedTrip.status === "PENDING"}
+                                    >
+                                        <Clock size={18} />
+                                        <span>Pending</span>
+                                    </button>
+                                    <button
+                                        className={`status-btn status-confirmed ${selectedTrip.status === "CONFIRMED" ? "current" : ""}`}
                                         onClick={() => handleStatusChange(selectedTrip.id, "CONFIRMED", actionNotes)}
-                                        disabled={completing !== null}
+                                        disabled={completing !== null || selectedTrip.status === "CONFIRMED"}
                                     >
                                         <CheckCircle size={18} />
                                         <span>Confirmed</span>
                                     </button>
                                     <button
-                                        className="status-btn status-no-answer"
+                                        className={`status-btn status-no-answer ${selectedTrip.status === "NO_ANSWER" ? "current" : ""}`}
                                         onClick={() => handleStatusChange(selectedTrip.id, "NO_ANSWER", actionNotes)}
-                                        disabled={completing !== null}
+                                        disabled={completing !== null || selectedTrip.status === "NO_ANSWER"}
                                     >
                                         <PhoneOff size={18} />
                                         <span>No Answer</span>
                                     </button>
                                     <button
-                                        className="status-btn status-cancelled"
+                                        className={`status-btn status-cancelled ${selectedTrip.status === "CANCELLED" ? "current" : ""}`}
                                         onClick={() => handleStatusChange(selectedTrip.id, "CANCELLED", actionNotes)}
-                                        disabled={completing !== null}
+                                        disabled={completing !== null || selectedTrip.status === "CANCELLED"}
                                     >
                                         <XCircle size={18} />
                                         <span>Cancelled</span>
                                     </button>
                                     <button
-                                        className="status-btn status-rescheduled"
+                                        className={`status-btn status-rescheduled ${selectedTrip.status === "RESCHEDULED" ? "current" : ""}`}
                                         onClick={() => handleStatusChange(selectedTrip.id, "RESCHEDULED", actionNotes)}
-                                        disabled={completing !== null}
+                                        disabled={completing !== null || selectedTrip.status === "RESCHEDULED"}
                                     >
                                         <RotateCcw size={18} />
                                         <span>Rescheduled</span>
@@ -2728,6 +2744,38 @@ export default function ConfirmationsClient({
                     background: rgba(167, 139, 250, 0.1);
                     border-color: #a78bfa;
                     color: #a78bfa;
+                }
+
+                .status-btn.status-pending {
+                    background: rgba(96, 165, 250, 0.1);
+                    border-color: #60a5fa;
+                    color: #60a5fa;
+                }
+
+                .status-btn.current {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                    position: relative;
+                }
+
+                .status-btn.current::after {
+                    content: "Current";
+                    position: absolute;
+                    top: -8px;
+                    right: -8px;
+                    background: var(--bg-secondary);
+                    color: var(--text-secondary);
+                    font-size: 0.625rem;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    font-weight: 600;
+                }
+
+                .current-status {
+                    background: var(--bg-tertiary);
+                    padding: 0.5rem 0.75rem;
+                    border-radius: 6px;
+                    margin-top: 0.25rem;
                 }
 
                 .notes-field {

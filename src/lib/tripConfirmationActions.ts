@@ -78,8 +78,9 @@ export async function getTodayConfirmations() {
 }
 
 /**
- * Complete a trip confirmation
- * Uses atomic update to prevent race conditions (double-completion)
+ * Complete or update a trip confirmation status
+ * - Admins can edit any trip status
+ * - Dispatchers can only complete PENDING trips (with race condition protection)
  */
 export async function completeConfirmation(
     confirmationId: string,
@@ -90,6 +91,10 @@ export async function completeConfirmation(
     if (!session?.user) {
         throw new Error("Unauthorized");
     }
+
+    const isAdmin = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"].includes(
+        session.user.role || ""
+    );
 
     // Fetch confirmation first to calculate minutesBeforeDue and get tripNumber
     const confirmation = await prisma.tripConfirmation.findUnique({
@@ -105,26 +110,42 @@ export async function completeConfirmation(
         (confirmation.dueAt.getTime() - now.getTime()) / (1000 * 60)
     );
 
-    // Atomic update: only update if status is still PENDING
-    // This prevents race conditions where two users try to complete simultaneously
-    const updateResult = await prisma.tripConfirmation.updateMany({
-        where: {
-            id: confirmationId,
-            status: "PENDING", // Only update if still pending
-        },
-        data: {
-            status,
-            completedAt: now,
-            completedById: session.user.id,
-            minutesBeforeDue,
-            notes: notes || null,
-            archivedAt: now, // Archive immediately on completion
-        },
-    });
+    const previousStatus = confirmation.status;
 
-    // Check if the update actually happened
-    if (updateResult.count === 0) {
-        throw new Error("Confirmation already completed by another user");
+    // Admins can update any status; dispatchers can only complete PENDING trips
+    if (isAdmin) {
+        // Admin: direct update, can change any status
+        await prisma.tripConfirmation.update({
+            where: { id: confirmationId },
+            data: {
+                status,
+                completedAt: confirmation.completedAt || now,
+                completedById: confirmation.completedById || session.user.id,
+                minutesBeforeDue: confirmation.minutesBeforeDue ?? minutesBeforeDue,
+                notes: notes || confirmation.notes || null,
+                archivedAt: confirmation.archivedAt || now,
+            },
+        });
+    } else {
+        // Dispatcher: atomic update, only if still PENDING
+        const updateResult = await prisma.tripConfirmation.updateMany({
+            where: {
+                id: confirmationId,
+                status: "PENDING",
+            },
+            data: {
+                status,
+                completedAt: now,
+                completedById: session.user.id,
+                minutesBeforeDue,
+                notes: notes || null,
+                archivedAt: now,
+            },
+        });
+
+        if (updateResult.count === 0) {
+            throw new Error("Confirmation already completed by another user");
+        }
     }
 
     // Fetch the updated record for return
@@ -145,12 +166,15 @@ export async function completeConfirmation(
         confirmationId,
         {
             tripNumber: confirmation.tripNumber,
-            status,
+            previousStatus,
+            newStatus: status,
             minutesBeforeDue,
+            editedByAdmin: isAdmin,
         }
     );
 
     revalidatePath("/dashboard");
+    revalidatePath("/admin/confirmations");
 
     return updated;
 }
