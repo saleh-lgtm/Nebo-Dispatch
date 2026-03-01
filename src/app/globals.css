@@ -1297,14 +1297,22 @@ textarea.input {
 }
 
 /* Sidebar Skeleton */
+/* Sidebar skeleton - matches actual sidebar dimensions */
 .sidebar-skeleton {
   position: fixed;
   left: 0;
   top: 0;
   bottom: 0;
-  width: 240px;
+  width: 260px;
   background: var(--bg-surface);
   border-right: 1px solid var(--border);
+  z-index: 100;
+}
+
+@media (min-width: 1400px) {
+  .sidebar-skeleton {
+    width: 280px;
+  }
 }
 
 /* Main Layout with Sidebar */

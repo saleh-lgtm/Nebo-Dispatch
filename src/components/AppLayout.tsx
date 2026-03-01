@@ -3,7 +3,8 @@
 import { useSession } from "next-auth/react";
 import dynamic from "next/dynamic";
 
-// Dynamic imports for heavy layout components - improves initial load
+// Dynamic imports for layout components
+// Sidebar: SSR enabled to prevent layout shift and ensure immediate functionality
 const Navbar = dynamic(() => import("./Navbar"), {
     loading: () => <NavbarSkeleton />,
     ssr: false,
@@ -11,7 +12,7 @@ const Navbar = dynamic(() => import("./Navbar"), {
 
 const Sidebar = dynamic(() => import("./Sidebar"), {
     loading: () => <SidebarSkeleton />,
-    ssr: false,
+    ssr: true, // Enable SSR to prevent layout shift
 });
 
 function NavbarSkeleton() {
@@ -30,9 +31,21 @@ function NavbarSkeleton() {
 function SidebarSkeleton() {
     return (
         <aside className="sidebar-skeleton">
-            <div className="skeleton" style={{ width: "100%", height: "60px" }} />
-            <div style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                {[1, 2, 3, 4, 5, 6].map((i) => (
+            {/* Header */}
+            <div style={{ padding: "1.25rem 1rem", borderBottom: "1px solid var(--border)" }}>
+                <div className="skeleton" style={{ width: "100px", height: "24px", borderRadius: "4px" }} />
+            </div>
+            {/* User card */}
+            <div style={{ padding: "1rem", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <div className="skeleton" style={{ width: "38px", height: "38px", borderRadius: "6px", flexShrink: 0 }} />
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                    <div className="skeleton" style={{ width: "80%", height: "14px", borderRadius: "4px" }} />
+                    <div className="skeleton" style={{ width: "50%", height: "10px", borderRadius: "4px" }} />
+                </div>
+            </div>
+            {/* Nav items */}
+            <div style={{ padding: "0.75rem 0.5rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
                     <div key={i} className="skeleton" style={{ width: "100%", height: "36px", borderRadius: "6px" }} />
                 ))}
             </div>

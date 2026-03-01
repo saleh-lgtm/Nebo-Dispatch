@@ -5,11 +5,6 @@ import {
     Phone,
     Clock,
     CheckCircle,
-    XCircle,
-    PhoneOff,
-    RotateCcw,
-    AlertTriangle,
-    User,
     TrendingUp,
     TrendingDown,
     Timer,
@@ -30,85 +25,24 @@ import {
     ChevronLeft,
     ChevronRight,
     ListFilter,
+    User,
+    AlertTriangle,
 } from "lucide-react";
 import { getAllConfirmations, completeConfirmation, getConfirmationTabData } from "@/lib/tripConfirmationActions";
 import { useRouter } from "next/navigation";
-
-interface Stats {
-    total: number;
-    completed: number;
-    pending: number;
-    expired: number;
-    onTime: number;
-    late: number;
-    avgLeadTime: number;
-    onTimeRate: number;
-    completionRate: number;
-    byStatus: Record<string, number>;
-}
-
-interface DispatcherMetric {
-    id: string;
-    name: string;
-    total: number;
-    onTime: number;
-    late: number;
-    onTimeRate: number;
-    byStatus: Record<string, number>;
-}
-
-interface TripConfirmation {
-    id: string;
-    tripNumber: string;
-    reservationNumber?: string | null;
-    pickupAt: Date | string;
-    dueAt: Date | string;
-    passengerName: string;
-    driverName: string;
-    accountName?: string | null;
-    accountNumber?: string | null;
-    status: string;
-    completedAt: Date | string | null;
-    completedBy: { id: string; name: string | null } | null;
-    minutesBeforeDue?: number | null;
-    notes?: string | null;
-    manifestDate: Date | string;
-    createdAt: Date | string;
-}
-
-interface AccountabilityMetric {
-    id: string;
-    name: string;
-    role: string;
-    totalShifts: number;
-    confirmationsCompleted: number;
-    confirmationsOnTime: number;
-    confirmationsMissedWhileOnDuty: number;
-    accountabilityRate: number;
-}
-
-interface MissedConfirmation {
-    id: string;
-    tripNumber: string;
-    passengerName: string;
-    driverName: string;
-    dueAt: Date | string;
-    pickupAt: Date | string;
-    expiredAt: Date | string | null;
-    onDutyDispatchers: Array<{
-        id: string;
-        name: string | null;
-        role: string;
-        shiftStart: Date | string;
-        shiftEnd: Date | string | null;
-    }>;
-}
-
-interface Dispatcher {
-    id: string;
-    name: string;
-    count: number;
-}
+import ConfirmationModal from "./components/ConfirmationModal";
+import {
+    Stats,
+    DispatcherMetric,
+    TripConfirmation,
+    AccountabilityMetric,
+    MissedConfirmation,
+    Dispatcher,
+    SortField,
+    SortDirection,
+    StatusFilter,
+    STATUS_CONFIG,
+} from "./types";
 
 interface Props {
     stats: Stats;
@@ -120,22 +54,6 @@ interface Props {
     totalConfirmations: number;
     dispatchers: Dispatcher[];
 }
-
-type SortField = "pickupAt" | "dueAt" | "status" | "tripNumber" | "createdAt" | "completedAt";
-type SortDirection = "asc" | "desc";
-type StatusFilter = "ALL" | "PENDING" | "CONFIRMED" | "NO_ANSWER" | "CANCELLED" | "RESCHEDULED" | "EXPIRED";
-
-const STATUS_CONFIG: Record<
-    string,
-    { label: string; icon: typeof CheckCircle; color: string; bgColor: string }
-> = {
-    PENDING: { label: "Pending", icon: Clock, color: "#60a5fa", bgColor: "rgba(96, 165, 250, 0.12)" },
-    CONFIRMED: { label: "Confirmed", icon: CheckCircle, color: "#4ade80", bgColor: "rgba(74, 222, 128, 0.12)" },
-    NO_ANSWER: { label: "No Answer", icon: PhoneOff, color: "#fbbf24", bgColor: "rgba(251, 191, 36, 0.12)" },
-    CANCELLED: { label: "Cancelled", icon: XCircle, color: "#f87171", bgColor: "rgba(248, 113, 113, 0.12)" },
-    RESCHEDULED: { label: "Rescheduled", icon: RotateCcw, color: "#a78bfa", bgColor: "rgba(167, 139, 250, 0.12)" },
-    EXPIRED: { label: "Expired", icon: AlertTriangle, color: "#ef4444", bgColor: "rgba(239, 68, 68, 0.12)" },
-};
 
 export default function ConfirmationsClient({
     stats,
@@ -167,8 +85,6 @@ export default function ConfirmationsClient({
     const [dateTo, setDateTo] = useState<string>("");
     const [selectedTrip, setSelectedTrip] = useState<TripConfirmation | null>(null);
     const [completing, setCompleting] = useState<string | null>(null);
-    const [actionNotes, setActionNotes] = useState("");
-    const [error, setError] = useState<string | null>(null);
     const [now, setNow] = useState(() => Date.now());
     const router = useRouter();
 
@@ -423,7 +339,7 @@ export default function ConfirmationsClient({
                 dateTo: dateTo ? new Date(dateTo) : undefined,
                 dispatcherId: dispatcherFilter === "ALL" ? undefined : dispatcherFilter,
                 search: searchQuery || undefined,
-                limit: 500,
+                limit: 100, // Optimized: reduced from 500 for better performance
             });
             setConfirmations(result.confirmations as TripConfirmation[]);
             setTotalCount(result.total);
@@ -448,18 +364,16 @@ export default function ConfirmationsClient({
 
     const handleStatusChange = async (tripId: string, newStatus: "PENDING" | "CONFIRMED" | "NO_ANSWER" | "CANCELLED" | "RESCHEDULED", notes?: string) => {
         setCompleting(tripId);
-        setError(null);
         try {
             await completeConfirmation(tripId, newStatus, notes || "");
             setSelectedTrip(null);
-            setActionNotes("");
             router.refresh();
             // Refresh the confirmations list
             await fetchConfirmations();
         } catch (err) {
-            const message = err instanceof Error ? err.message : "Failed to update confirmation";
-            setError(message);
             console.error("Failed to update confirmation:", err);
+            // Re-throw so the modal can display the error
+            throw err;
         } finally {
             setCompleting(null);
         }
@@ -864,109 +778,12 @@ export default function ConfirmationsClient({
 
             {/* Status Change Modal */}
             {selectedTrip && (
-                <div className="modal-overlay" onClick={() => setSelectedTrip(null)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h3>Edit Confirmation</h3>
-                            <span className="trip-badge">#{selectedTrip.tripNumber}</span>
-                        </div>
-                        <div className="modal-body">
-                            {error && (
-                                <div className="error-banner">
-                                    <AlertTriangle size={14} />
-                                    <span>{error}</span>
-                                    <button onClick={() => setError(null)} className="error-close">
-                                        <X size={14} />
-                                    </button>
-                                </div>
-                            )}
-                            <div className="modal-info">
-                                <div className="info-row">
-                                    <User size={14} />
-                                    <span>{selectedTrip.passengerName}</span>
-                                </div>
-                                <div className="info-row">
-                                    <Car size={14} />
-                                    <span>{selectedTrip.driverName}</span>
-                                </div>
-                                <div className="info-row">
-                                    <Clock size={14} />
-                                    <span>Pickup: {formatTime(selectedTrip.pickupAt)}</span>
-                                </div>
-                                <div className="info-row current-status">
-                                    {(() => {
-                                        const config = STATUS_CONFIG[selectedTrip.status] || STATUS_CONFIG.PENDING;
-                                        const Icon = config.icon;
-                                        return (
-                                            <>
-                                                <Icon size={14} style={{ color: config.color }} />
-                                                <span>Current: <strong style={{ color: config.color }}>{config.label}</strong></span>
-                                            </>
-                                        );
-                                    })()}
-                                </div>
-                            </div>
-                            <div className="status-options">
-                                <label>Change Status To:</label>
-                                <div className="options-grid">
-                                    <button
-                                        className={`status-btn status-pending ${selectedTrip.status === "PENDING" ? "current" : ""}`}
-                                        onClick={() => handleStatusChange(selectedTrip.id, "PENDING", actionNotes)}
-                                        disabled={completing !== null || selectedTrip.status === "PENDING"}
-                                    >
-                                        <Clock size={18} />
-                                        <span>Pending</span>
-                                    </button>
-                                    <button
-                                        className={`status-btn status-confirmed ${selectedTrip.status === "CONFIRMED" ? "current" : ""}`}
-                                        onClick={() => handleStatusChange(selectedTrip.id, "CONFIRMED", actionNotes)}
-                                        disabled={completing !== null || selectedTrip.status === "CONFIRMED"}
-                                    >
-                                        <CheckCircle size={18} />
-                                        <span>Confirmed</span>
-                                    </button>
-                                    <button
-                                        className={`status-btn status-no-answer ${selectedTrip.status === "NO_ANSWER" ? "current" : ""}`}
-                                        onClick={() => handleStatusChange(selectedTrip.id, "NO_ANSWER", actionNotes)}
-                                        disabled={completing !== null || selectedTrip.status === "NO_ANSWER"}
-                                    >
-                                        <PhoneOff size={18} />
-                                        <span>No Answer</span>
-                                    </button>
-                                    <button
-                                        className={`status-btn status-cancelled ${selectedTrip.status === "CANCELLED" ? "current" : ""}`}
-                                        onClick={() => handleStatusChange(selectedTrip.id, "CANCELLED", actionNotes)}
-                                        disabled={completing !== null || selectedTrip.status === "CANCELLED"}
-                                    >
-                                        <XCircle size={18} />
-                                        <span>Cancelled</span>
-                                    </button>
-                                    <button
-                                        className={`status-btn status-rescheduled ${selectedTrip.status === "RESCHEDULED" ? "current" : ""}`}
-                                        onClick={() => handleStatusChange(selectedTrip.id, "RESCHEDULED", actionNotes)}
-                                        disabled={completing !== null || selectedTrip.status === "RESCHEDULED"}
-                                    >
-                                        <RotateCcw size={18} />
-                                        <span>Rescheduled</span>
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="notes-field">
-                                <label>Notes (optional):</label>
-                                <textarea
-                                    value={actionNotes}
-                                    onChange={(e) => setActionNotes(e.target.value)}
-                                    placeholder="Add any notes about the call..."
-                                />
-                            </div>
-                        </div>
-                        <div className="modal-footer">
-                            <button className="cancel-btn" onClick={() => setSelectedTrip(null)}>
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <ConfirmationModal
+                    trip={selectedTrip}
+                    onClose={() => setSelectedTrip(null)}
+                    onStatusChange={handleStatusChange}
+                    isUpdating={completing !== null}
+                />
             )}
 
             {/* ANALYTICS TAB */}
