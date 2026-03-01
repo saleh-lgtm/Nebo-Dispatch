@@ -1766,13 +1766,31 @@ export default function ConfirmationsClient({
                     background: var(--bg-card);
                     border: 1px solid var(--border);
                     border-radius: 12px;
-                    overflow: hidden;
+                    overflow-x: auto;
                 }
 
                 .trips-table {
                     width: 100%;
+                    min-width: 1000px;
                     border-collapse: collapse;
                     font-size: 0.8125rem;
+                }
+
+                .trips-table .col-actions {
+                    width: 90px;
+                    text-align: center;
+                }
+
+                .trips-table tbody tr .col-actions {
+                    background: var(--bg-card);
+                }
+
+                .trips-table tbody tr:hover .col-actions {
+                    background: var(--bg-hover);
+                }
+
+                .trips-table tbody tr.overdue .col-actions {
+                    background: var(--danger-soft);
                 }
 
                 .trips-table thead {
