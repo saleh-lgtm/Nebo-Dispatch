@@ -156,6 +156,7 @@ model User {
   presence            UserPresence?
   eventsCreated       Event[]
   sopsCreated         SOP[]
+  portalsCreated      Portal[]  @relation("PortalCreatedBy")
 
   // Time Off and Shift Swap relations
   timeOffRequests     TimeOffRequest[]
@@ -1574,4 +1575,135 @@ model MissedConfirmationAccountability {
   @@index([dispatcherId])
   @@index([confirmationId])
   @@index([createdAt])
+}
+
+// ============================================
+// TBR GLOBAL INTEGRATION
+// ============================================
+
+// TBR Trip Status from TBR Global portal
+enum TbrTripStatus {
+  PENDING        // New trip from TBR
+  CONFIRMED      // Confirmed by TBR
+  MODIFIED       // Trip details changed
+  CANCELLED      // Trip cancelled
+}
+
+// LimoAnywhere sync status
+enum LaSyncStatus {
+  NOT_PUSHED     // Not yet sent to LA
+  PUSHED         // Successfully pushed to LA
+  PUSH_FAILED    // Push attempt failed
+}
+
+// TBR Global trips scraped from portal
+model TbrTrip {
+  id                String         @id @default(cuid())
+
+  // TBR Source Data
+  tbrTripId         String         @unique  // TBR's internal trip/order ID
+  tbrStatus         TbrTripStatus  @default(PENDING)
+  tbrStatusText     String?        // Raw status text from TBR
+
+  // Passenger Info
+  passengerName     String
+  passengerPhone    String?
+  passengerEmail    String?
+  passengerCount    Int            @default(1)
+
+  // Trip Details
+  pickupDatetime    DateTime
+  pickupAddress     String         @db.Text
+  dropoffAddress    String         @db.Text
+  vehicleType       String?        // TBR vehicle type (e.g., "Executive Sedan")
+  flightNumber      String?
+  specialNotes      String?        @db.Text
+
+  // Fare
+  fareAmount        Float?
+  currency          String         @default("USD")
+
+  // LimoAnywhere Integration
+  laReservationId   String?        // LA reservation number after push
+  laConfirmation    String?        // LA confirmation code
+  laStatus          String?        // Status in LA
+  laSyncStatus      LaSyncStatus   @default(NOT_PUSHED)
+  pushedAt          DateTime?      // When pushed to LA
+  pushError         String?        @db.Text  // Error message if push failed
+
+  // Sync Metadata
+  statusAlerted     Boolean        @default(false)  // Has status change been alerted?
+  lastSyncedAt      DateTime       @default(now())  // Last scraped from TBR
+  syncVersion       Int            @default(1)      // Increment on each sync
+
+  // Change history stored as JSON
+  changeHistory     Json?          // [{field, oldValue, newValue, changedAt}]
+
+  // Audit
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  archivedAt        DateTime?      // Soft delete/archive
+
+  @@index([tbrTripId])
+  @@index([tbrStatus])
+  @@index([pickupDatetime])
+  @@index([laSyncStatus])
+  @@index([statusAlerted, tbrStatus])
+  @@index([createdAt])
+  @@index([archivedAt])
+}
+
+// TBR Scraper sync logs
+model TbrSyncLog {
+  id              String   @id @default(cuid())
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  success         Boolean  @default(false)
+
+  // Stats
+  tripsFound      Int      @default(0)
+  tripsCreated    Int      @default(0)
+  tripsUpdated    Int      @default(0)
+  tripsCancelled  Int      @default(0)
+
+  // Errors
+  errorMessage    String?  @db.Text
+  errorDetails    Json?
+
+  // Sync method
+  triggerType     String   @default("cron")  // "cron", "manual", "webhook"
+
+  @@index([startedAt])
+  @@index([success])
+}
+
+// Vehicle type mapping (TBR → LimoAnywhere)
+model TbrVehicleMapping {
+  id              String   @id @default(cuid())
+  tbrVehicleType  String   @unique  // TBR vehicle type name
+  laVehicleType   String             // LimoAnywhere vehicle type
+  laVehicleId     String?            // LA internal vehicle ID
+  notes           String?
+  isActive        Boolean  @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// External portals for quick access links
+model Portal {
+  id          String   @id @default(cuid())
+  name        String
+  url         String
+  description String?
+  category    String   @default("other") // trips, rfp, affiliates, accounting, travel, other
+  icon        String   @default("Globe") // Lucide icon name
+  color       String   @default("#64748b") // Hex color for icon
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  createdBy   User?    @relation("PortalCreatedBy", fields: [createdById], references: [id])
 }
