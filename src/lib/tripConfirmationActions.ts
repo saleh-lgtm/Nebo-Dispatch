@@ -180,7 +180,73 @@ export async function completeConfirmation(
 }
 
 /**
- * Get confirmation stats for a date range
+ * Get confirmation stats using database aggregations (FAST)
+ * Uses COUNT queries instead of fetching all records
+ */
+export async function getConfirmationStatsOptimized(days: number = 7) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+        throw new Error("Unauthorized");
+    }
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
+
+    const baseWhere = { createdAt: { gte: startDate } };
+
+    // Run all counts in parallel - much faster than fetching all records
+    const [
+        total,
+        completed,
+        pending,
+        expired,
+        onTime,
+        late,
+        statusCounts,
+    ] = await Promise.all([
+        prisma.tripConfirmation.count({ where: baseWhere }),
+        prisma.tripConfirmation.count({ where: { ...baseWhere, completedAt: { not: null } } }),
+        prisma.tripConfirmation.count({ where: { ...baseWhere, status: "PENDING" } }),
+        prisma.tripConfirmation.count({ where: { ...baseWhere, status: "EXPIRED" } }),
+        prisma.tripConfirmation.count({ where: { ...baseWhere, minutesBeforeDue: { gt: 0 } } }),
+        prisma.tripConfirmation.count({
+            where: {
+                ...baseWhere,
+                minutesBeforeDue: { lte: 0 },
+                completedAt: { not: null },
+            }
+        }),
+        prisma.tripConfirmation.groupBy({
+            by: ["status"],
+            where: baseWhere,
+            _count: { status: true },
+        }),
+    ]);
+
+    // Convert status counts to object
+    const byStatus: Record<string, number> = {};
+    statusCounts.forEach((s) => {
+        byStatus[s.status] = s._count.status;
+    });
+
+    return {
+        total,
+        completed,
+        pending,
+        expired,
+        onTime,
+        late,
+        avgLeadTime: 0, // Skip for header stats - not critical
+        onTimeRate: total > 0 ? Math.round((onTime / total) * 100) : 0,
+        completionRate: total > 0 ? Math.round((completed / total) * 100) : 0,
+        byStatus,
+    };
+}
+
+/**
+ * Get confirmation stats for a date range (legacy - fetches all records)
+ * Use getConfirmationStatsOptimized for faster performance
  */
 export async function getConfirmationStats(days: number = 30) {
     const session = await getServerSession(authOptions);

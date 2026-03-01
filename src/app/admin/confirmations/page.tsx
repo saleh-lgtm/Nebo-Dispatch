@@ -2,11 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import {
-    getConfirmationStats,
-    getAllDispatcherMetrics,
-    getTodayConfirmations,
-    getDispatcherAccountabilityMetrics,
-    getMissedConfirmationReport,
+    getConfirmationStatsOptimized,
     getAllConfirmations,
     getConfirmationDispatchers,
 } from "@/lib/tripConfirmationActions";
@@ -31,20 +27,10 @@ export default async function ConfirmationsPage() {
         redirect("/dashboard");
     }
 
-    const [
-        stats,
-        dispatcherMetrics,
-        todayConfirmations,
-        accountabilityMetrics,
-        missedConfirmations,
-        allConfirmationsData,
-        dispatchers,
-    ] = await Promise.all([
-        getConfirmationStats(30),
-        getAllDispatcherMetrics(30),
-        getTodayConfirmations(),
-        getDispatcherAccountabilityMetrics(30),
-        getMissedConfirmationReport(30),
+    // Only fetch essential data for initial page load (Trips tab)
+    // Other tabs load their data on-demand via client-side fetch
+    const [stats, allConfirmationsData, dispatchers] = await Promise.all([
+        getConfirmationStatsOptimized(7), // Use 7 days for header stats (fast)
         getAllConfirmations({ limit: 100 }),
         getConfirmationDispatchers(),
     ]);
@@ -52,10 +38,6 @@ export default async function ConfirmationsPage() {
     return (
         <ConfirmationsClient
             stats={stats}
-            dispatcherMetrics={dispatcherMetrics}
-            todayConfirmations={todayConfirmations}
-            accountabilityMetrics={accountabilityMetrics}
-            missedConfirmations={missedConfirmations}
             allConfirmations={allConfirmationsData.confirmations}
             totalConfirmations={allConfirmationsData.total}
             dispatchers={dispatchers}

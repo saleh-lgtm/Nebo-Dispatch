@@ -112,8 +112,8 @@ interface Dispatcher {
 
 interface Props {
     stats: Stats;
-    dispatcherMetrics: DispatcherMetric[];
-    todayConfirmations: TripConfirmation[];
+    dispatcherMetrics?: DispatcherMetric[];
+    todayConfirmations?: TripConfirmation[];
     accountabilityMetrics?: AccountabilityMetric[];
     missedConfirmations?: MissedConfirmation[];
     allConfirmations: TripConfirmation[];
@@ -139,8 +139,8 @@ const STATUS_CONFIG: Record<
 
 export default function ConfirmationsClient({
     stats,
-    dispatcherMetrics,
-    todayConfirmations,
+    dispatcherMetrics = [],
+    todayConfirmations = [],
     accountabilityMetrics = [],
     missedConfirmations = [],
     allConfirmations: initialConfirmations,
