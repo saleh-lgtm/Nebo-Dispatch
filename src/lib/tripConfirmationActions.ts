@@ -699,14 +699,36 @@ export async function markExpiredConfirmations() {
 
 /**
  * Strip HTML tags and convert to plain text
+ * Also handles quoted-printable encoding from email
  */
 function htmlToPlainText(html: string): string {
+    let text = html;
+
+    // Handle quoted-printable encoding (common in email)
+    // =3D is "=" , =\n is soft line break
+    text = text.replace(/=3D/g, "=");
+    text = text.replace(/=\r?\n/g, ""); // Remove soft line breaks
+    text = text.replace(/=([0-9A-Fa-f]{2})/g, (_, hex) =>
+        String.fromCharCode(parseInt(hex, 16))
+    );
+
+    // Handle escaped newlines from n8n/JSON
+    text = text.replace(/\\n/g, "\n");
+    text = text.replace(/\\r/g, "");
+    text = text.replace(/\\t/g, "\t");
+
     // Replace <br> and </div> with newlines
-    let text = html.replace(/<br\s*\/?>/gi, "\n");
+    text = text.replace(/<br\s*\/?>/gi, "\n");
     text = text.replace(/<\/div>/gi, "\n");
     text = text.replace(/<\/p>/gi, "\n\n");
     text = text.replace(/<\/tr>/gi, "\n");
     text = text.replace(/<\/td>/gi, " ");
+    text = text.replace(/<\/th>/gi, " ");
+
+    // Remove style, script, and head content entirely
+    text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
+    text = text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "");
+    text = text.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, "");
 
     // Remove all HTML tags
     text = text.replace(/<[^>]+>/g, "");
@@ -718,6 +740,8 @@ function htmlToPlainText(html: string): string {
     text = text.replace(/&gt;/g, ">");
     text = text.replace(/&quot;/g, '"');
     text = text.replace(/&#39;/g, "'");
+    text = text.replace(/&apos;/g, "'");
+    text = text.replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)));
 
     // Normalize whitespace
     text = text.replace(/\r\n/g, "\n");
@@ -763,6 +787,7 @@ function isDaylightSavingTime(date: Date): boolean {
 
 /**
  * Parse manifest email and extract trips
+ * Supports LimoAnywhere manifest format
  */
 export async function parseManifestEmail(emailBody: string): Promise<Array<{
     tripNumber: string;
@@ -789,37 +814,59 @@ export async function parseManifestEmail(emailBody: string): Promise<Array<{
         plainText = htmlToPlainText(emailBody);
     }
 
+    // Debug: log first 500 chars to help troubleshoot
+    console.log("[parseManifestEmail] Plain text preview:", plainText.substring(0, 500));
+
     // Split email into trip sections
-    // Each trip starts with date pattern: MM/DD/YYYY - Pick Up At:HH:MM AM/PM
-    const sections = plainText.split(/(?=\d{2}\/\d{2}\/\d{4}\s*-?\s*Pick Up At:)/gi);
+    // LimoAnywhere format: MM/DD/YYYY  -  Pick Up At:HH:MM AM/PM
+    // Handle variable spacing around dash and colon
+    const sections = plainText.split(/(?=\d{2}\/\d{2}\/\d{4}\s+-\s+Pick Up At:)/gi);
+
+    console.log("[parseManifestEmail] Found", sections.length, "potential sections");
 
     for (const section of sections) {
         if (!section.trim()) continue;
 
-        // Extract date and time - handle various formats
+        // Extract date and time from LimoAnywhere format
+        // Format: "03/01/2026  -  Pick Up At:07:20 AM    Arrive At:07:05 AM"
         const dateTimeMatch = section.match(
-            /(\d{2}\/\d{2}\/\d{4})\s*-?\s*Pick Up At:\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/i
+            /(\d{2}\/\d{2}\/\d{4})\s+-\s+Pick Up At:(\d{1,2}:\d{2}\s*(?:AM|PM))/i
         );
-        if (!dateTimeMatch) continue;
+        if (!dateTimeMatch) {
+            // Try alternate format with space after colon
+            const altMatch = section.match(
+                /(\d{2}\/\d{2}\/\d{4})\s*-\s*Pick Up At:\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/i
+            );
+            if (!altMatch) continue;
+            // Use alternate match
+            const [, dateStr, timeStr] = altMatch;
+            processTrip(section, dateStr, timeStr);
+            continue;
+        }
 
-        const [fullMatch, dateStr, timeStr] = dateTimeMatch;
+        const [, dateStr, timeStr] = dateTimeMatch;
+        processTrip(section, dateStr, timeStr);
+    }
 
-        // Extract trip number - appears after the datetime line
-        // Skip the date part and look for a 4-6 digit number that's NOT part of a date
-        const afterDateTime = section.substring(section.indexOf(fullMatch) + fullMatch.length);
-        const tripNumberMatch = afterDateTime.match(/^\s*(?:\S+\s+)*?(\d{4,6})\b/);
-        if (!tripNumberMatch) continue;
+    function processTrip(section: string, dateStr: string, timeStr: string) {
+        // Extract trip number - appears on its own line after the date/time line
+        // Look for a 4-6 digit number at the start of a line
+        const tripNumberMatch = section.match(/\n\s*(\d{4,6})\s*\n/);
+        if (!tripNumberMatch) {
+            console.log("[parseManifestEmail] No trip number found in section");
+            return;
+        }
 
         const tripNumber = tripNumberMatch[1];
 
         // Skip if trip number looks like a year (2020-2030)
         const tripNumInt = parseInt(tripNumber, 10);
-        if (tripNumInt >= 2020 && tripNumInt <= 2030) continue;
+        if (tripNumInt >= 2020 && tripNumInt <= 2030) return;
 
         // Parse date and time
         const [month, day, year] = dateStr.split("/").map(Number);
         const timeParts = timeStr.trim().match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-        if (!timeParts) continue;
+        if (!timeParts) return;
 
         let hours = parseInt(timeParts[1], 10);
         const minutes = parseInt(timeParts[2], 10);
@@ -832,8 +879,6 @@ export async function parseManifestEmail(emailBody: string): Promise<Array<{
         }
 
         // Create date in CST/CDT (America/Chicago) timezone
-        // Determine if date is in DST (roughly March-November)
-        // DST: UTC-5, Standard: UTC-6
         const tempDate = new Date(year, month - 1, day);
         const isDST = isDaylightSavingTime(tempDate);
         const cstOffset = isDST ? 5 : 6; // hours to add to get UTC
@@ -841,44 +886,71 @@ export async function parseManifestEmail(emailBody: string): Promise<Array<{
         // Create UTC date by adding the CST offset
         const pickupAt = new Date(Date.UTC(year, month - 1, day, hours + cstOffset, minutes));
 
-        // Extract passenger name - look for "Passenger" section followed by a name
+        // Extract passenger name - LimoAnywhere format has "Passenger" on one line, name on next
         let passengerName = "Unknown Passenger";
-        const passengerMatch = section.match(/Passenger\s+([A-Za-z][A-Za-z\s]*[A-Za-z])/i);
+        const passengerMatch = section.match(/Passenger\s*\n\s*([A-Za-z][A-Za-z\s'-]*[A-Za-z])/i);
         if (passengerMatch) {
-            // Take only first two words (first + last name)
+            // Take first 2-3 words as name
             const nameParts = passengerMatch[1].trim().split(/\s+/).slice(0, 3);
             passengerName = nameParts.join(" ");
+        } else {
+            // Try alternate format: "Passenger:" followed by name
+            const altPassengerMatch = section.match(/Passenger:?\s+([A-Za-z][A-Za-z\s'-]*[A-Za-z])/i);
+            if (altPassengerMatch) {
+                const nameParts = altPassengerMatch[1].trim().split(/\s+/).slice(0, 3);
+                passengerName = nameParts.join(" ");
+            }
         }
 
-        // Extract driver name - look for "Driver Info" section
+        // Extract driver name - LimoAnywhere format has "Driver Info" on one line, name on next
         let driverName = "Unknown Driver";
-        const driverMatch = section.match(/Driver Info\s+([A-Za-z][A-Za-z0-9\s]*[A-Za-z0-9])/i);
+        const driverMatch = section.match(/Driver Info\s*\n\s*([A-Za-z][A-Za-z0-9\s'-]*[A-Za-z0-9])/i);
         if (driverMatch) {
-            // Take only first two words (first + last name)
             const nameParts = driverMatch[1].trim().split(/\s+/).slice(0, 3);
             driverName = nameParts.join(" ");
+        } else {
+            // Try alternate format
+            const altDriverMatch = section.match(/Driver Info:?\s+([A-Za-z][A-Za-z0-9\s'-]*)/i);
+            if (altDriverMatch) {
+                const nameParts = altDriverMatch[1].trim().split(/\s+/).slice(0, 3);
+                driverName = nameParts.join(" ");
+            }
         }
 
-        // Extract account name - look for "Account" or "Account:" followed by account code
+        // Extract account name - LimoAnywhere format has "Account" on one line, code on next
         let accountName: string | undefined;
-        const accountMatch = section.match(/Account[:\s]+([A-Za-z0-9][\w-]*)/i);
+        const accountMatch = section.match(/Account\s*\n\s*([A-Za-z0-9][\w-]*)/i);
         if (accountMatch) {
             accountName = accountMatch[1].trim();
+        } else {
+            // Try alternate format
+            const altAccountMatch = section.match(/Account[:\s]+([A-Za-z0-9][\w-]*)/i);
+            if (altAccountMatch) {
+                accountName = altAccountMatch[1].trim();
+            }
         }
 
-        // Extract account number - look for "Account #" or "Acct #" or "Account Number"
+        // Extract account number
         let accountNumber: string | undefined;
         const accountNumMatch = section.match(/(?:Account\s*#|Acct\s*#|Account\s+Number)[:\s]*(\d+)/i);
         if (accountNumMatch) {
             accountNumber = accountNumMatch[1].trim();
         }
 
-        // Extract reservation number - look for "Res #" or "Reservation #" or "Confirmation #"
+        // Extract reservation number
         let reservationNumber: string | undefined;
         const resNumMatch = section.match(/(?:Res(?:ervation)?\s*#|Confirmation\s*#|Booking\s*#)[:\s]*([A-Za-z0-9-]+)/i);
         if (resNumMatch) {
             reservationNumber = resNumMatch[1].trim();
         }
+
+        console.log("[parseManifestEmail] Parsed trip:", {
+            tripNumber,
+            pickupAt: pickupAt.toISOString(),
+            passengerName,
+            driverName,
+            accountName,
+        });
 
         trips.push({
             tripNumber,
@@ -891,6 +963,7 @@ export async function parseManifestEmail(emailBody: string): Promise<Array<{
         });
     }
 
+    console.log("[parseManifestEmail] Total trips parsed:", trips.length);
     return trips;
 }
 
