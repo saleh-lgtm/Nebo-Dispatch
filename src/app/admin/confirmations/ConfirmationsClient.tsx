@@ -31,7 +31,7 @@ import {
     ChevronRight,
     ListFilter,
 } from "lucide-react";
-import { getAllConfirmations, completeConfirmation } from "@/lib/tripConfirmationActions";
+import { getAllConfirmations, completeConfirmation, getConfirmationTabData } from "@/lib/tripConfirmationActions";
 import { useRouter } from "next/navigation";
 
 interface Stats {
@@ -172,11 +172,54 @@ export default function ConfirmationsClient({
     const [now, setNow] = useState(() => Date.now());
     const router = useRouter();
 
+    // Lazy loading state for tabs
+    const [lazyDispatcherMetrics, setLazyDispatcherMetrics] = useState<DispatcherMetric[] | null>(null);
+    const [lazyTodayConfirmations, setLazyTodayConfirmations] = useState<TripConfirmation[] | null>(null);
+    const [lazyAccountabilityMetrics, setLazyAccountabilityMetrics] = useState<AccountabilityMetric[] | null>(null);
+    const [lazyMissedConfirmations, setLazyMissedConfirmations] = useState<MissedConfirmation[] | null>(null);
+    const [tabLoading, setTabLoading] = useState<string | null>(null);
+    const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set(["trips"]));
+
     // Update time every minute for accurate time displays
     useEffect(() => {
         const interval = setInterval(() => setNow(Date.now()), 60000);
         return () => clearInterval(interval);
     }, []);
+
+    // Handle tab selection with lazy loading
+    const handleTabSelect = useCallback(async (tab: "trips" | "overview" | "dispatchers" | "accountability") => {
+        setSelectedTab(tab);
+
+        // Skip if already loaded or is trips tab (already loaded on server)
+        if (loadedTabs.has(tab) || tab === "trips") return;
+
+        // Fetch data for the tab
+        setTabLoading(tab);
+        try {
+            const data = await getConfirmationTabData(tab === "overview" ? "overview" : tab === "dispatchers" ? "dispatchers" : "accountability", 30);
+
+            if (tab === "overview") {
+                setLazyTodayConfirmations(data.todayConfirmations || []);
+            } else if (tab === "dispatchers") {
+                setLazyDispatcherMetrics(data.dispatcherMetrics || []);
+            } else if (tab === "accountability") {
+                setLazyAccountabilityMetrics(data.accountabilityMetrics || []);
+                setLazyMissedConfirmations(data.missedConfirmations || []);
+            }
+
+            setLoadedTabs(prev => new Set([...prev, tab]));
+        } catch (err) {
+            console.error(`Failed to load ${tab} data:`, err);
+        } finally {
+            setTabLoading(null);
+        }
+    }, [loadedTabs]);
+
+    // Use lazy-loaded data or fall back to props
+    const activeDispatcherMetrics = lazyDispatcherMetrics ?? dispatcherMetrics;
+    const activeTodayConfirmations = lazyTodayConfirmations ?? todayConfirmations;
+    const activeAccountabilityMetrics = lazyAccountabilityMetrics ?? accountabilityMetrics;
+    const activeMissedConfirmations = lazyMissedConfirmations ?? missedConfirmations;
 
     const ITEMS_PER_PAGE = 25;
 
@@ -226,8 +269,8 @@ export default function ConfirmationsClient({
         return `${mins}m`;
     };
 
-    const pendingCount = todayConfirmations.filter((c) => c.status === "PENDING").length;
-    const completedToday = todayConfirmations.filter((c) => c.completedAt !== null).length;
+    const pendingCount = activeTodayConfirmations.filter((c) => c.status === "PENDING").length;
+    const completedToday = activeTodayConfirmations.filter((c) => c.completedAt !== null).length;
 
     const toggleMissedExpand = (id: string) => {
         setExpandedMissed((prev) => {
@@ -241,15 +284,15 @@ export default function ConfirmationsClient({
         });
     };
 
-    const totalMissed = missedConfirmations.length;
+    const totalMissed = activeMissedConfirmations.length;
     const avgAccountabilityRate =
-        accountabilityMetrics.length > 0
+        activeAccountabilityMetrics.length > 0
             ? Math.round(
-                  accountabilityMetrics.reduce((sum, m) => sum + m.accountabilityRate, 0) /
-                      accountabilityMetrics.length
+                  activeAccountabilityMetrics.reduce((sum, m) => sum + m.accountabilityRate, 0) /
+                      activeAccountabilityMetrics.length
               )
             : 100;
-    const worstPerformers = accountabilityMetrics
+    const worstPerformers = activeAccountabilityMetrics
         .filter((m) => m.confirmationsMissedWhileOnDuty > 0)
         .slice(0, 3);
 
@@ -466,7 +509,7 @@ export default function ConfirmationsClient({
             <nav className="tab-nav">
                 <button
                     className={`tab-btn ${selectedTab === "trips" ? "active" : ""}`}
-                    onClick={() => setSelectedTab("trips")}
+                    onClick={() => handleTabSelect("trips")}
                 >
                     <ListFilter size={16} />
                     All Trips
@@ -474,25 +517,31 @@ export default function ConfirmationsClient({
                 </button>
                 <button
                     className={`tab-btn ${selectedTab === "overview" ? "active" : ""}`}
-                    onClick={() => setSelectedTab("overview")}
+                    onClick={() => handleTabSelect("overview")}
+                    disabled={tabLoading === "overview"}
                 >
                     <BarChart3 size={16} />
                     Analytics
+                    {tabLoading === "overview" && <span className="tab-loading">...</span>}
                 </button>
                 <button
                     className={`tab-btn ${selectedTab === "dispatchers" ? "active" : ""}`}
-                    onClick={() => setSelectedTab("dispatchers")}
+                    onClick={() => handleTabSelect("dispatchers")}
+                    disabled={tabLoading === "dispatchers"}
                 >
                     <Users size={16} />
                     Dispatchers
+                    {tabLoading === "dispatchers" && <span className="tab-loading">...</span>}
                 </button>
                 <button
                     className={`tab-btn ${selectedTab === "accountability" ? "active" : ""}`}
-                    onClick={() => setSelectedTab("accountability")}
+                    onClick={() => handleTabSelect("accountability")}
+                    disabled={tabLoading === "accountability"}
                 >
                     <ShieldAlert size={16} />
                     Accountability
-                    {totalMissed > 0 && <span className="missed-badge">{totalMissed}</span>}
+                    {tabLoading === "accountability" && <span className="tab-loading">...</span>}
+                    {totalMissed > 0 && !tabLoading && <span className="missed-badge">{totalMissed}</span>}
                 </button>
             </nav>
 
@@ -1023,20 +1072,27 @@ export default function ConfirmationsClient({
                             <Calendar size={18} />
                             Today&apos;s Activity
                         </h3>
-                        <div className="today-grid">
-                            <div className="today-stat">
-                                <span className="value">{todayConfirmations.length}</span>
-                                <span className="label">Total</span>
+                        {tabLoading === "overview" ? (
+                            <div className="loading-state">
+                                <div className="spinner" />
+                                <p>Loading today&apos;s data...</p>
                             </div>
-                            <div className="today-stat success">
-                                <span className="value">{completedToday}</span>
-                                <span className="label">Done</span>
+                        ) : (
+                            <div className="today-grid">
+                                <div className="today-stat">
+                                    <span className="value">{activeTodayConfirmations.length}</span>
+                                    <span className="label">Total</span>
+                                </div>
+                                <div className="today-stat success">
+                                    <span className="value">{completedToday}</span>
+                                    <span className="label">Done</span>
+                                </div>
+                                <div className="today-stat warning">
+                                    <span className="value">{pendingCount}</span>
+                                    <span className="label">Pending</span>
+                                </div>
                             </div>
-                            <div className="today-stat warning">
-                                <span className="value">{pendingCount}</span>
-                                <span className="label">Pending</span>
-                            </div>
-                        </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -1048,7 +1104,12 @@ export default function ConfirmationsClient({
                         <h3>Dispatcher Performance</h3>
                         <p className="card-subtitle">Last 30 days</p>
 
-                        {dispatcherMetrics.length === 0 ? (
+                        {tabLoading === "dispatchers" ? (
+                            <div className="loading-state">
+                                <div className="spinner" />
+                                <p>Loading dispatcher data...</p>
+                            </div>
+                        ) : activeDispatcherMetrics.length === 0 ? (
                             <div className="empty-state">
                                 <Users size={48} />
                                 <p>No confirmation data yet</p>
@@ -1062,7 +1123,7 @@ export default function ConfirmationsClient({
                                     <span className="col-late">Late</span>
                                     <span className="col-rate">Rate</span>
                                 </div>
-                                {dispatcherMetrics.map((d) => (
+                                {activeDispatcherMetrics.map((d) => (
                                     <div key={d.id} className="table-row">
                                         <div className="col-name">
                                             <div className="dispatcher-avatar">
@@ -1109,7 +1170,7 @@ export default function ConfirmationsClient({
                         </div>
                         <div className="summary-stat">
                             <span className="label">Dispatchers Tracked</span>
-                            <span className="value">{accountabilityMetrics.length}</span>
+                            <span className="value">{activeAccountabilityMetrics.length}</span>
                             <span className="sub">Active users</span>
                         </div>
                     </div>
@@ -1160,7 +1221,12 @@ export default function ConfirmationsClient({
                             Performance metrics including missed confirmations while on duty
                         </p>
 
-                        {accountabilityMetrics.length === 0 ? (
+                        {tabLoading === "accountability" ? (
+                            <div className="loading-state">
+                                <div className="spinner" />
+                                <p>Loading accountability data...</p>
+                            </div>
+                        ) : activeAccountabilityMetrics.length === 0 ? (
                             <div className="empty-state">
                                 <ShieldAlert size={48} />
                                 <p>No accountability data yet</p>
@@ -1175,7 +1241,7 @@ export default function ConfirmationsClient({
                                     <span className="col-missed">Missed</span>
                                     <span className="col-rate">Rate</span>
                                 </div>
-                                {accountabilityMetrics.map((m) => (
+                                {activeAccountabilityMetrics.map((m) => (
                                     <div key={m.id} className="table-row accountability-row">
                                         <div className="col-name">
                                             <div className="dispatcher-avatar">
@@ -1220,14 +1286,14 @@ export default function ConfirmationsClient({
                             Confirmations that expired while dispatchers were on duty
                         </p>
 
-                        {missedConfirmations.length === 0 ? (
+                        {activeMissedConfirmations.length === 0 ? (
                             <div className="empty-state">
                                 <CheckCircle size={48} />
                                 <p>No missed confirmations</p>
                             </div>
                         ) : (
                             <div className="missed-list">
-                                {missedConfirmations.map((conf) => (
+                                {activeMissedConfirmations.map((conf) => (
                                     <div key={conf.id} className="missed-item">
                                         <div
                                             className="missed-header"
@@ -1938,6 +2004,34 @@ export default function ConfirmationsClient({
 
                 .empty-state span {
                     font-size: 0.8125rem;
+                }
+
+                .loading-state {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 0.75rem;
+                    padding: 2rem;
+                    color: var(--text-muted);
+                }
+
+                .loading-state .spinner {
+                    width: 24px;
+                    height: 24px;
+                    border: 2px solid var(--border-primary);
+                    border-top-color: var(--accent-blue);
+                    border-radius: 50%;
+                    animation: spin 0.8s linear infinite;
+                }
+
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+
+                .tab-loading {
+                    font-size: 0.75rem;
+                    color: var(--accent-blue);
+                    margin-left: 0.25rem;
                 }
 
                 /* Pagination */

@@ -1173,3 +1173,184 @@ export async function getConfirmationDispatchers() {
         count: d._count.confirmationsCompleted,
     }));
 }
+
+/**
+ * Lazy load data for confirmation tabs
+ * Fetches data on-demand when tab is selected
+ */
+export async function getConfirmationTabData(tab: "overview" | "dispatchers" | "accountability", days: number = 7) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+        throw new Error("Unauthorized");
+    }
+
+    const isAdmin = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"].includes(
+        session.user.role || ""
+    );
+    if (!isAdmin) {
+        throw new Error("Admin access required");
+    }
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
+
+    if (tab === "overview") {
+        // Get today's confirmations for the overview tab
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const todayConfirmations = await prisma.tripConfirmation.findMany({
+            where: {
+                manifestDate: { gte: today, lt: tomorrow },
+                archivedAt: null,
+            },
+            orderBy: { dueAt: "asc" },
+            include: {
+                completedBy: { select: { id: true, name: true } },
+            },
+        });
+
+        return { todayConfirmations };
+    }
+
+    if (tab === "dispatchers") {
+        // Get dispatcher metrics
+        const confirmations = await prisma.tripConfirmation.findMany({
+            where: {
+                completedAt: { gte: startDate },
+                completedById: { not: null },
+            },
+            select: {
+                completedById: true,
+                status: true,
+                minutesBeforeDue: true,
+                completedBy: { select: { id: true, name: true } },
+            },
+        });
+
+        const byDispatcher: Record<string, {
+            id: string;
+            name: string;
+            total: number;
+            onTime: number;
+            late: number;
+            byStatus: Record<string, number>;
+        }> = {};
+
+        confirmations.forEach((c) => {
+            if (!c.completedById || !c.completedBy) return;
+            if (!byDispatcher[c.completedById]) {
+                byDispatcher[c.completedById] = {
+                    id: c.completedById,
+                    name: c.completedBy.name || "Unknown",
+                    total: 0,
+                    onTime: 0,
+                    late: 0,
+                    byStatus: {},
+                };
+            }
+            const d = byDispatcher[c.completedById];
+            d.total++;
+            if (c.minutesBeforeDue !== null && c.minutesBeforeDue > 0) {
+                d.onTime++;
+            } else if (c.minutesBeforeDue !== null && c.minutesBeforeDue <= 0) {
+                d.late++;
+            }
+            d.byStatus[c.status] = (d.byStatus[c.status] || 0) + 1;
+        });
+
+        const dispatcherMetrics = Object.values(byDispatcher)
+            .map((d) => ({
+                ...d,
+                onTimeRate: d.total > 0 ? Math.round((d.onTime / d.total) * 100) : 0,
+            }))
+            .sort((a, b) => b.total - a.total);
+
+        return { dispatcherMetrics };
+    }
+
+    if (tab === "accountability") {
+        // Get accountability metrics and missed confirmations
+        const [accountabilityRecords, dispatchers, missedConfirmations] = await Promise.all([
+            prisma.missedConfirmationAccountability.groupBy({
+                by: ["dispatcherId"],
+                _count: { confirmationId: true },
+                where: {
+                    createdAt: { gte: startDate },
+                    dispatcher: { role: { in: ["DISPATCHER", "ADMIN"] } },
+                },
+            }),
+            prisma.user.findMany({
+                where: { role: { in: ["DISPATCHER", "ADMIN"] }, isActive: true },
+                select: {
+                    id: true,
+                    name: true,
+                    role: true,
+                    shifts: { where: { clockIn: { gte: startDate } }, select: { id: true } },
+                    confirmationsCompleted: {
+                        where: { completedAt: { gte: startDate } },
+                        select: { id: true, minutesBeforeDue: true },
+                    },
+                },
+            }),
+            prisma.tripConfirmation.findMany({
+                where: { status: "EXPIRED", archivedAt: { gte: startDate } },
+                include: {
+                    accountableDispatchers: {
+                        include: {
+                            dispatcher: { select: { id: true, name: true, role: true } },
+                            shift: { select: { clockIn: true, clockOut: true } },
+                        },
+                    },
+                },
+                orderBy: { archivedAt: "desc" },
+                take: 50, // Limit for performance
+            }),
+        ]);
+
+        const accountabilityMetrics = dispatchers.map((d) => {
+            const missedCount = accountabilityRecords.find((a) => a.dispatcherId === d.id)?._count.confirmationId || 0;
+            const completedCount = d.confirmationsCompleted.length;
+            const onTimeCount = d.confirmationsCompleted.filter(
+                (c) => c.minutesBeforeDue !== null && c.minutesBeforeDue > 0
+            ).length;
+
+            return {
+                id: d.id,
+                name: d.name || "Unknown",
+                role: d.role,
+                totalShifts: d.shifts.length,
+                confirmationsCompleted: completedCount,
+                confirmationsOnTime: onTimeCount,
+                confirmationsMissedWhileOnDuty: missedCount,
+                accountabilityRate: completedCount + missedCount > 0
+                    ? Math.round((completedCount / (completedCount + missedCount)) * 100)
+                    : 100,
+            };
+        }).sort((a, b) => b.confirmationsMissedWhileOnDuty - a.confirmationsMissedWhileOnDuty);
+
+        const missedReport = missedConfirmations.map((conf) => ({
+            id: conf.id,
+            tripNumber: conf.tripNumber,
+            passengerName: conf.passengerName,
+            driverName: conf.driverName,
+            dueAt: conf.dueAt,
+            pickupAt: conf.pickupAt,
+            expiredAt: conf.archivedAt,
+            onDutyDispatchers: conf.accountableDispatchers.map((a) => ({
+                id: a.dispatcher.id,
+                name: a.dispatcher.name,
+                role: a.dispatcher.role,
+                shiftStart: a.shift.clockIn,
+                shiftEnd: a.shift.clockOut,
+            })),
+        }));
+
+        return { accountabilityMetrics, missedConfirmations: missedReport };
+    }
+
+    return {};
+}
