@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import {
     Phone,
     Clock,
@@ -168,7 +168,15 @@ export default function ConfirmationsClient({
     const [selectedTrip, setSelectedTrip] = useState<TripConfirmation | null>(null);
     const [completing, setCompleting] = useState<string | null>(null);
     const [actionNotes, setActionNotes] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [now, setNow] = useState(() => Date.now());
     const router = useRouter();
+
+    // Update time every minute for accurate time displays
+    useEffect(() => {
+        const interval = setInterval(() => setNow(Date.now()), 60000);
+        return () => clearInterval(interval);
+    }, []);
 
     const ITEMS_PER_PAGE = 25;
 
@@ -201,8 +209,6 @@ export default function ConfirmationsClient({
             timeZone: "America/Chicago",
         });
     };
-
-    const now = useMemo(() => Date.now(), []);
 
     const isOverdue = (dueAt: Date | string) => {
         return new Date(dueAt).getTime() < now;
@@ -399,6 +405,7 @@ export default function ConfirmationsClient({
 
     const handleStatusChange = async (tripId: string, newStatus: "CONFIRMED" | "NO_ANSWER" | "CANCELLED" | "RESCHEDULED", notes?: string) => {
         setCompleting(tripId);
+        setError(null);
         try {
             await completeConfirmation(tripId, newStatus, notes || "");
             setSelectedTrip(null);
@@ -406,8 +413,10 @@ export default function ConfirmationsClient({
             router.refresh();
             // Refresh the confirmations list
             await fetchConfirmations();
-        } catch (error) {
-            console.error("Failed to update confirmation:", error);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : "Failed to update confirmation";
+            setError(message);
+            console.error("Failed to update confirmation:", err);
         } finally {
             setCompleting(null);
         }
@@ -817,6 +826,15 @@ export default function ConfirmationsClient({
                             <span className="trip-badge">#{selectedTrip.tripNumber}</span>
                         </div>
                         <div className="modal-body">
+                            {error && (
+                                <div className="error-banner">
+                                    <AlertTriangle size={14} />
+                                    <span>{error}</span>
+                                    <button onClick={() => setError(null)} className="error-close">
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            )}
                             <div className="modal-info">
                                 <div className="info-row">
                                     <User size={14} />
@@ -2586,6 +2604,39 @@ export default function ConfirmationsClient({
 
                 .modal-body {
                     padding: 1.25rem;
+                }
+
+                .error-banner {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.75rem 1rem;
+                    background: var(--danger-soft, rgba(239, 68, 68, 0.1));
+                    border: 1px solid var(--danger, #ef4444);
+                    border-radius: 8px;
+                    color: var(--danger, #ef4444);
+                    font-size: 0.875rem;
+                    margin-bottom: 1rem;
+                }
+
+                .error-banner span {
+                    flex: 1;
+                }
+
+                .error-close {
+                    background: none;
+                    border: none;
+                    color: inherit;
+                    cursor: pointer;
+                    padding: 0.25rem;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    opacity: 0.7;
+                }
+
+                .error-close:hover {
+                    opacity: 1;
                 }
 
                 .modal-info {

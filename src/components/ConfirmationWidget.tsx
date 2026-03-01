@@ -12,6 +12,7 @@ import {
     RotateCcw,
     AlertTriangle,
     ChevronRight,
+    X,
 } from "lucide-react";
 import { completeConfirmation } from "@/lib/tripConfirmationActions";
 import { useRouter } from "next/navigation";
@@ -72,6 +73,7 @@ export default function ConfirmationWidget({ confirmations, onRefresh }: Props) 
     const [completing, setCompleting] = useState<string | null>(null);
     const [selectedConfirmation, setSelectedConfirmation] = useState<Confirmation | null>(null);
     const [notes, setNotes] = useState("");
+    const [error, setError] = useState<string | null>(null);
     const [now, setNow] = useState(new Date());
 
     // Update "now" every minute for time display
@@ -121,14 +123,17 @@ export default function ConfirmationWidget({ confirmations, onRefresh }: Props) 
         if (!selectedConfirmation) return;
 
         setCompleting(selectedConfirmation.id);
+        setError(null);
         try {
             await completeConfirmation(selectedConfirmation.id, status, notes);
             setSelectedConfirmation(null);
             setNotes("");
             router.refresh();
             onRefresh?.();
-        } catch (error) {
-            console.error("Failed to complete confirmation:", error);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : "Failed to complete confirmation";
+            setError(message);
+            console.error("Failed to complete confirmation:", err);
         } finally {
             setCompleting(null);
         }
@@ -229,6 +234,15 @@ export default function ConfirmationWidget({ confirmations, onRefresh }: Props) 
                         </div>
 
                         <div className="modal-body">
+                            {error && (
+                                <div className="error-banner">
+                                    <AlertTriangle size={14} />
+                                    <span>{error}</span>
+                                    <button onClick={() => setError(null)} className="error-close">
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            )}
                             <div className="modal-info">
                                 <div className="info-row">
                                     <User size={14} />
@@ -567,6 +581,39 @@ const styles = `
 
     .modal-body {
         padding: 1.25rem;
+    }
+
+    .error-banner {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        background: var(--danger-bg, rgba(239, 68, 68, 0.1));
+        border: 1px solid var(--danger, #ef4444);
+        border-radius: 8px;
+        color: var(--danger, #ef4444);
+        font-size: 0.875rem;
+        margin-bottom: 1rem;
+    }
+
+    .error-banner span {
+        flex: 1;
+    }
+
+    .error-close {
+        background: none;
+        border: none;
+        color: inherit;
+        cursor: pointer;
+        padding: 0.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0.7;
+    }
+
+    .error-close:hover {
+        opacity: 1;
     }
 
     .modal-info {

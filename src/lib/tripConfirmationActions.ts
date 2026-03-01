@@ -79,6 +79,7 @@ export async function getTodayConfirmations() {
 
 /**
  * Complete a trip confirmation
+ * Uses atomic update to prevent race conditions (double-completion)
  */
 export async function completeConfirmation(
     confirmationId: string,
@@ -90,6 +91,7 @@ export async function completeConfirmation(
         throw new Error("Unauthorized");
     }
 
+    // Fetch confirmation first to calculate minutesBeforeDue and get tripNumber
     const confirmation = await prisma.tripConfirmation.findUnique({
         where: { id: confirmationId },
     });
@@ -98,17 +100,18 @@ export async function completeConfirmation(
         throw new Error("Confirmation not found");
     }
 
-    if (confirmation.status !== "PENDING") {
-        throw new Error("Confirmation already completed");
-    }
-
     const now = new Date();
     const minutesBeforeDue = Math.round(
         (confirmation.dueAt.getTime() - now.getTime()) / (1000 * 60)
     );
 
-    const updated = await prisma.tripConfirmation.update({
-        where: { id: confirmationId },
+    // Atomic update: only update if status is still PENDING
+    // This prevents race conditions where two users try to complete simultaneously
+    const updateResult = await prisma.tripConfirmation.updateMany({
+        where: {
+            id: confirmationId,
+            status: "PENDING", // Only update if still pending
+        },
         data: {
             status,
             completedAt: now,
@@ -117,6 +120,16 @@ export async function completeConfirmation(
             notes: notes || null,
             archivedAt: now, // Archive immediately on completion
         },
+    });
+
+    // Check if the update actually happened
+    if (updateResult.count === 0) {
+        throw new Error("Confirmation already completed by another user");
+    }
+
+    // Fetch the updated record for return
+    const updated = await prisma.tripConfirmation.findUnique({
+        where: { id: confirmationId },
         include: {
             completedBy: {
                 select: { id: true, name: true },
