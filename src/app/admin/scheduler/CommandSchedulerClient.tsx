@@ -14,6 +14,7 @@ import {
     GripVertical,
     Radio,
     Radar,
+    Copy,
 } from "lucide-react";
 import {
     createScheduleBlock,
@@ -22,6 +23,7 @@ import {
     publishWeekSchedules,
     unpublishWeekSchedules,
     getWeekSchedules,
+    copyPreviousWeekSchedules,
 } from "@/lib/schedulerActions";
 import "./scheduler-command.css";
 
@@ -489,6 +491,45 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
         setIsPublished(false);
     };
 
+    const [copying, setCopying] = useState(false);
+    const [copyMessage, setCopyMessage] = useState<string | null>(null);
+
+    const handleCopyPreviousWeek = async () => {
+        if (shifts.length > 0) {
+            const confirmed = window.confirm(
+                "This week already has schedules. Copy will only work on empty weeks. Do you want to clear all schedules first?"
+            );
+            if (!confirmed) return;
+
+            // Delete all current week schedules
+            for (const shift of shifts) {
+                await deleteScheduleBlock(shift.id);
+            }
+            setShifts([]);
+        }
+
+        setCopying(true);
+        setCopyMessage(null);
+        try {
+            const result = await copyPreviousWeekSchedules(weekStart);
+            setCopyMessage(result.message);
+
+            if (result.copied > 0 && result.schedules) {
+                // Convert to shift blocks and update state
+                const newBlocks = schedulesToBlocks(result.schedules, dispatchers, weekStart);
+                setShifts(newBlocks);
+            }
+
+            // Clear message after 3 seconds
+            setTimeout(() => setCopyMessage(null), 3000);
+        } catch (error) {
+            console.error("Failed to copy schedules:", error);
+            setCopyMessage("Failed to copy schedules");
+        } finally {
+            setCopying(false);
+        }
+    };
+
     const handleExport = () => {
         const lines = ["Day,Dispatcher,Start,End,Hours"];
         for (let d = 0; d < DAYS_IN_WEEK; d++) {
@@ -549,6 +590,15 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                 </div>
 
                 <div className="cmd-header__actions">
+                    <button
+                        onClick={handleCopyPreviousWeek}
+                        className="cmd-btn cmd-btn--ghost"
+                        disabled={copying}
+                        title="Copy last week's schedule to this week"
+                    >
+                        <Copy size={14} />
+                        {copying ? "Copying..." : "Copy Last Week"}
+                    </button>
                     <button onClick={handleExport} className="cmd-btn cmd-btn--ghost">
                         <Download size={14} />
                         Export
@@ -565,6 +615,22 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                         </button>
                     )}
                 </div>
+                {copyMessage && (
+                    <div className="cmd-toast" style={{
+                        position: "fixed",
+                        bottom: "1rem",
+                        right: "1rem",
+                        padding: "0.75rem 1rem",
+                        background: copyMessage.includes("Copied") ? "rgba(74, 222, 128, 0.2)" : "rgba(251, 191, 36, 0.2)",
+                        border: `1px solid ${copyMessage.includes("Copied") ? "#4ade80" : "#fbbf24"}`,
+                        borderRadius: "6px",
+                        color: copyMessage.includes("Copied") ? "#4ade80" : "#fbbf24",
+                        fontSize: "0.875rem",
+                        zIndex: 1000,
+                    }}>
+                        {copyMessage}
+                    </div>
+                )}
             </header>
 
             {/* Main Layout */}

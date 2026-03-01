@@ -206,6 +206,96 @@ export async function isWeekPublished(weekStart: Date): Promise<boolean> {
     return count > 0;
 }
 
+// Copy schedules from previous week to target week (ADMIN/SUPER_ADMIN only)
+export async function copyPreviousWeekSchedules(targetWeekStart: Date) {
+    const session = await requireAdmin();
+
+    // Calculate previous week start
+    const previousWeekStart = new Date(targetWeekStart);
+    previousWeekStart.setDate(previousWeekStart.getDate() - 7);
+
+    const previousWeekEnd = new Date(previousWeekStart);
+    previousWeekEnd.setDate(previousWeekEnd.getDate() + 7);
+
+    const targetWeekEnd = new Date(targetWeekStart);
+    targetWeekEnd.setDate(targetWeekEnd.getDate() + 7);
+
+    // Get all schedules from previous week
+    const previousSchedules = await prisma.schedule.findMany({
+        where: {
+            shiftStart: {
+                gte: previousWeekStart,
+                lt: previousWeekEnd,
+            },
+        },
+        include: { user: { select: { id: true, name: true } } },
+    });
+
+    if (previousSchedules.length === 0) {
+        return { copied: 0, message: "No schedules found in previous week" };
+    }
+
+    // Check for existing schedules in target week
+    const existingCount = await prisma.schedule.count({
+        where: {
+            shiftStart: {
+                gte: targetWeekStart,
+                lt: targetWeekEnd,
+            },
+        },
+    });
+
+    if (existingCount > 0) {
+        return {
+            copied: 0,
+            message: `Target week already has ${existingCount} schedule(s). Clear them first or add manually.`
+        };
+    }
+
+    // Copy each schedule, adjusting dates by +7 days
+    const newSchedules = await Promise.all(
+        previousSchedules.map(async (schedule) => {
+            const newShiftStart = new Date(schedule.shiftStart);
+            newShiftStart.setDate(newShiftStart.getDate() + 7);
+
+            const newShiftEnd = new Date(schedule.shiftEnd);
+            newShiftEnd.setDate(newShiftEnd.getDate() + 7);
+
+            return prisma.schedule.create({
+                data: {
+                    userId: schedule.userId,
+                    shiftStart: newShiftStart,
+                    shiftEnd: newShiftEnd,
+                    weekStart: targetWeekStart,
+                    isPublished: false, // Always create as unpublished
+                },
+                include: { user: { select: { id: true, name: true } } },
+            });
+        })
+    );
+
+    await createAuditLog(
+        session.user.id,
+        "CREATE",
+        "Schedule",
+        undefined,
+        {
+            action: "copy_previous_week",
+            sourceWeek: previousWeekStart.toISOString(),
+            targetWeek: targetWeekStart.toISOString(),
+            copiedCount: newSchedules.length
+        }
+    );
+
+    revalidatePath("/admin/scheduler");
+
+    return {
+        copied: newSchedules.length,
+        schedules: newSchedules,
+        message: `Copied ${newSchedules.length} schedule(s) from previous week`
+    };
+}
+
 // Get user's next scheduled shift (for any authenticated user)
 export async function getUserNextShift(userId: string) {
     await requireAuth();
