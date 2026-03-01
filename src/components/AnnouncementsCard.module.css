@@ -95,11 +95,39 @@
     color: var(--text-primary);
 }
 
+.contentWrapper {
+    margin-bottom: 0.75rem;
+}
+
 .itemContent {
     font-size: 0.8125rem;
     color: var(--text-secondary);
     line-height: 1.5;
-    margin-bottom: 0.75rem;
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.expandButton {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--accent);
+    font-size: 0.75rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.expandButton:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent-border);
 }
 
 .itemFooter {

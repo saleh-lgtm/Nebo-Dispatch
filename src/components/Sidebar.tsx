@@ -20,6 +20,7 @@ import {
     Car,
     Network,
     BookOpen,
+    Globe,
     FileText,
     BarChart3,
     Calculator,
@@ -332,6 +333,13 @@ export default function Sidebar({ user }: Props) {
                         href={isAdmin ? "/admin/sops" : "/sops"}
                         icon={<BookOpen size={18} />}
                         label="SOPs"
+                        collapsed={collapsed}
+                        onClick={isMobile ? closeMobileMenu : undefined}
+                    />
+                    <NavItem
+                        href="/portals"
+                        icon={<Globe size={18} />}
+                        label="Portals"
                         collapsed={collapsed}
                         onClick={isMobile ? closeMobileMenu : undefined}
                     />

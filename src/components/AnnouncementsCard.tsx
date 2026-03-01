@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bell, Pin, Check, Clock, User } from "lucide-react";
+import { Bell, Pin, Check, Clock, User, ChevronDown, ChevronUp } from "lucide-react";
 import { acknowledgeAnnouncement } from "@/lib/notesActions";
 import type { AnnouncementWithStatus } from "@/types/note";
 import styles from "./AnnouncementsCard.module.css";
@@ -20,6 +20,19 @@ export default function AnnouncementsCard({
         useState(announcements);
     const [localUnacknowledgedCount, setLocalUnacknowledgedCount] =
         useState(unacknowledgedCount);
+    const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+    const toggleExpand = (id: string) => {
+        setExpandedIds((prev) => {
+            const newSet = new Set(prev);
+            if (newSet.has(id)) {
+                newSet.delete(id);
+            } else {
+                newSet.add(id);
+            }
+            return newSet;
+        });
+    };
 
     const handleAcknowledge = async (id: string) => {
         setAcknowledging(id);
@@ -92,11 +105,32 @@ export default function AnnouncementsCard({
                                 </h4>
                             </div>
 
-                            <p className={styles.itemContent}>
-                                {announcement.content.length > 150
-                                    ? `${announcement.content.slice(0, 150)}...`
-                                    : announcement.content}
-                            </p>
+                            <div className={styles.contentWrapper}>
+                                <p className={styles.itemContent}>
+                                    {expandedIds.has(announcement.id) || announcement.content.length <= 150
+                                        ? announcement.content
+                                        : `${announcement.content.slice(0, 150)}...`}
+                                </p>
+                                {announcement.content.length > 150 && (
+                                    <button
+                                        onClick={() => toggleExpand(announcement.id)}
+                                        className={styles.expandButton}
+                                        type="button"
+                                    >
+                                        {expandedIds.has(announcement.id) ? (
+                                            <>
+                                                <ChevronUp size={14} />
+                                                Show less
+                                            </>
+                                        ) : (
+                                            <>
+                                                <ChevronDown size={14} />
+                                                Read more
+                                            </>
+                                        )}
+                                    </button>
+                                )}
+                            </div>
 
                             <div className={styles.itemFooter}>
                                 <div className={styles.meta}>
