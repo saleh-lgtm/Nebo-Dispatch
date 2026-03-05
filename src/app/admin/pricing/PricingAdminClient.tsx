@@ -16,7 +16,15 @@ import {
     History,
     X,
 } from "lucide-react";
-import { importRoutePrices, RoutePriceRow, ImportResult, RoutePricingStats } from "@/lib/routePricingActions";
+import {
+    importRoutePrices,
+    clearRoutePrices,
+    importRoutePricesBatch,
+    logRoutePriceImport,
+    RoutePriceRow,
+    ImportResult,
+    RoutePricingStats
+} from "@/lib/routePricingActions";
 
 interface ImportHistoryItem {
     id: string;
@@ -47,6 +55,7 @@ export default function PricingAdminClient({ initialStats, importHistory }: Prop
     const [parseError, setParseError] = useState<string | null>(null);
     const [isParsing, setIsParsing] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
+    const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
     const [importResult, setImportResult] = useState<ImportResult | null>(null);
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,19 +96,59 @@ export default function PricingAdminClient({ initialStats, importHistory }: Prop
 
         setIsImporting(true);
         setImportResult(null);
+        setImportProgress(null);
+
+        const startTime = Date.now();
+        const BATCH_SIZE = 10000;
+        const fileName = selectedFile?.name || "unknown.xlsx";
+        const fileSize = selectedFile?.size || 0;
 
         try {
-            const result = await importRoutePrices(
-                parsedRows,
-                selectedFile?.name || "unknown.xlsx",
-                selectedFile?.size || 0
-            );
+            // For large imports (>10K rows), use batch approach
+            if (parsedRows.length > BATCH_SIZE) {
+                const totalBatches = Math.ceil(parsedRows.length / BATCH_SIZE);
+                let totalImported = 0;
+                let totalSkipped = 0;
+                const allErrors: Array<{ row: number; message: string }> = [];
 
-            setImportResult(result);
+                // Step 1: Clear existing data
+                setImportProgress({ current: 0, total: totalBatches + 1 });
+                await clearRoutePrices();
 
-            if (result.success) {
-                // Refresh the page to get updated stats
+                // Step 2: Import in batches
+                for (let i = 0; i < totalBatches; i++) {
+                    setImportProgress({ current: i + 1, total: totalBatches + 1 });
+
+                    const batchStart = i * BATCH_SIZE;
+                    const batchRows = parsedRows.slice(batchStart, batchStart + BATCH_SIZE);
+
+                    const result = await importRoutePricesBatch(batchRows, i);
+                    totalImported += result.imported;
+                    totalSkipped += batchRows.length - result.imported;
+                    allErrors.push(...result.errors);
+                }
+
+                // Step 3: Log the import
+                const durationMs = Date.now() - startTime;
+                await logRoutePriceImport(fileName, fileSize, totalImported, totalSkipped, durationMs, allErrors);
+
+                setImportResult({
+                    success: true,
+                    rowsImported: totalImported,
+                    rowsSkipped: totalSkipped,
+                    errors: allErrors.slice(0, 100),
+                    durationMs,
+                });
+
                 router.refresh();
+            } else {
+                // For smaller imports, use the simple approach
+                const result = await importRoutePrices(parsedRows, fileName, fileSize);
+                setImportResult(result);
+
+                if (result.success) {
+                    router.refresh();
+                }
             }
         } catch (error) {
             setImportResult({
@@ -107,10 +156,11 @@ export default function PricingAdminClient({ initialStats, importHistory }: Prop
                 rowsImported: 0,
                 rowsSkipped: parsedRows.length,
                 errors: [{ row: 0, message: error instanceof Error ? error.message : "Import failed" }],
-                durationMs: 0,
+                durationMs: Date.now() - startTime,
             });
         } finally {
             setIsImporting(false);
+            setImportProgress(null);
         }
     };
 
@@ -368,7 +418,9 @@ export default function PricingAdminClient({ initialStats, importHistory }: Prop
                                     {isImporting ? (
                                         <>
                                             <Loader2 size={16} className="animate-spin" />
-                                            Importing...
+                                            {importProgress
+                                                ? `Batch ${importProgress.current}/${importProgress.total}...`
+                                                : "Importing..."}
                                         </>
                                     ) : (
                                         <>

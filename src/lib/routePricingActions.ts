@@ -72,8 +72,124 @@ function normalizeZone(zone: string): string {
 // ============================================
 
 /**
- * Import route prices from parsed Excel data
- * Performs atomic replace: DELETE ALL + INSERT ALL in transaction
+ * Clear all route prices - call before batch import
+ */
+export async function clearRoutePrices(): Promise<{ success: boolean; deleted: number }> {
+    await requireAdmin();
+
+    const result = await prisma.routePrice.deleteMany({});
+
+    return { success: true, deleted: result.count };
+}
+
+/**
+ * Import a batch of route prices (for large imports that exceed serverless timeout)
+ * Call clearRoutePrices() first, then call this for each batch
+ */
+export async function importRoutePricesBatch(
+    rows: RoutePriceRow[],
+    batchNumber: number
+): Promise<{ success: boolean; imported: number; errors: Array<{ row: number; message: string }> }> {
+    await requireAdmin();
+
+    const errors: Array<{ row: number; message: string }> = [];
+    const validRows: Array<{
+        vehicleCode: string;
+        zoneFrom: string;
+        zoneTo: string;
+        zoneFromNorm: string;
+        zoneToNorm: string;
+        rate: number;
+    }> = [];
+
+    // Validate and normalize each row
+    rows.forEach((row, index) => {
+        const rowNum = (batchNumber * 10000) + index + 2; // Approximate Excel row
+
+        if (!row.vehicleCode?.trim()) {
+            errors.push({ row: rowNum, message: "Missing vehicle code" });
+            return;
+        }
+        if (!row.zoneFrom?.trim()) {
+            errors.push({ row: rowNum, message: "Missing zone from" });
+            return;
+        }
+        if (!row.zoneTo?.trim()) {
+            errors.push({ row: rowNum, message: "Missing zone to" });
+            return;
+        }
+        if (typeof row.rate !== "number" || isNaN(row.rate) || row.rate < 0) {
+            errors.push({ row: rowNum, message: `Invalid rate: ${row.rate}` });
+            return;
+        }
+
+        validRows.push({
+            vehicleCode: row.vehicleCode.trim().toUpperCase(),
+            zoneFrom: row.zoneFrom.trim(),
+            zoneTo: row.zoneTo.trim(),
+            zoneFromNorm: normalizeZone(row.zoneFrom),
+            zoneToNorm: normalizeZone(row.zoneTo),
+            rate: row.rate,
+        });
+    });
+
+    if (validRows.length > 0) {
+        await prisma.routePrice.createMany({
+            data: validRows,
+            skipDuplicates: true,
+        });
+    }
+
+    return {
+        success: true,
+        imported: validRows.length,
+        errors: errors.slice(0, 20),
+    };
+}
+
+/**
+ * Log the import after all batches complete
+ */
+export async function logRoutePriceImport(
+    fileName: string,
+    fileSize: number,
+    rowsImported: number,
+    rowsSkipped: number,
+    durationMs: number,
+    errors: Array<{ row: number; message: string }>
+): Promise<void> {
+    const session = await requireAdmin();
+
+    await prisma.routePriceImport.create({
+        data: {
+            importedById: session.user.id,
+            fileName,
+            fileSize,
+            rowsImported,
+            rowsSkipped,
+            errors: errors.length > 0 ? JSON.stringify(errors.slice(0, 100)) : null,
+            durationMs,
+        },
+    });
+
+    await createAuditLog(
+        session.user.id,
+        "CREATE",
+        "RoutePrice",
+        undefined,
+        {
+            action: "bulk_import",
+            rowsImported,
+            rowsSkipped,
+            fileName,
+        }
+    );
+
+    revalidatePath("/admin/pricing");
+}
+
+/**
+ * Import route prices from parsed Excel data (for smaller imports < 10K rows)
  */
 export async function importRoutePrices(
     rows: RoutePriceRow[],
@@ -93,11 +209,9 @@ export async function importRoutePrices(
         rate: number;
     }> = [];
 
-    // Validate and normalize each row
     rows.forEach((row, index) => {
-        const rowNum = index + 2; // Excel row (1-indexed + header)
+        const rowNum = index + 2;
 
-        // Validation
         if (!row.vehicleCode?.trim()) {
             errors.push({ row: rowNum, message: "Missing vehicle code" });
             return;
@@ -135,42 +249,26 @@ export async function importRoutePrices(
         };
     }
 
-    // Atomic replace: delete all existing + insert new in chunks
-    const CHUNK_SIZE = 5000;
+    // Delete and insert
+    await prisma.routePrice.deleteMany({});
+    await prisma.routePrice.createMany({
+        data: validRows,
+        skipDuplicates: true,
+    });
 
-    await prisma.$transaction(
-        async (tx) => {
-            // Delete all existing prices
-            await tx.routePrice.deleteMany({});
-
-            // Insert in chunks
-            for (let i = 0; i < validRows.length; i += CHUNK_SIZE) {
-                const chunk = validRows.slice(i, i + CHUNK_SIZE);
-                await tx.routePrice.createMany({
-                    data: chunk,
-                    skipDuplicates: true, // Handle any duplicates within the file
-                });
-            }
-
-            // Log the import
-            await tx.routePriceImport.create({
-                data: {
-                    importedById: session.user.id,
-                    fileName,
-                    fileSize,
-                    rowsImported: validRows.length,
-                    rowsSkipped: errors.length,
-                    errors: errors.length > 0 ? JSON.stringify(errors.slice(0, 100)) : null,
-                    durationMs: Date.now() - startTime,
-                },
-            });
+    // Log
+    await prisma.routePriceImport.create({
+        data: {
+            importedById: session.user.id,
+            fileName,
+            fileSize,
+            rowsImported: validRows.length,
+            rowsSkipped: errors.length,
+            errors: errors.length > 0 ? JSON.stringify(errors.slice(0, 100)) : null,
+            durationMs: Date.now() - startTime,
         },
-        {
-            timeout: 120000, // 2 minute timeout for large imports
-        }
-    );
+    });
 
-    // Audit log
     await createAuditLog(
         session.user.id,
         "CREATE",
@@ -190,7 +288,7 @@ export async function importRoutePrices(
         success: true,
         rowsImported: validRows.length,
         rowsSkipped: errors.length,
-        errors: errors.slice(0, 100), // Limit returned errors
+        errors: errors.slice(0, 100),
         durationMs: Date.now() - startTime,
     };
 }
