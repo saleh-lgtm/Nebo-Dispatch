@@ -25,6 +25,7 @@ import {
     ImportResult,
     RoutePricingStats
 } from "@/lib/routePricingActions";
+import RoutePriceLookup from "@/components/pricing/RoutePriceLookup";
 
 interface ImportHistoryItem {
     id: string;
@@ -484,6 +485,13 @@ export default function PricingAdminClient({ initialStats, importHistory }: Prop
                     )}
                 </div>
             </div>
+
+            {/* Rate Lookup */}
+            {stats.totalRoutes > 0 && (
+                <div className="card" style={{ marginBottom: "1.5rem" }}>
+                    <RoutePriceLookup />
+                </div>
+            )}
 
             {/* Import History */}
             {history.length > 0 && (
