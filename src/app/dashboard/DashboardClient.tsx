@@ -10,9 +10,11 @@ import {
     Crown,
     ArrowRight,
     PlayCircle,
+    DollarSign,
+    ChevronDown,
 } from "lucide-react";
 import { createActiveShift } from "@/lib/actions";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import QuotesPanel from "@/components/QuotesPanel";
 import ActiveUsersPanel from "@/components/ActiveUsersPanel";
 import RecentReportsPanel from "@/components/RecentReportsPanel";
@@ -22,6 +24,7 @@ import AdminTaskProgressPanel from "@/components/AdminTaskProgressPanel";
 import ConfirmationWidget from "@/components/ConfirmationWidget";
 import AnnouncementsCard from "@/components/AnnouncementsCard";
 import ShiftNotesCard from "@/components/ShiftNotesCard";
+import RoutePriceLookup from "@/components/pricing/RoutePriceLookup";
 import type { DashboardNotesData } from "@/types/note";
 import styles from "./Dashboard.module.css";
 
@@ -205,6 +208,7 @@ export default function DashboardClient({
     const { data: session } = useSession();
     const router = useRouter();
     const [loading, setLoading] = useState(false);
+    const [showRateLookup, setShowRateLookup] = useState(false);
 
     if (!session) return null;
 
@@ -393,6 +397,31 @@ export default function DashboardClient({
                 <div className={styles.contentCol}>
                     {/* 2-Hour Confirmations - Top Priority */}
                     <ConfirmationWidget confirmations={upcomingConfirmations} />
+
+                    {/* Quick Rate Lookup Widget */}
+                    <div className={styles.notesCard}>
+                        <button
+                            onClick={() => setShowRateLookup(!showRateLookup)}
+                            className={styles.rateLookupToggle}
+                        >
+                            <div className={styles.cardHeader} style={{ marginBottom: 0 }}>
+                                <DollarSign size={18} className={styles.headerIcon} />
+                                <span className={styles.cardTitle}>Quick Rate Lookup</span>
+                            </div>
+                            <ChevronDown
+                                size={18}
+                                style={{
+                                    transition: "transform 0.2s",
+                                    transform: showRateLookup ? "rotate(180deg)" : "rotate(0deg)",
+                                }}
+                            />
+                        </button>
+                        {showRateLookup && (
+                            <div style={{ marginTop: "1rem" }}>
+                                <RoutePriceLookup />
+                            </div>
+                        )}
+                    </div>
 
                     {/* My Tasks - Priority */}
                     {myTasks.length > 0 && <TasksPanel tasks={myTasks} />}

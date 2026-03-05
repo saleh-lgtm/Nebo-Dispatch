@@ -291,6 +291,27 @@
 }
 
 /* ===========================================
+   Rate Lookup Toggle
+   =========================================== */
+
+.rateLookupToggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    color: var(--text-primary);
+    font-family: inherit;
+}
+
+.rateLookupToggle:hover {
+    opacity: 0.8;
+}
+
+/* ===========================================
    Empty State
    =========================================== */
 
