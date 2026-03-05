@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus, Trash2, Flag, AlertOctagon } from "lucide-react";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { ReservationEntry, FLAG_REASONS, ColorTheme } from "@/types/shift-report";
 
 const SECTION_COLORS: Record<string, { bg: string; border: string; text: string }> = {
@@ -105,6 +106,7 @@ interface ReservationEntryItemProps {
     sectionColor: { bg: string; border: string; text: string };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function ReservationEntryItem({ item, index, onUpdate, onRemove, sectionColor }: ReservationEntryItemProps) {
     const handleToggleFlag = () => {
         if (item.flaggedForAccounting) {

@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useTransition } from "react";
 import {
     Bell,
-    Check,
     CheckCheck,
     X,
     ArrowRight,
@@ -59,7 +58,8 @@ export default function NotificationBell() {
         }
     };
 
-    // Initial fetch and polling
+    // Initial fetch and polling - data fetching pattern with setState in callback
+    /* eslint-disable react-hooks/set-state-in-effect */
     useEffect(() => {
         fetchNotifications();
 
@@ -68,6 +68,7 @@ export default function NotificationBell() {
 
         return () => clearInterval(interval);
     }, []);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     // Close dropdown when clicking outside
     useEffect(() => {

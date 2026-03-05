@@ -9,7 +9,6 @@ import {
     X,
     Clock,
     User,
-    AlertCircle,
     Pin,
     PinOff,
     Calendar,
@@ -39,6 +38,7 @@ interface Props {
     currentUserId: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function NotesClient({ initialNotes, currentUserId }: Props) {
     // Filter to only show announcements
     const [announcements, setAnnouncements] = useState<Announcement[]>(

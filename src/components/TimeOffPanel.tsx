@@ -20,6 +20,7 @@ import {
     rejectTimeOff,
 } from "@/lib/timeOffActions";
 import TimeOffRequestForm from "./TimeOffRequestForm";
+import { useToastContext } from "./ui/ToastProvider";
 
 interface TimeOffRequest {
     id: string;
@@ -49,6 +50,8 @@ export default function TimeOffPanel({ myRequests, pendingRequests = [], isAdmin
     const [loading, setLoading] = useState<string | null>(null);
     const [adminNotes, setAdminNotes] = useState<Record<string, string>>({});
     const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
+    const [, setShowCancelConfirm] = useState<string | null>(null);
+    const { addToast } = useToastContext();
 
     const statusConfig = {
         PENDING: {
@@ -101,13 +104,14 @@ export default function TimeOffPanel({ myRequests, pendingRequests = [], isAdmin
     };
 
     const handleCancel = async (id: string) => {
-        if (!confirm("Are you sure you want to cancel this request?")) return;
         setLoading(id);
+        setShowCancelConfirm(null);
         try {
             await cancelTimeOff(id);
+            addToast("Request cancelled successfully", "success");
         } catch (err) {
             console.error(err);
-            alert(err instanceof Error ? err.message : "Failed to cancel request");
+            addToast(err instanceof Error ? err.message : "Failed to cancel request", "error");
         }
         setLoading(null);
     };
@@ -121,9 +125,10 @@ export default function TimeOffPanel({ myRequests, pendingRequests = [], isAdmin
                 delete updated[id];
                 return updated;
             });
+            addToast("Request approved", "success");
         } catch (err) {
             console.error(err);
-            alert(err instanceof Error ? err.message : "Failed to approve request");
+            addToast(err instanceof Error ? err.message : "Failed to approve request", "error");
         }
         setLoading(null);
     };
@@ -137,9 +142,10 @@ export default function TimeOffPanel({ myRequests, pendingRequests = [], isAdmin
                 delete updated[id];
                 return updated;
             });
+            addToast("Request rejected", "info");
         } catch (err) {
             console.error(err);
-            alert(err instanceof Error ? err.message : "Failed to reject request");
+            addToast(err instanceof Error ? err.message : "Failed to reject request", "error");
         }
         setLoading(null);
     };

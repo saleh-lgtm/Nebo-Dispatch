@@ -33,8 +33,10 @@ const ALLOWED_SENDERS = [
 // If empty, all senders are allowed (not recommended for production)
 const ALLOW_ALL_SENDERS = ALLOWED_SENDERS.length === 0;
 
+// eslint-disable-next-line import/no-anonymous-default-export
 export default {
-  async email(message, env, ctx) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async email(message, env, _ctx) {
     // Extract email metadata
     const from = message.from;
     const subject = message.headers.get("subject") || "";
@@ -173,7 +175,7 @@ function decodeBody(body, partHeaders) {
   if (encoding === "base64") {
     try {
       return atob(body.replace(/\s/g, ""));
-    } catch (e) {
+    } catch {
       return body;
     }
   }

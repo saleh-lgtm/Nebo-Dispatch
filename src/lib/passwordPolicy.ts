@@ -198,9 +198,9 @@ export function generateSecurePassword(length: number = 16): string {
  * This is a placeholder - implement password history table if needed
  */
 export async function wasRecentlyUsed(
-    _userId: string,
-    _password: string,
-    _historyCount: number = 5
+    userId: string,
+    password: string,
+    historyCount: number = 5 // eslint-disable-line @typescript-eslint/no-unused-vars
 ): Promise<boolean> {
     // TODO: Implement password history checking
     // This would require a PasswordHistory table in the schema

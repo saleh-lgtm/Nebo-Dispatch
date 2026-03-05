@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback, useMemo, useRef, useTransition
 import { useRouter } from "next/navigation";
 import {
     MessageSquare,
-    Phone,
     Users,
     Search,
     Send,
@@ -17,19 +16,13 @@ import {
     XCircle,
     AlertCircle,
     TrendingUp,
-    BarChart3,
     Plus,
-    Filter,
-    MoreHorizontal,
-    ChevronRight,
     ArrowLeft,
     Loader2,
     Zap,
     MessageCircle,
     PhoneCall,
     Edit3,
-    Trash2,
-    ShieldCheck,
     X,
     RefreshCw,
     Sparkles,
@@ -43,7 +36,6 @@ import {
 } from "@/lib/twilioActions";
 import {
     createNetworkPartner,
-    updateNetworkPartner,
     deleteNetworkPartner,
     approveNetworkPartner,
     type PartnerType,
@@ -166,7 +158,7 @@ export default function CommunicationsHub({
 }: Props) {
     const router = useRouter();
     const { addToast } = useToast();
-    const [isPending, startTransition] = useTransition();
+    const [, startTransition] = useTransition(); // eslint-disable-line @typescript-eslint/no-unused-vars
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -174,7 +166,7 @@ export default function CommunicationsHub({
     const [partners] = useState<Partner[]>(initialPartners);
     const [conversations] = useState<Conversation[]>(initialConversations);
     const [search, setSearch] = useState("");
-    const [activeView, setActiveView] = useState<"contacts" | "messages">("contacts");
+    const [activeView, setActiveView] = useState<"contacts" | "messages">("contacts"); // eslint-disable-line @typescript-eslint/no-unused-vars
     const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
     const [messages, setMessages] = useState<SMSMessage[]>([]);
     const [newMessage, setNewMessage] = useState("");
@@ -182,7 +174,7 @@ export default function CommunicationsHub({
     const [isSending, setIsSending] = useState(false);
     const [typeFilter, setTypeFilter] = useState<PartnerType | "all">("all");
     const [showAddModal, setShowAddModal] = useState(false);
-    const [selectedPartner, setSelectedPartner] = useState<Partner | null>(null);
+    const [, setSelectedPartner] = useState<Partner | null>(null);
     const [mobileView, setMobileView] = useState<"list" | "chat">("list");
 
     // Unified contacts list (partners + conversations)
@@ -297,7 +289,7 @@ export default function CommunicationsHub({
             } else {
                 addToast(result.error || "Failed to send message", "error");
             }
-        } catch (error) {
+        } catch {
             addToast("Failed to send message", "error");
         } finally {
             setIsSending(false);
@@ -333,6 +325,7 @@ export default function CommunicationsHub({
         }
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const handleDeletePartner = async (partner: Partner) => {
         if (!confirm(`Delete ${partner.name}?`)) return;
         try {

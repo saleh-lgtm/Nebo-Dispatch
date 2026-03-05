@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useCallback, useMemo, memo } from "react";
+import React, { useState, useRef, useCallback, useMemo } from "react";
 import {
     ChevronLeft,
     ChevronRight,
@@ -64,6 +64,7 @@ interface ShiftBlock {
 }
 
 // Constants
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const HOURS_IN_DAY = 24;
 const DAYS_IN_WEEK = 7;
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -112,6 +113,7 @@ function getDispatcherColor(index: number): string {
 }
 
 // Convert schedule data to shift blocks (handles cross-midnight shifts by splitting)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function schedulesToBlocks(schedules: ScheduleData[], dispatchers: Dispatcher[], weekStart: Date): ShiftBlock[] {
     const blocks: ShiftBlock[] = [];
 
@@ -198,7 +200,7 @@ function calculateOverlapPositions(shifts: ShiftBlock[]): Map<string, { index: n
     };
 
     // For each day, find overlapping groups using union-find approach
-    for (const [_day, dayShifts] of shiftsByDay) {
+    for (const [, dayShifts] of shiftsByDay) {
         if (dayShifts.length === 0) continue;
 
         // Build adjacency: which shifts overlap with which

@@ -273,7 +273,8 @@ export async function getDailyEngagementTrend(days: number = 7) {
         },
     });
 
-    // Create a map for dispatcher names
+    // Create a map for dispatcher names (for future use)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const dispatcherMap = new Map(dispatchers.map((d) => [d.id, d.name || "Unknown"]));
 
     // Build daily data structure

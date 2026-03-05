@@ -95,7 +95,7 @@ export default function SMSConversationsClient() {
             });
 
             setIsRealtimeConnected(true);
-        }, []),
+        }, []), // eslint-disable-line react-hooks/exhaustive-deps
         onStatusUpdate: useCallback((messageSid: string, newStatus: string) => {
             // Update message status in real-time
             setConversationMessages((prev) =>

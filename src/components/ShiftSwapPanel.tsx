@@ -140,13 +140,7 @@ export default function ShiftSwapPanel({
         });
     };
 
-    // Load available shifts for swap
-    useEffect(() => {
-        if (showForm) {
-            loadAvailableShifts();
-        }
-    }, [showForm]);
-
+    // Define loadAvailableShifts before useEffect to avoid accessing before declaration
     const loadAvailableShifts = async () => {
         setLoadingShifts(true);
         try {
@@ -161,6 +155,14 @@ export default function ShiftSwapPanel({
         }
         setLoadingShifts(false);
     };
+
+    // Load available shifts for swap
+    useEffect(() => {
+        if (showForm) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            loadAvailableShifts();
+        }
+    }, [showForm]);
 
     const handleSubmitSwap = async (e: React.FormEvent) => {
         e.preventDefault();

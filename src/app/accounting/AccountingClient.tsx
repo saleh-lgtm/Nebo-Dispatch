@@ -32,13 +32,13 @@ interface AccountingFlag {
     status: "PENDING" | "IN_REVIEW" | "RESOLVED";
     accountingNotes: string | null;
     resolution: string | null;
-    createdAt: string;
-    reviewedAt: string | null;
+    createdAt: Date;
+    reviewedAt: Date | null;
     shiftReport: {
         id: string;
-        createdAt: string;
+        createdAt: Date;
         user: { id: string; name: string | null; email: string | null };
-        shift: { clockIn: string; clockOut: string | null };
+        shift: { clockIn: Date; clockOut: Date | null };
     };
     flaggedBy: { id: string; name: string | null };
     reviewedBy: { id: string; name: string | null } | null;
@@ -90,6 +90,7 @@ export default function AccountingClient({
     initialStats,
     initialFlags,
     totalFlags,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     userRole,
     isAdmin,
     affiliates,
@@ -98,7 +99,7 @@ export default function AccountingClient({
     const [mainSection, setMainSection] = useState<"flags" | "pricing">("flags");
     const [stats, setStats] = useState(initialStats);
     const [flags, setFlags] = useState(initialFlags);
-    const [total, setTotal] = useState(totalFlags);
+    const [, setTotal] = useState(totalFlags);
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState<"PENDING" | "IN_REVIEW" | "RESOLVED" | "ALL">("PENDING");
     const [selectedFlag, setSelectedFlag] = useState<AccountingFlag | null>(null);

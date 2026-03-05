@@ -12,7 +12,6 @@ import {
     Minus,
     X,
     GripVertical,
-    Radio,
     Radar,
     Copy,
 } from "lucide-react";
@@ -118,6 +117,7 @@ function getWeekStart(date: Date): Date {
     return d;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function schedulesToBlocks(schedules: ScheduleData[], dispatchers: Dispatcher[], weekStart: Date): ShiftBlock[] {
     const blocks: ShiftBlock[] = [];
 

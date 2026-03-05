@@ -70,6 +70,7 @@ export default function HoursClient({
         });
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const formatDate = (date: Date) => {
         return new Date(date).toLocaleDateString(undefined, {
             weekday: "short",

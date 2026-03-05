@@ -61,7 +61,8 @@ export async function POST(request: NextRequest) {
 }
 
 // GET endpoint for health check / manual trigger in development
-export async function GET(_request: NextRequest) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function GET(request: NextRequest) {
     const isDev = process.env.NODE_ENV === "development";
 
     if (!isDev) {

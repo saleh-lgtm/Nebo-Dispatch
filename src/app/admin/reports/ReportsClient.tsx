@@ -88,6 +88,23 @@ interface DispatcherStats {
     flaggedReports: number;
 }
 
+interface DispatcherPerformanceData {
+    totalReports: number;
+    totalHours: number;
+    averages: {
+        performanceScore: number;
+        shiftRating: number;
+        callsPerShift: number;
+        emailsPerShift: number;
+        quotesPerShift: number;
+    };
+    statusCounts: {
+        pending: number;
+        flagged: number;
+        reviewed: number;
+    };
+}
+
 interface Props {
     initialReports: Report[];
     totalReports: number;
@@ -151,8 +168,8 @@ export default function ReportsClient({
     const [reviewStatus, setReviewStatus] = useState<"REVIEWED" | "FLAGGED">("REVIEWED");
 
     // Performance view
-    const [selectedDispatcher, setSelectedDispatcher] = useState<string | null>(null);
-    const [dispatcherPerformance, setDispatcherPerformance] = useState<any>(null);
+    const [, setSelectedDispatcher] = useState<string | null>(null);
+    const [dispatcherPerformance, setDispatcherPerformance] = useState<DispatcherPerformanceData | null>(null);
 
     const handleFilter = async () => {
         setLoading(true);

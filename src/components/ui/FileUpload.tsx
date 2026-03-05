@@ -116,6 +116,7 @@ export default function FileUpload({
     const getFileIcon = (fileName: string) => {
         const ext = fileName.split(".").pop()?.toLowerCase();
         if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext || "")) {
+            // eslint-disable-next-line jsx-a11y/alt-text
             return <Image size={20} />;
         }
         return <FileText size={20} />;

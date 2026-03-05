@@ -77,7 +77,7 @@ const VEHICLE_STATUSES: { value: VehicleStatus; label: string; color: string }[]
 export default function FleetClient({ initialVehicles, stats }: Props) {
     const router = useRouter();
     const { addToast } = useToast();
-    const [vehicles, setVehicles] = useState(initialVehicles);
+    const [vehicles] = useState(initialVehicles);
     const [search, setSearch] = useState("");
     const [filterStatus, setFilterStatus] = useState<VehicleStatus | "all">("all");
     const [filterType, setFilterType] = useState<VehicleType | "all">("all");

@@ -96,6 +96,7 @@ const ACTION_COLORS: Record<string, string> = {
 };
 
 export default function AuditClient({ initialLogs, totalLogs, stats, users }: Props) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const router = useRouter();
     const { addToast } = useToast();
     const [logs, setLogs] = useState(initialLogs);

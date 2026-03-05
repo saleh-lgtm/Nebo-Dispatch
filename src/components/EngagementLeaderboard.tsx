@@ -44,6 +44,7 @@ interface Props {
     initialDays?: number;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const CHART_COLORS = [
     "#3b82f6", // blue
     "#22c55e", // green

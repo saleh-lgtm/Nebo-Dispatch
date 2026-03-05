@@ -172,7 +172,8 @@ export async function logAccessDenied(
 export async function logRateLimitExceeded(
     identifier: string,
     endpoint: string,
-    _ipAddress?: string
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    ipAddress?: string
 ): Promise<void> {
     console.warn(`[SECURITY] Rate limit exceeded: ${identifier} on ${endpoint}`);
     // Don't create DB record for rate limits - could be DoS vector

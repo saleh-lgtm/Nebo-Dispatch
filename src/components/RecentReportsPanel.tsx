@@ -6,11 +6,9 @@ import {
     Star,
     Phone,
     Mail,
-    Calendar,
     ChevronRight,
     X,
     Clock,
-    User,
     TrendingUp,
     MessageSquare,
     Award,
@@ -56,6 +54,7 @@ interface Props {
     currentUserId: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function RecentReportsPanel({ reports, isAdmin, currentUserId }: Props) {
     const [selectedReport, setSelectedReport] = useState<ShiftReport | null>(null);
 
@@ -64,13 +63,6 @@ export default function RecentReportsPanel({ reports, isAdmin, currentUserId }: 
             weekday: "short",
             month: "short",
             day: "numeric",
-        });
-    };
-
-    const formatTime = (date: Date) => {
-        return new Date(date).toLocaleTimeString(undefined, {
-            hour: "numeric",
-            minute: "2-digit",
         });
     };
 
@@ -188,6 +180,7 @@ export default function RecentReportsPanel({ reports, isAdmin, currentUserId }: 
 function ReportDetailModal({
     report,
     onClose,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     isAdmin,
 }: {
     report: ShiftReport;

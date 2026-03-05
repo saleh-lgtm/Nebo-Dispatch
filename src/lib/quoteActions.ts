@@ -251,7 +251,7 @@ export async function recordFollowUp(
     const session = await requireAuth();
     const now = new Date();
 
-    const [quote, action] = await prisma.$transaction([
+    const [quote] = await prisma.$transaction([
         prisma.quote.update({
             where: { id: quoteId },
             data: {
@@ -297,7 +297,7 @@ export async function setQuoteOutcome(
 
     const status: QuoteStatus = outcome === "WON" ? "CONVERTED" : "LOST";
 
-    const [quote, action] = await prisma.$transaction([
+    const [quote] = await prisma.$transaction([
         prisma.quote.update({
             where: { id: quoteId },
             data: {

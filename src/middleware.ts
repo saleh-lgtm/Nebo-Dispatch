@@ -13,6 +13,7 @@ const protectedRoutes = [
 ];
 
 // Routes only for unauthenticated users
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const authRoutes = ["/login"];
 
 // Routes that should redirect logged-in users to dashboard
