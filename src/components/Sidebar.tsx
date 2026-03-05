@@ -24,6 +24,7 @@ import {
     FileText,
     BarChart3,
     Calculator,
+    DollarSign,
     History,
     Settings,
     LogOut,
@@ -121,11 +122,12 @@ export default function Sidebar({ user }: Props) {
         return () => window.removeEventListener("resize", checkMobile);
     }, []);
 
-    // Load collapsed state from localStorage
+    // Load collapsed state from localStorage - valid initialization pattern
     useEffect(() => {
         if (!isMobile) {
             const saved = localStorage.getItem("sidebar-collapsed");
             if (saved !== null) {
+                // eslint-disable-next-line react-hooks/set-state-in-effect
                 setCollapsed(saved === "true");
             }
         }
@@ -336,10 +338,26 @@ export default function Sidebar({ user }: Props) {
                         collapsed={collapsed}
                         onClick={isMobile ? closeMobileMenu : undefined}
                     />
+                    {isAdmin && (
+                        <NavItem
+                            href="/admin/pricing"
+                            icon={<DollarSign size={18} />}
+                            label="Route Pricing"
+                            collapsed={collapsed}
+                            onClick={isMobile ? closeMobileMenu : undefined}
+                        />
+                    )}
                     <NavItem
                         href="/portals"
                         icon={<Globe size={18} />}
                         label="Portals"
+                        collapsed={collapsed}
+                        onClick={isMobile ? closeMobileMenu : undefined}
+                    />
+                    <NavItem
+                        href="/tbr-trips"
+                        icon={<Globe size={18} />}
+                        label="TBR Global"
                         collapsed={collapsed}
                         onClick={isMobile ? closeMobileMenu : undefined}
                     />

@@ -59,7 +59,11 @@ export type AuditEntity =
     | "DriverVehicle"
     | "SchedulePreferences"
     | "VehicleAssignment"
-    | "TripConfirmation";
+    | "TripConfirmation"
+    | "TbrTrip"
+    | "TbrVehicleMapping"
+    | "TbrSyncLog"
+    | "RoutePrice";
 
 /**
  * Create an audit log entry

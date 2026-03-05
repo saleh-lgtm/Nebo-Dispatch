@@ -208,6 +208,9 @@ model User {
   // Missed confirmation accountability (when on duty but confirmation expired)
   missedConfirmations    MissedConfirmationAccountability[] @relation("MissedConfirmations")
 
+  // Route pricing imports
+  routePriceImports      RoutePriceImport[] @relation("RoutePriceImporter")
+
   // CRITICAL INDEXES for performance
   @@index([email])                      // Auth queries on every request
   @@index([role, isActive, createdAt])  // Admin dashboards, user listings
@@ -1709,4 +1712,43 @@ model Portal {
   updatedAt   DateTime @updatedAt
   createdById String?
   createdBy   User?    @relation("PortalCreatedBy", fields: [createdById], references: [id])
+}
+
+// ============================================
+// ROUTE PRICING (Excel Import)
+// ============================================
+
+// Route-based pricing for dispatcher quote lookups
+// ~158,000 rows imported from Excel
+model RoutePrice {
+  id              String   @id @default(cuid())
+  vehicleCode     String   // "FIRST", "SUV", etc.
+  zoneFrom        String   // Original format from Excel
+  zoneTo          String   // Original format from Excel
+  zoneFromNorm    String   // Lowercase for search
+  zoneToNorm      String   // Lowercase for search
+  rate            Float
+  createdAt       DateTime @default(now())
+
+  @@unique([vehicleCode, zoneFrom, zoneTo])
+  @@index([zoneFromNorm, zoneToNorm])
+  @@index([vehicleCode])
+  @@index([zoneFromNorm])
+  @@index([zoneToNorm])
+}
+
+// Import audit trail
+model RoutePriceImport {
+  id            String   @id @default(cuid())
+  importedById  String
+  importedBy    User     @relation("RoutePriceImporter", fields: [importedById], references: [id])
+  fileName      String
+  fileSize      Int
+  rowsImported  Int
+  rowsSkipped   Int      @default(0)
+  errors        String?  @db.Text
+  durationMs    Int
+  importedAt    DateTime @default(now())
+
+  @@index([importedAt])
 }
