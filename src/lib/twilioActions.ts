@@ -412,6 +412,10 @@ export async function getConversations(options?: {
 
     const { limit = 50, offset = 0 } = options || {};
 
+    // Validate and sanitize limit/offset to prevent SQL injection
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 100));
+    const safeOffset = Math.max(0, Number(offset) || 0);
+
     // Get distinct conversation phones with the latest message
     const conversations = await prisma.$queryRaw<
         Array<{
@@ -432,8 +436,8 @@ export async function getConversations(options?: {
         WHERE "conversationPhone" IS NOT NULL
         GROUP BY "conversationPhone"
         ORDER BY MAX("createdAt") DESC
-        LIMIT ${limit}
-        OFFSET ${offset}
+        LIMIT ${safeLimit}
+        OFFSET ${safeOffset}
     `;
 
     // Convert BigInt to number for JSON serialization

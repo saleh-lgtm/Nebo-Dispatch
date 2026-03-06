@@ -24,6 +24,7 @@ import {
     cancelSwapRequest,
     getSwapableShifts,
 } from "@/lib/shiftSwapActions";
+import { useToastContext } from "./ui/ToastProvider";
 
 interface Schedule {
     id: string;
@@ -77,6 +78,8 @@ export default function ShiftSwapPanel({
     const [adminNotes, setAdminNotes] = useState<Record<string, string>>({});
     const [targetResponse, setTargetResponse] = useState<Record<string, string>>({});
     const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
+    const [pendingCancelId, setPendingCancelId] = useState<string | null>(null);
+    const { addToast } = useToastContext();
 
     // Form state
     const [availableShifts, setAvailableShifts] = useState<Schedule[]>([]);
@@ -204,9 +207,10 @@ export default function ShiftSwapPanel({
                 delete updated[id];
                 return updated;
             });
+            addToast(accept ? "Swap request accepted" : "Swap request declined", accept ? "success" : "info");
         } catch (err) {
             console.error(err);
-            alert(err instanceof Error ? err.message : "Failed to respond to swap");
+            addToast(err instanceof Error ? err.message : "Failed to respond to swap", "error");
         }
         setLoading(null);
     };
@@ -220,9 +224,10 @@ export default function ShiftSwapPanel({
                 delete updated[id];
                 return updated;
             });
+            addToast("Swap approved", "success");
         } catch (err) {
             console.error(err);
-            alert(err instanceof Error ? err.message : "Failed to approve swap");
+            addToast(err instanceof Error ? err.message : "Failed to approve swap", "error");
         }
         setLoading(null);
     };
@@ -236,21 +241,23 @@ export default function ShiftSwapPanel({
                 delete updated[id];
                 return updated;
             });
+            addToast("Swap rejected", "info");
         } catch (err) {
             console.error(err);
-            alert(err instanceof Error ? err.message : "Failed to reject swap");
+            addToast(err instanceof Error ? err.message : "Failed to reject swap", "error");
         }
         setLoading(null);
     };
 
     const handleCancelSwap = async (id: string) => {
-        if (!confirm("Are you sure you want to cancel this swap request?")) return;
+        setPendingCancelId(null);
         setLoading(id);
         try {
             await cancelSwapRequest(id);
+            addToast("Swap request cancelled", "success");
         } catch (err) {
             console.error(err);
-            alert(err instanceof Error ? err.message : "Failed to cancel swap");
+            addToast(err instanceof Error ? err.message : "Failed to cancel swap", "error");
         }
         setLoading(null);
     };
@@ -363,25 +370,60 @@ export default function ShiftSwapPanel({
                     </div>
 
                     {canCancel && (
-                        <button
-                            onClick={() => handleCancelSwap(request.id)}
-                            disabled={loading === request.id}
-                            style={{
-                                background: "rgba(239, 68, 68, 0.1)",
-                                color: "var(--danger)",
-                                border: "1px solid var(--danger)",
-                                borderRadius: "0.5rem",
-                                padding: "0.5rem",
-                                cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "0.25rem",
-                                fontSize: "0.75rem",
-                            }}
-                        >
-                            <Trash2 size={14} />
-                            Cancel
-                        </button>
+                        pendingCancelId === request.id ? (
+                            <div style={{ display: "flex", gap: "0.25rem" }}>
+                                <button
+                                    onClick={() => handleCancelSwap(request.id)}
+                                    disabled={loading === request.id}
+                                    style={{
+                                        background: "var(--danger)",
+                                        color: "white",
+                                        border: "none",
+                                        borderRadius: "0.5rem",
+                                        padding: "0.5rem 0.75rem",
+                                        cursor: "pointer",
+                                        fontSize: "0.75rem",
+                                        fontWeight: 500,
+                                    }}
+                                >
+                                    {loading === request.id ? "..." : "Confirm"}
+                                </button>
+                                <button
+                                    onClick={() => setPendingCancelId(null)}
+                                    style={{
+                                        background: "var(--bg-hover)",
+                                        color: "var(--text-secondary)",
+                                        border: "1px solid var(--border)",
+                                        borderRadius: "0.5rem",
+                                        padding: "0.5rem",
+                                        cursor: "pointer",
+                                        fontSize: "0.75rem",
+                                    }}
+                                >
+                                    No
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setPendingCancelId(request.id)}
+                                disabled={loading === request.id}
+                                style={{
+                                    background: "rgba(239, 68, 68, 0.1)",
+                                    color: "var(--danger)",
+                                    border: "1px solid var(--danger)",
+                                    borderRadius: "0.5rem",
+                                    padding: "0.5rem",
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "0.25rem",
+                                    fontSize: "0.75rem",
+                                }}
+                            >
+                                <Trash2 size={14} />
+                                Cancel
+                            </button>
+                        )
                     )}
                 </div>
 

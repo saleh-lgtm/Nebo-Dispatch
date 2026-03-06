@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { createEvent, deleteEvent } from "@/lib/eventActions";
 import { EventType } from "@prisma/client";
+import { useToastContext } from "./ui/ToastProvider";
 
 interface Event {
     id: string;
@@ -244,22 +245,26 @@ export default function EventsPanel({ events: initialEvents, isAdmin }: Props) {
     const [events, setEvents] = useState<Event[]>(initialEvents);
     const [showAddModal, setShowAddModal] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+    const { addToast } = useToastContext();
 
     const handleAddEvent = (event: Event) => {
         setEvents((prev) => [...prev, event].sort(
             (a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime()
         ));
+        addToast("Event added", "success");
     };
 
     const handleDelete = async (eventId: string) => {
-        if (!confirm("Are you sure you want to delete this event?")) return;
-
+        setPendingDeleteId(null);
         setDeletingId(eventId);
         try {
             await deleteEvent(eventId);
             setEvents((prev) => prev.filter((e) => e.id !== eventId));
+            addToast("Event deleted", "success");
         } catch (e) {
             console.error(e);
+            addToast("Failed to delete event", "error");
         }
         setDeletingId(null);
     };
@@ -369,14 +374,48 @@ export default function EventsPanel({ events: initialEvents, isAdmin }: Props) {
                                             {daysUntil}
                                         </span>
                                         {isAdmin && (
-                                            <button
-                                                onClick={() => handleDelete(event.id)}
-                                                disabled={deletingId === event.id}
-                                                className="btn-icon"
-                                                style={{ opacity: deletingId === event.id ? 0.5 : 1 }}
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
+                                            pendingDeleteId === event.id ? (
+                                                <div style={{ display: "flex", gap: "0.25rem" }}>
+                                                    <button
+                                                        onClick={() => handleDelete(event.id)}
+                                                        disabled={deletingId === event.id}
+                                                        style={{
+                                                            background: "var(--danger)",
+                                                            color: "white",
+                                                            border: "none",
+                                                            borderRadius: "0.25rem",
+                                                            padding: "0.25rem 0.5rem",
+                                                            fontSize: "0.7rem",
+                                                            cursor: "pointer",
+                                                        }}
+                                                    >
+                                                        {deletingId === event.id ? "..." : "Yes"}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setPendingDeleteId(null)}
+                                                        style={{
+                                                            background: "var(--bg-hover)",
+                                                            color: "var(--text-secondary)",
+                                                            border: "1px solid var(--border)",
+                                                            borderRadius: "0.25rem",
+                                                            padding: "0.25rem 0.5rem",
+                                                            fontSize: "0.7rem",
+                                                            cursor: "pointer",
+                                                        }}
+                                                    >
+                                                        No
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => setPendingDeleteId(event.id)}
+                                                    disabled={deletingId === event.id}
+                                                    className="btn-icon"
+                                                    style={{ opacity: deletingId === event.id ? 0.5 : 1 }}
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            )
                                         )}
                                     </div>
                                 </div>

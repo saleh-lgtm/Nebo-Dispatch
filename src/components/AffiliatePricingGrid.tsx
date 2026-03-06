@@ -8,6 +8,7 @@ import {
 } from "@/lib/affiliatePricingActions";
 import { SERVICE_TYPES } from "@/lib/affiliatePricingTypes";
 import { useRouter } from "next/navigation";
+import { useToastContext } from "./ui/ToastProvider";
 
 interface PricingEntry {
     id: string;
@@ -32,6 +33,7 @@ export default function AffiliatePricingGrid({
     onClose,
 }: Props) {
     const router = useRouter();
+    const { addToast } = useToastContext();
     const [pricing, setPricing] = useState(initialPricing);
     const [editingRow, setEditingRow] = useState<string | null>(null);
     const [newEntry, setNewEntry] = useState<{
@@ -44,6 +46,7 @@ export default function AffiliatePricingGrid({
         notes: string;
     }>({ flatRate: "", notes: "" });
     const [loading, setLoading] = useState(false);
+    const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
     const usedServiceTypes = pricing.map((p) => p.serviceType);
     const availableServiceTypes = SERVICE_TYPES.filter(
@@ -82,10 +85,11 @@ export default function AffiliatePricingGrid({
                 )
             );
             setEditingRow(null);
+            addToast("Pricing updated", "success");
             router.refresh();
         } catch (error) {
             console.error("Failed to update pricing:", error);
-            alert("Failed to update pricing");
+            addToast("Failed to update pricing", "error");
         } finally {
             setLoading(false);
         }
@@ -113,26 +117,27 @@ export default function AffiliatePricingGrid({
                 },
             ]);
             setNewEntry(null);
+            addToast("Pricing added", "success");
             router.refresh();
         } catch (error) {
             console.error("Failed to add pricing:", error);
-            alert("Failed to add pricing");
+            addToast("Failed to add pricing", "error");
         } finally {
             setLoading(false);
         }
     };
 
     const handleDelete = async (pricingId: string) => {
-        if (!confirm("Are you sure you want to delete this pricing entry?")) return;
-
+        setPendingDeleteId(null);
         setLoading(true);
         try {
             await deleteAffiliatePricing(pricingId);
             setPricing(pricing.filter((p) => p.id !== pricingId));
+            addToast("Pricing deleted", "success");
             router.refresh();
         } catch (error) {
             console.error("Failed to delete pricing:", error);
-            alert("Failed to delete pricing");
+            addToast("Failed to delete pricing", "error");
         } finally {
             setLoading(false);
         }
@@ -234,13 +239,31 @@ export default function AffiliatePricingGrid({
                                                 >
                                                     <FileText size={14} />
                                                 </button>
-                                                <button
-                                                    onClick={() => handleDelete(entry.id)}
-                                                    className="action-btn delete"
-                                                    disabled={loading}
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
+                                                {pendingDeleteId === entry.id ? (
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleDelete(entry.id)}
+                                                            className="action-btn confirm-delete"
+                                                            disabled={loading}
+                                                        >
+                                                            {loading ? "..." : "Yes"}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setPendingDeleteId(null)}
+                                                            className="action-btn cancel"
+                                                        >
+                                                            No
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => setPendingDeleteId(entry.id)}
+                                                        className="action-btn delete"
+                                                        disabled={loading}
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                )}
                                             </>
                                         )}
                                     </td>

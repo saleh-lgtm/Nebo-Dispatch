@@ -33,6 +33,7 @@ export default function ClockButton() {
     const [showDropdown, setShowDropdown] = useState(false);
     const [elapsedTime, setElapsedTime] = useState<string>("");
     const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         loadStatus();
@@ -64,17 +65,20 @@ export default function ClockButton() {
 
     async function handleClockIn() {
         setActionLoading(true);
+        setError(null);
         try {
             const result = await clockIn();
             if (result.success) {
                 await loadStatus();
                 setShowDropdown(false);
             } else {
-                alert(result.error || "Failed to clock in");
+                setError(result.error || "Failed to clock in");
+                setTimeout(() => setError(null), 5000);
             }
         } catch (e) {
-            console.error(e);
-            alert("Failed to clock in");
+            console.error("Clock in error:", e);
+            setError("Failed to clock in. Please try again.");
+            setTimeout(() => setError(null), 5000);
         } finally {
             setActionLoading(false);
         }
@@ -82,6 +86,7 @@ export default function ClockButton() {
 
     async function handleClockOut(force = false) {
         setActionLoading(true);
+        setError(null);
         try {
             const result = await clockOut(force);
             if (result.success) {
@@ -92,11 +97,15 @@ export default function ClockButton() {
                 // Show confirmation modal for clocking out without report
                 setShowConfirmModal(true);
             } else {
-                alert(result.error || "Failed to clock out");
+                // Show error in UI instead of alert
+                setError(result.error || "Failed to clock out");
+                // Auto-clear error after 5 seconds
+                setTimeout(() => setError(null), 5000);
             }
         } catch (e) {
-            console.error(e);
-            alert("Failed to clock out");
+            console.error("Clock out error:", e);
+            setError("Failed to clock out. Please try again.");
+            setTimeout(() => setError(null), 5000);
         } finally {
             setActionLoading(false);
         }
@@ -143,6 +152,14 @@ export default function ClockButton() {
 
                 {showDropdown && (
                     <div className="clock-dropdown">
+                        {/* Error display */}
+                        {error && (
+                            <div className="clock-error">
+                                <AlertTriangle size={14} />
+                                <span>{error}</span>
+                            </div>
+                        )}
+
                         {isClocked && shift ? (
                             <>
                                 <div className="clock-status">
@@ -326,6 +343,25 @@ export default function ClockButton() {
                         opacity: 1;
                         transform: translateY(0);
                     }
+                }
+
+                .clock-error {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.5rem 0.75rem;
+                    background: rgba(239, 68, 68, 0.15);
+                    border: 1px solid rgba(239, 68, 68, 0.3);
+                    border-radius: var(--radius-md);
+                    color: #f87171;
+                    font-size: 0.75rem;
+                    margin-bottom: 0.75rem;
+                    animation: errorFade 0.2s ease;
+                }
+
+                @keyframes errorFade {
+                    from { opacity: 0; transform: translateY(-4px); }
+                    to { opacity: 1; transform: translateY(0); }
                 }
 
                 .clock-status {

@@ -204,107 +204,137 @@ export async function clockIn(): Promise<{ success: boolean; shiftId?: string; e
 
 /**
  * Clock out - requires shift report or flags for admin
+ * Uses a transaction to ensure atomicity and prevent race conditions
  */
 export async function clockOut(forceWithoutReport = false): Promise<{
     success: boolean;
     error?: string;
     requiresReport?: boolean;
+    details?: string;
 }> {
-    const session = await requireAuth();
-    const userId = session.user.id;
+    try {
+        const session = await requireAuth();
+        const userId = session.user.id;
 
-    // Get active shift
-    const activeShift = await prisma.shift.findFirst({
-        where: { userId, clockOut: null },
-        include: {
-            reports: {
-                where: { status: { in: ["SUBMITTED", "REVIEWED"] } },
+        // Get active shift with report status
+        const activeShift = await prisma.shift.findFirst({
+            where: { userId, clockOut: null },
+            include: {
+                reports: {
+                    where: { status: { in: ["SUBMITTED", "REVIEWED"] } },
+                    take: 1,
+                },
+                tasks: {
+                    where: { isAdminTask: true },
+                    select: { id: true, content: true },
+                },
             },
-        },
-    });
+        });
 
-    if (!activeShift) {
-        return { success: false, error: "Not clocked in" };
-    }
+        if (!activeShift) {
+            return {
+                success: false,
+                error: "Not clocked in",
+                details: "No active shift found. You may have already clocked out."
+            };
+        }
 
-    const hasReport = activeShift.reports.length > 0;
+        const hasReport = activeShift.reports.length > 0;
 
-    // If no report and not forcing, require report
-    if (!hasReport && !forceWithoutReport) {
-        return {
-            success: false,
-            error: "Please complete your shift report before clocking out",
-            requiresReport: true,
-        };
-    }
+        // If no report and not forcing, require report
+        if (!hasReport && !forceWithoutReport) {
+            return {
+                success: false,
+                error: "Please complete your shift report before clocking out",
+                requiresReport: true,
+                details: "Submit your shift report first, or choose to clock out without it (will be flagged for review)."
+            };
+        }
 
-    const clockOutTime = new Date();
-    const totalHours =
-        (clockOutTime.getTime() - activeShift.clockIn.getTime()) / (1000 * 60 * 60);
+        const clockOutTime = new Date();
+        const totalHours =
+            (clockOutTime.getTime() - activeShift.clockIn.getTime()) / (1000 * 60 * 60);
 
-    let earlyClockOut: number | null = null;
-    if (activeShift.scheduledEnd) {
-        // Calculate minutes early (positive) or late (negative)
-        const scheduledMs = activeShift.scheduledEnd.getTime();
-        const actualMs = clockOutTime.getTime();
-        earlyClockOut = Math.round((scheduledMs - actualMs) / (1000 * 60));
-    }
+        let earlyClockOut: number | null = null;
+        if (activeShift.scheduledEnd) {
+            const scheduledMs = activeShift.scheduledEnd.getTime();
+            const actualMs = clockOutTime.getTime();
+            earlyClockOut = Math.round((scheduledMs - actualMs) / (1000 * 60));
+        }
 
-    // Update shift
-    await prisma.shift.update({
-        where: { id: activeShift.id },
-        data: {
-            clockOut: clockOutTime,
+        // Use transaction for atomicity - all operations succeed or none do
+        const result = await prisma.$transaction(async (tx) => {
+            // 1. Update shift with clock out time
+            await tx.shift.update({
+                where: { id: activeShift.id },
+                data: {
+                    clockOut: clockOutTime,
+                    totalHours: Math.round(totalHours * 100) / 100,
+                    earlyClockOut,
+                    incompleteReportFlag: !hasReport,
+                },
+            });
+
+            // 2. Reset admin task completions for THIS shift's tasks only
+            // Get the specific admin task IDs that were assigned to this shift
+            const shiftAdminTaskContents = activeShift.tasks.map(t => t.content);
+
+            let deletedCount = 0;
+            if (shiftAdminTaskContents.length > 0) {
+                // Find admin tasks that match the shift task contents
+                const matchingAdminTasks = await tx.adminTask.findMany({
+                    where: {
+                        title: { in: shiftAdminTaskContents },
+                        isActive: true,
+                    },
+                    select: { id: true },
+                });
+
+                if (matchingAdminTasks.length > 0) {
+                    const adminTaskIds = matchingAdminTasks.map(t => t.id);
+                    const deleted = await tx.adminTaskCompletion.deleteMany({
+                        where: {
+                            userId,
+                            taskId: { in: adminTaskIds },
+                        },
+                    });
+                    deletedCount = deleted.count;
+                }
+            }
+
+            return { deletedCount };
+        });
+
+        // Create audit logs outside transaction (non-critical)
+        if (result.deletedCount > 0) {
+            await createAuditLog(
+                session.user.id,
+                "DELETE",
+                "AdminTaskCompletion",
+                activeShift.id,
+                { action: "shift_clock_out_reset", completionsCleared: result.deletedCount, shiftId: activeShift.id }
+            );
+        }
+
+        await createAuditLog(session.user.id, "CLOCK_OUT", "Shift", activeShift.id, {
             totalHours: Math.round(totalHours * 100) / 100,
             earlyClockOut,
-            incompleteReportFlag: !hasReport,
-        },
-    });
+            incompleteReport: !hasReport,
+        });
 
-    // Reset task completions for this specific shift only
-    // SECURITY FIX: Previously deleted ALL completions for user across all shifts
-    // Now scoped to only tasks that were assigned during this shift
-    const shiftTasks = await prisma.shiftTask.findMany({
-        where: { shiftId: activeShift.id, isAdminTask: true },
-        select: { content: true },
-    });
+        revalidatePath("/dashboard");
+        revalidatePath("/reports/shift");
+        revalidatePath("/admin/hours");
 
-    // Get admin task IDs that match tasks from this shift
-    const adminTaskTitles = shiftTasks.map(t => t.content);
-    const matchingAdminTasks = await prisma.adminTask.findMany({
-        where: { title: { in: adminTaskTitles } },
-        select: { id: true },
-    });
-    const adminTaskIds = matchingAdminTasks.map(t => t.id);
-
-    const deletedCompletions = await prisma.adminTaskCompletion.deleteMany({
-        where: {
-            userId,
-            taskId: { in: adminTaskIds },
-        },
-    });
-
-    if (deletedCompletions.count > 0) {
-        await createAuditLog(
-            session.user.id,
-            "DELETE",
-            "AdminTaskCompletion",
-            "bulk",
-            { action: "shift_reset", completionsCleared: deletedCompletions.count }
-        );
+        return { success: true };
+    } catch (error) {
+        console.error("Clock out failed:", error);
+        return {
+            success: false,
+            error: "Failed to clock out. Please try again.",
+            details: error instanceof Error ? error.message : "Unknown error occurred",
+        };
     }
-
-    await createAuditLog(session.user.id, "CLOCK_OUT", "Shift", activeShift.id, {
-        totalHours: Math.round(totalHours * 100) / 100,
-        earlyClockOut,
-        incompleteReport: !hasReport,
-    });
-
-    revalidatePath("/dashboard");
-    revalidatePath("/reports/shift");
-    revalidatePath("/admin/hours");
-
-    return { success: true };
 }
 
 /**

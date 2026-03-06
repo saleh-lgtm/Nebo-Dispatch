@@ -143,10 +143,16 @@ export async function saveShiftReport(data: Record<string, unknown> & {
 
     // Also clock out if requested (often reports are done at shift end)
     if (clockOut) {
-        // Get shift to calculate total hours
+        // Get shift with admin tasks to calculate total hours and reset completions
         const shift = await prisma.shift.findUnique({
             where: { id: shiftId },
-            select: { clockIn: true },
+            select: {
+                clockIn: true,
+                tasks: {
+                    where: { isAdminTask: true },
+                    select: { content: true },
+                },
+            },
         });
 
         const clockOutTime = new Date();
@@ -154,36 +160,50 @@ export async function saveShiftReport(data: Record<string, unknown> & {
             ? (clockOutTime.getTime() - shift.clockIn.getTime()) / (1000 * 60 * 60)
             : null;
 
-        await prisma.shift.update({
-            where: { id: shiftId },
-            data: {
-                clockOut: clockOutTime,
-                totalHours: totalHours ? Math.round(totalHours * 100) / 100 : null,
-            },
-        });
+        // Use transaction for atomicity
+        await prisma.$transaction(async (tx) => {
+            await tx.shift.update({
+                where: { id: shiftId },
+                data: {
+                    clockOut: clockOutTime,
+                    totalHours: totalHours ? Math.round(totalHours * 100) / 100 : null,
+                },
+            });
 
-        // Reset all task completions for this dispatcher (Option A)
-        // Admin tasks persist, but completions are reset for the next shift
-        const deletedCompletions = await prisma.adminTaskCompletion.deleteMany({
-            where: { userId: session.user.id },
-        });
+            // Reset only the admin task completions for tasks assigned to THIS shift
+            // This prevents accidentally clearing completions for tasks from other shifts
+            if (shift?.tasks && shift.tasks.length > 0) {
+                const shiftTaskContents = shift.tasks.map(t => t.content);
+                const matchingAdminTasks = await tx.adminTask.findMany({
+                    where: {
+                        title: { in: shiftTaskContents },
+                        isActive: true,
+                    },
+                    select: { id: true },
+                });
 
-        if (deletedCompletions.count > 0) {
-            await createAuditLog(
-                session.user.id,
-                "DELETE",
-                "AdminTaskCompletion",
-                "bulk",
-                { action: "shift_reset", completionsCleared: deletedCompletions.count }
-            );
-        }
+                if (matchingAdminTasks.length > 0) {
+                    const adminTaskIds = matchingAdminTasks.map(t => t.id);
+                    const deletedCompletions = await tx.adminTaskCompletion.deleteMany({
+                        where: {
+                            userId: session.user.id,
+                            taskId: { in: adminTaskIds },
+                        },
+                    });
+
+                    if (deletedCompletions.count > 0) {
+                        // Note: Audit log created outside transaction below
+                    }
+                }
+            }
+        });
 
         await createAuditLog(
             session.user.id,
             "CLOCK_OUT",
             "Shift",
             shiftId,
-            { totalHours: totalHours ? Math.round(totalHours * 100) / 100 : null }
+            { totalHours: totalHours ? Math.round(totalHours * 100) / 100 : null, source: "shift_report_submit" }
         );
     }
 

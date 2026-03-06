@@ -52,7 +52,42 @@ interface Narrative {
     ideas: string;
 }
 
-export default function ShiftReportPage({ session, activeShift, initialTasks, initialQuotes = [], initialDraft, notesCreated = 0, announcementsRead = 0 }: any) {
+interface ShiftTask {
+    id: string;
+    content: string;
+    isCompleted: boolean;
+    isAdminTask?: boolean;
+    assignedById?: string | null;
+    priority?: number | null;
+}
+
+interface ActiveShift {
+    id: string;
+    clockIn: Date;
+    clockOut: Date | null;
+    userId: string;
+}
+
+interface Session {
+    user: {
+        id: string;
+        name?: string | null;
+        email?: string | null;
+        role: string;
+    };
+}
+
+interface Props {
+    session: Session;
+    activeShift: ActiveShift;
+    initialTasks: ShiftTask[];
+    initialQuotes?: Quote[];
+    initialDraft?: ShiftReportDraft | null;
+    notesCreated?: number;
+    announcementsRead?: number;
+}
+
+export default function ShiftReportPage({ session, activeShift, initialTasks, initialQuotes = [], initialDraft, notesCreated = 0, announcementsRead = 0 }: Props) {
     const router = useRouter();
     const [accepted, setAccepted] = useState<ReservationEntry[]>(initialDraft?.accepted || []);
     const [modified, setModified] = useState<ReservationEntry[]>(initialDraft?.modified || []);
@@ -76,6 +111,7 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
     const [quotes, setQuotes] = useState<Quote[]>(initialQuotes);
     const [showQuoteModal, setShowQuoteModal] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
     const [showDraftRecovery, setShowDraftRecovery] = useState(false);
     const [draftDecisionMade, setDraftDecisionMade] = useState(!!initialDraft);
 
@@ -143,20 +179,20 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
         setShowDraftRecovery(false);
     }, [dismissDraft]);
 
-    const addReservation = (setter: any) => {
-        setter((prev: any) => [...prev, { id: "", notes: "" }]);
+    const addReservation = (setter: React.Dispatch<React.SetStateAction<ReservationEntry[]>>) => {
+        setter((prev) => [...prev, { id: "", notes: "" }]);
     };
 
-    const updateReservation = (setter: any, index: number, field: string, value: string) => {
-        setter((prev: any) => prev.map((item: any, i: number) => i === index ? { ...item, [field]: value } : item));
+    const updateReservation = (setter: React.Dispatch<React.SetStateAction<ReservationEntry[]>>, index: number, field: string, value: string | boolean) => {
+        setter((prev) => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));
     };
 
-    const removeReservation = (setter: any, index: number) => {
-        setter((prev: any) => prev.filter((_: any, i: number) => i !== index));
+    const removeReservation = (setter: React.Dispatch<React.SetStateAction<ReservationEntry[]>>, index: number) => {
+        setter((prev) => prev.filter((_, i) => i !== index));
     };
 
     const handleToggleTask = async (taskId: string, currentStatus: boolean) => {
-        setTasks(tasks.map((t: any) => t.id === taskId ? { ...t, isCompleted: !currentStatus } : t));
+        setTasks(tasks.map((t) => t.id === taskId ? { ...t, isCompleted: !currentStatus } : t));
         await toggleTask(taskId, !currentStatus);
     };
 
@@ -287,11 +323,17 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
         } catch (error) {
             console.error("Failed to save shift report:", error);
             setIsSubmitting(false);
-            alert("Failed to submit shift report. Please try again.");
+            setSubmitError(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to submit shift report. Please try again."
+            );
+            // Auto-clear error after 8 seconds
+            setTimeout(() => setSubmitError(null), 8000);
         }
     };
 
-    const completedTasks = tasks.filter((t: any) => t.isCompleted).length;
+    const completedTasks = tasks.filter((t) => t.isCompleted).length;
     const taskProgress = tasks.length > 0 ? (completedTasks / tasks.length) * 100 : 0;
 
     // Format the last saved time
@@ -366,6 +408,17 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
                         <span>{isSubmitting ? "Submitting..." : "Finalize & Clock Out"}</span>
                     </button>
                 </div>
+
+                {/* Submit Error Toast */}
+                {submitError && (
+                    <div className="submit-error-toast" role="alert">
+                        <AlertCircle size={18} />
+                        <span>{submitError}</span>
+                        <button onClick={() => setSubmitError(null)} className="error-dismiss" aria-label="Dismiss">
+                            <X size={16} />
+                        </button>
+                    </div>
+                )}
             </header>
 
             <div className="report-layout">
@@ -806,7 +859,7 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
                                     <p>No tasks assigned</p>
                                 </div>
                             ) : (
-                                tasks.map((task: any) => (
+                                tasks.map((task) => (
                                     <label key={task.id} className="task-item">
                                         <input
                                             type="checkbox"
@@ -859,6 +912,48 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
                     margin-bottom: 2rem;
                     flex-wrap: wrap;
                     gap: 1rem;
+                    position: relative;
+                }
+
+                .submit-error-toast {
+                    position: absolute;
+                    top: 100%;
+                    right: 0;
+                    margin-top: 0.5rem;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.75rem 1rem;
+                    background: rgba(239, 68, 68, 0.15);
+                    border: 1px solid rgba(239, 68, 68, 0.3);
+                    border-radius: 8px;
+                    color: #f87171;
+                    font-size: 0.875rem;
+                    animation: slideDown 0.2s ease;
+                    z-index: 100;
+                    max-width: 400px;
+                }
+
+                .submit-error-toast .error-dismiss {
+                    background: none;
+                    border: none;
+                    color: #f87171;
+                    cursor: pointer;
+                    padding: 0.25rem;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    opacity: 0.7;
+                    transition: opacity 0.15s;
+                }
+
+                .submit-error-toast .error-dismiss:hover {
+                    opacity: 1;
+                }
+
+                @keyframes slideDown {
+                    from { opacity: 0; transform: translateY(-8px); }
+                    to { opacity: 1; transform: translateY(0); }
                 }
 
                 .header-content {
@@ -1894,7 +1989,17 @@ const FLAG_REASONS = [
 ] as const;
 
 // Reservation Section Component
-function ReservationSection({ title, data, setter, add, update, remove, color }: any) {
+interface ReservationSectionProps {
+    title: string;
+    data: ReservationEntry[];
+    setter: React.Dispatch<React.SetStateAction<ReservationEntry[]>>;
+    add: () => void;
+    update: (setter: React.Dispatch<React.SetStateAction<ReservationEntry[]>>, index: number, field: string, value: string | boolean) => void;
+    remove: (setter: React.Dispatch<React.SetStateAction<ReservationEntry[]>>, index: number) => void;
+    color: "green" | "blue" | "red";
+}
+
+function ReservationSection({ title, data, setter, add, update, remove, color }: ReservationSectionProps) {
     const colors: Record<string, { bg: string; border: string; text: string }> = {
         green: { bg: "rgba(34, 197, 94, 0.05)", border: "rgba(34, 197, 94, 0.15)", text: "#4ade80" },
         blue: { bg: "rgba(59, 130, 246, 0.05)", border: "rgba(59, 130, 246, 0.15)", text: "#60a5fa" },
@@ -1931,7 +2036,7 @@ function ReservationSection({ title, data, setter, add, update, remove, color }:
                 </button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                {data.map((item: any, index: number) => (
+                {data.map((item, index) => (
                     <div key={index} style={{
                         display: "flex",
                         flexDirection: "column",
@@ -2036,7 +2141,7 @@ function ReservationSection({ title, data, setter, add, update, remove, color }:
                                 </div>
                                 <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                                     <select
-                                        value={FLAG_REASONS.includes(item.flagReason as any) ? item.flagReason : (item.flagReason ? "Other" : "")}
+                                        value={(FLAG_REASONS as readonly string[]).includes(item.flagReason || "") ? item.flagReason : (item.flagReason ? "Other" : "")}
                                         onChange={(e) => {
                                             const value = e.target.value;
                                             if (value === "Other") {
@@ -2061,10 +2166,10 @@ function ReservationSection({ title, data, setter, add, update, remove, color }:
                                             <option key={reason} value={reason}>{reason}</option>
                                         ))}
                                     </select>
-                                    {(!FLAG_REASONS.includes(item.flagReason as any) || item.flagReason === "Other" || !item.flagReason) && (
+                                    {(!(FLAG_REASONS as readonly string[]).includes(item.flagReason || "") || item.flagReason === "Other" || !item.flagReason) && (
                                         <input
                                             placeholder="Specify reason..."
-                                            value={FLAG_REASONS.includes(item.flagReason as any) ? "" : (item.flagReason || "")}
+                                            value={(FLAG_REASONS as readonly string[]).includes(item.flagReason || "") ? "" : (item.flagReason || "")}
                                             onChange={(e) => update(setter, index, "flagReason", e.target.value)}
                                             style={{
                                                 flex: 2,
