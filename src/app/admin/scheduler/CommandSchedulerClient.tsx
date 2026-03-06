@@ -60,6 +60,7 @@ const DAYS_IN_WEEK = 7;
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAY_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const SHIFT_START = 23;
+const COMPANY_TIMEZONE = "America/Chicago";
 
 // Command Center color palette - vibrant, glowing colors
 const COLORS = [
@@ -97,6 +98,68 @@ function formatHourFull(h: number): string {
     return `${hour - 12}:00 PM`;
 }
 
+// Helper to get date parts in company timezone
+function getDateInTimezone(date: Date): { year: number; month: number; day: number; hour: number; dayOfWeek: number } {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: COMPANY_TIMEZONE,
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+        hour: "numeric",
+        hour12: false,
+        weekday: "short",
+    });
+    const parts = formatter.formatToParts(date);
+    const dayOfWeekStr = parts.find(p => p.type === "weekday")?.value || "Sun";
+    const dayOfWeekMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    return {
+        year: parseInt(parts.find(p => p.type === "year")?.value || "0"),
+        month: parseInt(parts.find(p => p.type === "month")?.value || "0") - 1,
+        day: parseInt(parts.find(p => p.type === "day")?.value || "0"),
+        hour: parseInt(parts.find(p => p.type === "hour")?.value || "0"),
+        dayOfWeek: dayOfWeekMap[dayOfWeekStr] ?? 0,
+    };
+}
+
+// Helper to create a UTC Date from Central Time components
+function createDateInTimezone(year: number, month: number, day: number, hour: number): Date {
+    // Create a date string in the target timezone format
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}T${String(hour).padStart(2, "0")}:00:00`;
+
+    // Get the UTC offset for this date in the company timezone
+    const tempDate = new Date(dateStr + "Z"); // Treat as UTC temporarily
+    const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: COMPANY_TIMEZONE,
+        hour: "numeric",
+        hour12: false,
+    });
+
+    // Calculate offset by comparing: we want `hour` in Central, find what UTC hour gives us that
+    // Binary search or iterative approach - try UTC times until Central matches
+    for (let offset = -12; offset <= 14; offset++) {
+        const testDate = new Date(tempDate.getTime() + offset * 60 * 60 * 1000);
+        const testHour = parseInt(formatter.format(testDate));
+        if (testHour === hour) {
+            // Verify the date is also correct
+            const fullFormatter = new Intl.DateTimeFormat("en-US", {
+                timeZone: COMPANY_TIMEZONE,
+                year: "numeric",
+                month: "numeric",
+                day: "numeric",
+            });
+            const parts = fullFormatter.formatToParts(testDate);
+            const testDay = parseInt(parts.find(p => p.type === "day")?.value || "0");
+            if (testDay === day) {
+                return testDate;
+            }
+        }
+    }
+
+    // Fallback: assume Central is UTC-6 (CST) or UTC-5 (CDT)
+    // This shouldn't happen but provides a reasonable default
+    return new Date(tempDate.getTime() + 6 * 60 * 60 * 1000);
+}
+
 function getContrastColor(hex: string): string {
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
@@ -125,8 +188,10 @@ function schedulesToBlocks(schedules: ScheduleData[], dispatchers: Dispatcher[],
         const shiftStart = new Date(schedule.shiftStart);
         const shiftEnd = new Date(schedule.shiftEnd);
 
-        const dayOfWeek = shiftStart.getUTCDay();
-        const startHour = shiftStart.getUTCHours();
+        // Get day and hour in company timezone for display
+        const startInTz = getDateInTimezone(shiftStart);
+        const dayOfWeek = startInTz.dayOfWeek;
+        const startHour = startInTz.hour;
         const totalDuration = Math.ceil((shiftEnd.getTime() - shiftStart.getTime()) / (1000 * 60 * 60));
 
         const dispatcherIndex = dispatchers.findIndex((d) => d.id === schedule.userId);
@@ -320,7 +385,7 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
         const start = new Date(weekStart);
         const end = new Date(weekStart);
         end.setUTCDate(end.getUTCDate() + 6);
-        const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", timeZone: "UTC" };
+        const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", timeZone: COMPANY_TIMEZONE };
         return `${start.toLocaleDateString(undefined, opts)} – ${end.toLocaleDateString(undefined, opts)}, ${start.getUTCFullYear()}`;
     };
 
@@ -332,10 +397,11 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
 
     const isToday = (dayIndex: number): boolean => {
         const date = getDateForDay(dayIndex);
-        const today = new Date();
-        return date.getUTCDate() === today.getUTCDate() &&
-            date.getUTCMonth() === today.getUTCMonth() &&
-            date.getUTCFullYear() === today.getUTCFullYear();
+        const dateInTz = getDateInTimezone(date);
+        const todayInTz = getDateInTimezone(new Date());
+        return dateInTz.day === todayInTz.day &&
+            dateInTz.month === todayInTz.month &&
+            dateInTz.year === todayInTz.year;
     };
 
     const handleDispatcherDragStart = (dispatcher: Dispatcher, e: React.DragEvent) => {
@@ -420,12 +486,15 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
     const handleCellDrop = async (day: number, hour: number) => {
         if (!dragState) return;
 
+        // Get the date for this day column and create shift time in company timezone
         const date = getDateForDay(day);
-        const shiftStart = new Date(date);
-        shiftStart.setUTCHours(hour, 0, 0, 0);
+        const dateInTz = getDateInTimezone(date);
 
-        const shiftEnd = new Date(shiftStart);
-        shiftEnd.setUTCHours(shiftEnd.getUTCHours() + dragState.duration);
+        // Create shift start time: the clicked hour in Central Time, converted to UTC
+        const shiftStart = createDateInTimezone(dateInTz.year, dateInTz.month, dateInTz.day, hour);
+
+        // Shift end is duration hours after start
+        const shiftEnd = new Date(shiftStart.getTime() + dragState.duration * 60 * 60 * 1000);
 
         if (dragState.type === "new") {
             const newSchedule = await createScheduleBlock({
