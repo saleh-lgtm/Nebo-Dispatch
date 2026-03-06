@@ -93,7 +93,14 @@ export default async function DashboardPage() {
     const isAdmin = session.user.role === "ADMIN" || session.user.role === "SUPER_ADMIN";
     const isSuperAdmin = session.user.role === "SUPER_ADMIN";
 
-    // Parallel data fetching
+    // Parallel data fetching with error handling
+    // Wrap each promise to prevent one failure from crashing the whole page
+    const safePromise = <T,>(promise: Promise<T>, fallback: T): Promise<T> =>
+        promise.catch((err) => {
+            console.error("Dashboard data fetch error:", err);
+            return fallback;
+        });
+
     const [
         userCount,
         activeShift,
@@ -109,52 +116,67 @@ export default async function DashboardPage() {
         upcomingConfirmations,
     ] = await Promise.all([
         // User count for admins
-        isAdmin ? prisma.user.count({ where: { isActive: true } }) : Promise.resolve(0),
+        safePromise(
+            isAdmin ? prisma.user.count({ where: { isActive: true } }) : Promise.resolve(0),
+            0
+        ),
 
         // Active shift for non-super-admin (super admin doesn't need to clock in)
-        isSuperAdmin
-            ? Promise.resolve(null)
-            : prisma.shift.findFirst({
-                where: { userId: session.user.id, clockOut: null },
-            }),
+        safePromise(
+            isSuperAdmin
+                ? Promise.resolve(null)
+                : prisma.shift.findFirst({
+                    where: { userId: session.user.id, clockOut: null },
+                }),
+            null
+        ),
 
         // Dashboard notes (announcements + shift notes)
-        getDashboardNotes(session.user.id),
+        safePromise(
+            getDashboardNotes(session.user.id),
+            { announcements: [], shiftNotes: [], unacknowledgedCount: 0 }
+        ),
 
         // Pending quotes (for follow-up panel)
-        getPendingQuotes(),
+        safePromise(getPendingQuotes(), []),
 
         // Online users
-        getOnlineUsers(),
+        safePromise(getOnlineUsers(), []),
 
         // Users with active shifts
-        getActiveShiftUsers(),
+        safePromise(getActiveShiftUsers(), []),
 
         // Recent reports - for super admin show all, for dispatchers show their own
-        prisma.shiftReport.findMany({
-            where: isSuperAdmin ? {} : { userId: session.user.id },
-            include: {
-                user: { select: { id: true, name: true } },
-                shift: { select: { clockIn: true, clockOut: true, totalHours: true } },
-            },
-            orderBy: { createdAt: "desc" },
-            take: 10,
-        }),
+        safePromise(
+            prisma.shiftReport.findMany({
+                where: isSuperAdmin ? {} : { userId: session.user.id },
+                include: {
+                    user: { select: { id: true, name: true } },
+                    shift: { select: { clockIn: true, clockOut: true, totalHours: true } },
+                },
+                orderBy: { createdAt: "desc" },
+                take: 10,
+            }),
+            []
+        ),
 
         // Upcoming events
-        getUpcomingEvents(10),
+        safePromise(getUpcomingEvents(10), []),
 
         // Next scheduled shift for non-super-admin
-        isSuperAdmin ? Promise.resolve(null) : getUserNextShift(session.user.id),
+        safePromise(
+            isSuperAdmin ? Promise.resolve(null) : getUserNextShift(session.user.id),
+            null
+        ),
 
         // Tasks assigned to this user
-        getMyTasks(session.user.id),
+        safePromise(getMyTasks(session.user.id), []),
 
         // Task progress for admins
-        isAdmin ? getTaskProgress() : Promise.resolve([]),
+        safePromise(isAdmin ? getTaskProgress() : Promise.resolve([]), []),
 
         // Upcoming 2-hour confirmations (next 6 trips)
-        getUpcomingConfirmations(6),
+        safePromise(getUpcomingConfirmations(6), []),
     ]);
 
     const stats = {

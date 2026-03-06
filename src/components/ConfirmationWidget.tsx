@@ -310,7 +310,9 @@ const styles = `
         background: var(--bg-card);
         border: 1px solid var(--border);
         border-radius: 12px;
-        overflow: hidden;
+        overflow: visible;
+        position: relative;
+        z-index: 1;
     }
 
     .confirmation-widget.queue-mode {
