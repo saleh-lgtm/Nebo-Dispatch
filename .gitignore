@@ -50,6 +50,7 @@ credentials/
 # Claude Code local files
 .claude/worktrees/
 .claude/skills/
+.mcp.json
 
 # typescript
 *.tsbuildinfo

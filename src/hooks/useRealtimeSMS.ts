@@ -81,9 +81,8 @@ export function useRealtimeSMS({
             : "sms-all";
 
         // Subscribe to SMSLog changes
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const channel = (supabase
-            .channel(channelName) as any)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase channel types are incomplete
+        const channel = (supabase.channel(channelName) as any)
             .on(
                 "postgres_changes",
                 {

@@ -421,7 +421,7 @@ export default function SOPsAdminClient({ initialSOPs }: Props) {
                                     />
                                     <span>Requires Acknowledgment</span>
                                 </label>
-                                <span className="toggle-hint">Users must confirm they've read and understood this SOP</span>
+                                <span className="toggle-hint">Users must confirm they&apos;ve read and understood this SOP</span>
                             </div>
 
                             <div className="publish-toggle">

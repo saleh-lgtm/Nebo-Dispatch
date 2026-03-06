@@ -2,6 +2,7 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import prisma from "@/lib/prisma";
 import { compare } from "bcryptjs";
+import { Role } from "@prisma/client";
 
 // Security constants
 const MAX_LOGIN_ATTEMPTS = 5;
@@ -195,11 +196,10 @@ export const authOptions: NextAuthOptions = {
         },
         jwt: ({ token, user }) => {
             if (user) {
-                const u = user as unknown as any;
                 return {
                     ...token,
-                    id: u.id,
-                    role: u.role,
+                    id: (user as { id: string }).id,
+                    role: (user as { role: Role }).role,
                 };
             }
             return token;

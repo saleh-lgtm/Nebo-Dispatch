@@ -41,7 +41,7 @@ export default async function SMSPage() {
 
     return (
         <SMSClient
-            initialLogs={historyData.logs as any}
+            initialLogs={historyData.logs}
             totalLogs={historyData.total}
             initialStats={stats}
         />

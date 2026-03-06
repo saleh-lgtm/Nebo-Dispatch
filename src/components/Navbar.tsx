@@ -86,7 +86,9 @@ function NavDropdown({ label, icon, children, badge, activePrefix = "/admin" }: 
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    // Close dropdown on route change - valid cascading render pattern
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setOpen(false);
     }, [pathname]);
 
@@ -160,7 +162,9 @@ export default function Navbar() {
     const pathname = usePathname();
     const router = useRouter();
 
+    // Close mobile menu on route change - valid cascading render pattern
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setMobileMenuOpen(false);
     }, [pathname]);
 

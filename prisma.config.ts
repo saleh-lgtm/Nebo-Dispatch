@@ -12,5 +12,5 @@ export default defineConfig({
   datasource: {
     // Use direct connection for migrations (faster, no pooler timeout)
     url: process.env["DIRECT_URL"] || process.env["DATABASE_URL"],
-  } as any,
+  } as { url: string | undefined },
 });

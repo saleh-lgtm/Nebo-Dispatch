@@ -44,6 +44,39 @@ interface AutoSaveReturn<T> {
 // Session storage key to track dismissed drafts
 const getDismissedKey = (storageKey: string) => `${storageKey}-dismissed`;
 
+// Helper to compute initial state from localStorage
+function getInitialAutoSaveState(storageKey: string): { hasDraft: boolean; draftDismissed: boolean } {
+    if (typeof window === "undefined") {
+        return { hasDraft: false, draftDismissed: false };
+    }
+
+    const wasDismissed = sessionStorage.getItem(getDismissedKey(storageKey)) === "true";
+    if (wasDismissed) {
+        return { hasDraft: false, draftDismissed: true };
+    }
+
+    const savedDraft = localStorage.getItem(storageKey);
+    if (savedDraft) {
+        try {
+            const parsed = JSON.parse(savedDraft);
+            if (parsed.data && parsed.timestamp && parsed.version === DRAFT_SCHEMA_VERSION) {
+                const draftAge = Date.now() - new Date(parsed.timestamp).getTime();
+                const maxAge = 24 * 60 * 60 * 1000;
+                if (draftAge < maxAge) {
+                    return { hasDraft: true, draftDismissed: false };
+                } else {
+                    localStorage.removeItem(storageKey);
+                }
+            } else if (parsed.version !== DRAFT_SCHEMA_VERSION) {
+                localStorage.removeItem(storageKey);
+            }
+        } catch {
+            localStorage.removeItem(storageKey);
+        }
+    }
+    return { hasDraft: false, draftDismissed: false };
+}
+
 export function useAutoSave<T>({
     storageKey,
     data,
@@ -54,58 +87,23 @@ export function useAutoSave<T>({
     enabled = true,
     silentMode = true,
 }: AutoSaveOptions<T>): AutoSaveReturn<T> {
-    const [state, setState] = useState<AutoSaveState>({
-        status: "idle",
-        lastSaved: null,
-        hasUnsavedChanges: false,
-        hasDraft: false,
-        draftDismissed: false,
+    // Initialize state with localStorage values to avoid setState in effect
+    const [state, setState] = useState<AutoSaveState>(() => {
+        const initial = getInitialAutoSaveState(storageKey);
+        return {
+            status: "idle",
+            lastSaved: null,
+            hasUnsavedChanges: false,
+            hasDraft: initial.hasDraft,
+            draftDismissed: initial.draftDismissed,
+        };
     });
 
     const dataRef = useRef(data);
-    const initialDataRef = useRef<string | null>(null);
+    const initialDataRef = useRef<string>(JSON.stringify(data));
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const serverSaveIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const lastServerSaveRef = useRef<string>("");
-
-    // Check for existing draft on mount
-    useEffect(() => {
-        if (typeof window === "undefined") return;
-
-        // Check if user dismissed draft this session
-        const wasDismissed = sessionStorage.getItem(getDismissedKey(storageKey)) === "true";
-
-        const savedDraft = localStorage.getItem(storageKey);
-        if (savedDraft && !wasDismissed) {
-            try {
-                const parsed = JSON.parse(savedDraft);
-                // Validate draft structure and version
-                if (parsed.data && parsed.timestamp && parsed.version === DRAFT_SCHEMA_VERSION) {
-                    // Check if draft is not too old (24 hours)
-                    const draftAge = Date.now() - new Date(parsed.timestamp).getTime();
-                    const maxAge = 24 * 60 * 60 * 1000; // 24 hours
-
-                    if (draftAge < maxAge) {
-                        setState((prev) => ({ ...prev, hasDraft: true, draftDismissed: false }));
-                    } else {
-                        // Draft too old, clean it up
-                        localStorage.removeItem(storageKey);
-                    }
-                } else if (parsed.version !== DRAFT_SCHEMA_VERSION) {
-                    // Old schema version, remove it
-                    localStorage.removeItem(storageKey);
-                }
-            } catch {
-                // Invalid draft, clear it
-                localStorage.removeItem(storageKey);
-            }
-        } else if (wasDismissed) {
-            setState((prev) => ({ ...prev, draftDismissed: true }));
-        }
-
-        // Store initial data for comparison
-        initialDataRef.current = JSON.stringify(data);
-    }, [storageKey]);
 
     // Update dataRef when data changes
     useEffect(() => {

@@ -1,10 +1,30 @@
 {
   "version": 1,
   "skills": {
+    "architecture-refiner": {
+      "source": "gravito-framework/gravito",
+      "sourceType": "github",
+      "computedHash": "23973639acf85ca1ebdf18dbf3ac7ff340a4e074205427807befb37333e34c4f"
+    },
+    "code-review": {
+      "source": "skillcreatorai/ai-agent-skills",
+      "sourceType": "github",
+      "computedHash": "80be5dd754605f7d4c6e2a18e2d8ef427c24f0957487eaaa34cf11b9f7622e2b"
+    },
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "computedHash": "6412eb4eb3b91595ebab937f0c69501240e7ba761b3d82510b5cf506ec5c7adc"
+    },
     "frontend-design": {
       "source": "anthropics/skills",
       "sourceType": "github",
       "computedHash": "063a0e6448123cd359ad0044cc46b0e490cc7964d45ef4bb9fd842bd2ffbca67"
+    },
+    "reducing-entropy": {
+      "source": "softaworks/agent-toolkit",
+      "sourceType": "github",
+      "computedHash": "b13a84c41dc386c758a3eec600314ad2753989bd556bc2628519277ae3739fe5"
     },
     "twilio-communications": {
       "source": "sickn33/antigravity-awesome-skills",

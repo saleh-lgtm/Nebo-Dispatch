@@ -44,10 +44,7 @@ export default function QuoteDetailModal({ quoteId, onClose }: Props) {
     const [outcomeReason, setOutcomeReason] = useState("");
     const [activeTab, setActiveTab] = useState<"actions" | "details">("actions");
 
-    useEffect(() => {
-        loadQuote();
-    }, [quoteId]);
-
+    // Define loadQuote before useEffect to avoid accessing before declaration
     const loadQuote = async () => {
         setLoading(true);
         try {
@@ -58,6 +55,11 @@ export default function QuoteDetailModal({ quoteId, onClose }: Props) {
         }
         setLoading(false);
     };
+
+    useEffect(() => {
+        loadQuote();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [quoteId]);
 
     const handleAction = async (actionType: "CALLED" | "EMAILED" | "TEXTED" | "FOLLOW_UP") => {
         if (!noteInput.trim()) return;

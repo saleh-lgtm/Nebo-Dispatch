@@ -279,7 +279,7 @@ export default function SOPsClient({
                     ) : (
                         <div className="empty-state">
                             <Search size={48} />
-                            <p>No SOPs found for "{searchQuery}"</p>
+                            <p>No SOPs found for &quot;{searchQuery}&quot;</p>
                         </div>
                     )}
                 </div>

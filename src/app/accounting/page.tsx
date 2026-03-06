@@ -53,11 +53,11 @@ export default async function AccountingPage() {
     return (
         <AccountingClient
             initialStats={stats}
-            initialFlags={flaggedData.flags as any}
+            initialFlags={flaggedData.flags}
             totalFlags={flaggedData.total}
             userRole={session.user.role}
             isAdmin={isAdmin}
-            affiliates={affiliatesData as any}
+            affiliates={affiliatesData}
         />
     );
 }

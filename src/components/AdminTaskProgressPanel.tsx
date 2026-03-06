@@ -138,7 +138,7 @@ export default function AdminTaskProgressPanel({ tasks }: Props) {
                                     {formatDate(completion.completedAt)}
                                 </span>
                                 {completion.notes && (
-                                    <span className="completion-notes">"{completion.notes}"</span>
+                                    <span className="completion-notes">&quot;{completion.notes}&quot;</span>
                                 )}
                             </div>
                         ))}

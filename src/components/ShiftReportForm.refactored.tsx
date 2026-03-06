@@ -111,9 +111,10 @@ export default function ShiftReportForm({
         enabled: !!activeShift?.id,
     });
 
-    // Check for draft on mount
+    // Check for draft on mount - valid UI state initialization
     useEffect(() => {
         if (saveState.hasDraft && !initialDraft && !draftDecisionMade) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setShowDraftRecovery(true);
         }
     }, [saveState.hasDraft, initialDraft, draftDecisionMade]);

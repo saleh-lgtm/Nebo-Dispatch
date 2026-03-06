@@ -89,7 +89,7 @@ export default function QuotesModal({ quotes, onClose }: Props) {
                             <div className={styles.emptyState}>
                                 <FileText size={48} />
                                 <p>No quotes to display</p>
-                                <span>Click "Add Quote" to create a new quote.</span>
+                                <span>Click &quot;Add Quote&quot; to create a new quote.</span>
                             </div>
                         ) : (
                             <div className={styles.quotesList}>

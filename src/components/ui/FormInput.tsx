@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, InputHTMLAttributes, TextareaHTMLAttributes, ReactNode, useState } from "react";
+import { forwardRef, InputHTMLAttributes, TextareaHTMLAttributes, ReactNode, useState, useId } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
 interface BaseInputProps {
@@ -18,7 +18,8 @@ type TextareaProps = BaseInputProps & TextareaHTMLAttributes<HTMLTextAreaElement
 export const FormInput = forwardRef<HTMLInputElement, InputProps>(
     ({ label, error, hint, required, leftIcon, rightIcon, className = "", id, type, ...props }, ref) => {
         const [showPassword, setShowPassword] = useState(false);
-        const inputId = id || `input-${Math.random().toString(36).substring(2, 9)}`;
+        const reactId = useId();
+        const inputId = id || `input-${reactId}`;
         const isPassword = type === "password";
         const inputType = isPassword && showPassword ? "text" : type;
 
@@ -128,7 +129,8 @@ FormInput.displayName = "FormInput";
 
 export const FormTextarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     ({ label, error, hint, required, className = "", id, ...props }, ref) => {
-        const textareaId = id || `textarea-${Math.random().toString(36).substring(2, 9)}`;
+        const reactId = useId();
+        const textareaId = id || `textarea-${reactId}`;
 
         return (
             <div className="form-group">
@@ -199,7 +201,8 @@ export function FormSelect({
     placeholder,
     ...props
 }: FormSelectProps) {
-    const selectId = `select-${Math.random().toString(36).substring(2, 9)}`;
+    const reactId = useId();
+    const selectId = `select-${reactId}`;
 
     return (
         <div className="form-group">

@@ -666,7 +666,7 @@ export default function SOPDetailClient({ sop }: Props) {
                     {/* Acknowledgment Footer */}
                     {sop.requiresAcknowledgment && !isAcknowledged && (
                         <div className="acknowledgment-footer">
-                            <p>By clicking "I Acknowledge", you confirm that you have read and understood this SOP.</p>
+                            <p>By clicking &quot;I Acknowledge&quot;, you confirm that you have read and understood this SOP.</p>
                             <button
                                 onClick={handleAcknowledge}
                                 disabled={isPending}
