@@ -157,6 +157,9 @@ model User {
   eventsCreated       Event[]
   sopsCreated         SOP[]
   portalsCreated      Portal[]  @relation("PortalCreatedBy")
+  portalsApproved     Portal[]  @relation("PortalApprovals")
+  contactsCreated     Contact[] @relation("ContactsCreated")
+  contactsApproved    Contact[] @relation("ContactApprovals")
 
   // Time Off and Shift Swap relations
   timeOffRequests     TimeOffRequest[]
@@ -1708,10 +1711,41 @@ model Portal {
   sortOrder   Int      @default(0)
   isActive    Boolean  @default(true)
 
+  // Approval workflow
+  approvalStatus  ApprovalStatus @default(APPROVED) // APPROVED for backwards compat
+  approvedById    String?
+  approvedBy      User?          @relation("PortalApprovals", fields: [approvedById], references: [id])
+  approvedAt      DateTime?
+  rejectionReason String?
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   createdById String?
   createdBy   User?    @relation("PortalCreatedBy", fields: [createdById], references: [id])
+}
+
+// Customer contacts directory
+model Contact {
+  id              String         @id @default(cuid())
+  name            String
+  email           String?
+  phone           String?
+  company         String?
+  notes           String?
+
+  // Approval workflow
+  approvalStatus  ApprovalStatus @default(PENDING)
+  approvedById    String?
+  approvedBy      User?          @relation("ContactApprovals", fields: [approvedById], references: [id])
+  approvedAt      DateTime?
+  rejectionReason String?
+
+  // Audit
+  createdById     String
+  createdBy       User           @relation("ContactsCreated", fields: [createdById], references: [id])
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  isActive        Boolean        @default(true)
 }
 
 // ============================================

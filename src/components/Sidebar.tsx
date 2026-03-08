@@ -36,6 +36,7 @@ import {
     ShieldCheck,
     Shield,
     Briefcase,
+    Contact,
 } from "lucide-react";
 import NotificationBell from "./NotificationBell";
 import ClockButton from "./ClockButton";
@@ -351,6 +352,13 @@ export default function Sidebar({ user }: Props) {
                         href="/portals"
                         icon={<Globe size={18} />}
                         label="Portals"
+                        collapsed={collapsed}
+                        onClick={isMobile ? closeMobileMenu : undefined}
+                    />
+                    <NavItem
+                        href="/dispatcher/directory"
+                        icon={<Contact size={18} />}
+                        label="Directory"
                         collapsed={collapsed}
                         onClick={isMobile ? closeMobileMenu : undefined}
                     />

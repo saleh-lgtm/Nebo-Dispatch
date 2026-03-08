@@ -4,9 +4,10 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { createAuditLog } from "@/lib/auditActions";
 
 /**
- * Get all active portals
+ * Get all active and approved portals
  */
 export async function getPortals() {
     const session = await getServerSession(authOptions);
@@ -15,8 +16,61 @@ export async function getPortals() {
     }
 
     const portals = await prisma.portal.findMany({
-        where: { isActive: true },
+        where: {
+            isActive: true,
+            approvalStatus: "APPROVED"
+        },
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    });
+
+    return portals;
+}
+
+/**
+ * Get pending portals for approval (admin only)
+ */
+export async function getPendingPortals() {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+        throw new Error("Unauthorized");
+    }
+
+    const isAdmin = ["SUPER_ADMIN", "ADMIN"].includes(session.user.role || "");
+    if (!isAdmin) {
+        throw new Error("Admin access required");
+    }
+
+    const portals = await prisma.portal.findMany({
+        where: {
+            isActive: true,
+            approvalStatus: "PENDING"
+        },
+        orderBy: [{ createdAt: "asc" }],
+        include: {
+            createdBy: {
+                select: { id: true, name: true, email: true },
+            },
+        },
+    });
+
+    return portals;
+}
+
+/**
+ * Get portals created by the current user (for dispatcher view)
+ */
+export async function getMyPortals() {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+        throw new Error("Unauthorized");
+    }
+
+    const portals = await prisma.portal.findMany({
+        where: {
+            isActive: true,
+            createdById: session.user.id
+        },
+        orderBy: [{ createdAt: "desc" }],
     });
 
     return portals;
@@ -42,6 +96,9 @@ export async function getAllPortals() {
             createdBy: {
                 select: { id: true, name: true },
             },
+            approvedBy: {
+                select: { id: true, name: true },
+            },
         },
     });
 
@@ -49,7 +106,7 @@ export async function getAllPortals() {
 }
 
 /**
- * Create a new portal
+ * Create a new portal (PENDING status for dispatchers, APPROVED for admins)
  */
 export async function createPortal(data: {
     name: string;
@@ -65,9 +122,6 @@ export async function createPortal(data: {
     }
 
     const isAdmin = ["SUPER_ADMIN", "ADMIN"].includes(session.user.role || "");
-    if (!isAdmin) {
-        throw new Error("Admin access required");
-    }
 
     // Get max sortOrder
     const maxOrder = await prisma.portal.aggregate({
@@ -84,15 +138,28 @@ export async function createPortal(data: {
             color: data.color || "#64748b",
             sortOrder: (maxOrder._max.sortOrder || 0) + 1,
             createdById: session.user.id,
+            approvalStatus: isAdmin ? "APPROVED" : "PENDING",
+            approvedById: isAdmin ? session.user.id : null,
+            approvedAt: isAdmin ? new Date() : null,
         },
     });
 
+    await createAuditLog(
+        session.user.id,
+        "CREATE",
+        "Portal",
+        portal.id,
+        { name: data.name, url: data.url, status: isAdmin ? "APPROVED" : "PENDING" }
+    );
+
     revalidatePath("/portals");
+    revalidatePath("/dispatcher/directory");
+    revalidatePath("/admin/approvals");
     return portal;
 }
 
 /**
- * Update an existing portal
+ * Update an existing portal (admins can update any, dispatchers can update their own)
  */
 export async function updatePortal(
     id: string,
@@ -112,9 +179,16 @@ export async function updatePortal(
         throw new Error("Unauthorized");
     }
 
+    const existing = await prisma.portal.findUnique({ where: { id } });
+    if (!existing) {
+        throw new Error("Portal not found");
+    }
+
     const isAdmin = ["SUPER_ADMIN", "ADMIN"].includes(session.user.role || "");
-    if (!isAdmin) {
-        throw new Error("Admin access required");
+    const isOwner = existing.createdById === session.user.id;
+
+    if (!isAdmin && !isOwner) {
+        throw new Error("Not authorized to update this portal");
     }
 
     const portal = await prisma.portal.update({
@@ -122,12 +196,21 @@ export async function updatePortal(
         data,
     });
 
+    await createAuditLog(
+        session.user.id,
+        "UPDATE",
+        "Portal",
+        id,
+        { changes: data }
+    );
+
     revalidatePath("/portals");
+    revalidatePath("/dispatcher/directory");
     return portal;
 }
 
 /**
- * Delete a portal (soft delete by setting isActive to false)
+ * Delete a portal (soft delete - admins can delete any, dispatchers can delete their own)
  */
 export async function deletePortal(id: string) {
     const session = await getServerSession(authOptions);
@@ -135,9 +218,16 @@ export async function deletePortal(id: string) {
         throw new Error("Unauthorized");
     }
 
+    const portal = await prisma.portal.findUnique({ where: { id } });
+    if (!portal) {
+        throw new Error("Portal not found");
+    }
+
     const isAdmin = ["SUPER_ADMIN", "ADMIN"].includes(session.user.role || "");
-    if (!isAdmin) {
-        throw new Error("Admin access required");
+    const isOwner = portal.createdById === session.user.id;
+
+    if (!isAdmin && !isOwner) {
+        throw new Error("Not authorized to delete this portal");
     }
 
     // Soft delete
@@ -146,7 +236,17 @@ export async function deletePortal(id: string) {
         data: { isActive: false },
     });
 
+    await createAuditLog(
+        session.user.id,
+        "DELETE",
+        "Portal",
+        id,
+        { name: portal.name }
+    );
+
     revalidatePath("/portals");
+    revalidatePath("/dispatcher/directory");
+    revalidatePath("/admin/approvals");
 }
 
 /**
@@ -219,4 +319,80 @@ export async function seedDefaultPortals() {
 
     revalidatePath("/portals");
     return { message: "Default portals seeded", count: defaultPortals.length };
+}
+
+/**
+ * Approve a portal (admin only)
+ */
+export async function approvePortal(id: string) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+        throw new Error("Unauthorized");
+    }
+
+    const isAdmin = ["SUPER_ADMIN", "ADMIN"].includes(session.user.role || "");
+    if (!isAdmin) {
+        throw new Error("Admin access required");
+    }
+
+    const portal = await prisma.portal.update({
+        where: { id },
+        data: {
+            approvalStatus: "APPROVED",
+            approvedById: session.user.id,
+            approvedAt: new Date(),
+            rejectionReason: null,
+        },
+    });
+
+    await createAuditLog(
+        session.user.id,
+        "UPDATE",
+        "Portal",
+        id,
+        { action: "APPROVED", name: portal.name }
+    );
+
+    revalidatePath("/portals");
+    revalidatePath("/dispatcher/directory");
+    revalidatePath("/admin/approvals");
+    return portal;
+}
+
+/**
+ * Reject a portal (admin only)
+ */
+export async function rejectPortal(id: string, reason?: string) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+        throw new Error("Unauthorized");
+    }
+
+    const isAdmin = ["SUPER_ADMIN", "ADMIN"].includes(session.user.role || "");
+    if (!isAdmin) {
+        throw new Error("Admin access required");
+    }
+
+    const portal = await prisma.portal.update({
+        where: { id },
+        data: {
+            approvalStatus: "REJECTED",
+            approvedById: session.user.id,
+            approvedAt: new Date(),
+            rejectionReason: reason || null,
+        },
+    });
+
+    await createAuditLog(
+        session.user.id,
+        "UPDATE",
+        "Portal",
+        id,
+        { action: "REJECTED", name: portal.name, reason }
+    );
+
+    revalidatePath("/portals");
+    revalidatePath("/dispatcher/directory");
+    revalidatePath("/admin/approvals");
+    return portal;
 }

@@ -155,3 +155,31 @@ export async function isSuperAdmin(): Promise<boolean> {
     if (!session) return false;
     return session.user.role === "SUPER_ADMIN";
 }
+
+/**
+ * Check if role can manage portals (all authenticated users can)
+ */
+export function canManagePortals(role: Role): boolean {
+    return ["SUPER_ADMIN", "ADMIN", "ACCOUNTING", "DISPATCHER"].includes(role);
+}
+
+/**
+ * Check if role can manage contacts (all authenticated users can)
+ */
+export function canManageContacts(role: Role): boolean {
+    return ["SUPER_ADMIN", "ADMIN", "ACCOUNTING", "DISPATCHER"].includes(role);
+}
+
+/**
+ * Check if role can approve portals (admin only)
+ */
+export function canApprovePortals(role: Role): boolean {
+    return ["SUPER_ADMIN", "ADMIN"].includes(role);
+}
+
+/**
+ * Check if role can approve contacts (admin only)
+ */
+export function canApproveContacts(role: Role): boolean {
+    return ["SUPER_ADMIN", "ADMIN"].includes(role);
+}
