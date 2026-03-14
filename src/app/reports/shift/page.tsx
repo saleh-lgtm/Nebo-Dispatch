@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getShiftQuotes } from "@/lib/quoteActions";
 import { getShiftReportDraft } from "@/lib/actions";
+import { getAffiliatesForShiftAudit } from "@/lib/affiliateAuditActions";
 import dynamic from "next/dynamic";
 
 const ShiftReportForm = dynamic(() => import("@/components/ShiftReportForm"), {
@@ -33,8 +34,8 @@ export default async function ShiftReportPage() {
         redirect("/dashboard?error=no-active-shift");
     }
 
-    // Fetch tasks, quotes, draft, and notes metrics in parallel
-    const [tasks, shiftQuotes, serverDraft, notesCreatedCount, announcementsReadCount] = await Promise.all([
+    // Fetch tasks, quotes, draft, notes metrics, and affiliate audits in parallel
+    const [tasks, shiftQuotes, serverDraft, notesCreatedCount, announcementsReadCount, affiliateAudits] = await Promise.all([
         prisma.shiftTask.findMany({
             where: { shiftId: activeShift.id },
             orderBy: { id: "asc" },
@@ -54,6 +55,8 @@ export default async function ShiftReportPage() {
                 },
             },
         }),
+        // Get affiliates configured for audit
+        getAffiliatesForShiftAudit().catch(() => []),
     ]);
 
     return (
@@ -65,6 +68,7 @@ export default async function ShiftReportPage() {
             initialDraft={serverDraft}
             notesCreated={notesCreatedCount}
             announcementsRead={announcementsReadCount}
+            initialAffiliateAudits={affiliateAudits}
         />
     );
 }

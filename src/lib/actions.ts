@@ -239,6 +239,15 @@ export interface ShiftReportDraft {
         amount?: number;
         notes?: string;
     }>;
+    affiliateAudits?: Array<{
+        affiliateId: string;
+        affiliateName: string;
+        portalTripCount: number | null;
+        laTripCount: number | null;
+        hasDiscrepancy: boolean;
+        notes: string;
+        auditedAt?: string;
+    }>;
     handoffNotes: string;
     metrics: {
         calls: number;

@@ -1,13 +1,19 @@
 "use client";
 
-import { useState, memo, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, ClipboardCheck, Send, AlertCircle, Bookmark, Phone, Mail, FileText, TrendingUp, MessageSquare, Lightbulb, Clock, CheckCircle, Minus, X, DollarSign, User, Flag, PhoneCall, ThumbsUp, ThumbsDown, AlertOctagon, Cloud, CloudOff, RefreshCw, StickyNote, Bell } from "lucide-react";
+import { Plus, ClipboardCheck, Send, AlertCircle, Bookmark, Phone, Mail, FileText, TrendingUp, Clock, X, DollarSign, User, Cloud, CloudOff, RefreshCw, StickyNote, Bell } from "lucide-react";
 import { toggleTask, saveShiftReport, saveShiftReportDraft, deleteShiftReportDraft, type ShiftReportDraft } from "@/lib/actions";
 import { createQuote } from "@/lib/quoteActions";
 import { createBillingReviews } from "@/lib/billingReviewActions";
 import { useAutoSave } from "@/hooks/useAutoSave";
+import AffiliateAuditSection, { type AffiliateAuditEntry } from "./shift-report/AffiliateAuditSection";
 import BillingReviewSection, { type BillingReviewEntry } from "./shift-report/BillingReviewSection";
+import MetricCard from "./shift-report/MetricCard";
+import ReservationSection from "./shift-report/ReservationSection";
+import RetailLeadsSection from "./shift-report/RetailLeadsSection";
+import NarrativeSection from "./shift-report/NarrativeSection";
+import TasksChecklist from "./shift-report/TasksChecklist";
 import { BillingReviewReason } from "@prisma/client";
 
 interface ReservationEntry {
@@ -85,14 +91,18 @@ interface Props {
     initialDraft?: ShiftReportDraft | null;
     notesCreated?: number;
     announcementsRead?: number;
+    initialAffiliateAudits?: AffiliateAuditEntry[];
 }
 
-export default function ShiftReportPage({ session, activeShift, initialTasks, initialQuotes = [], initialDraft, notesCreated = 0, announcementsRead = 0 }: Props) {
+export default function ShiftReportPage({ session, activeShift, initialTasks, initialQuotes = [], initialDraft, notesCreated = 0, announcementsRead = 0, initialAffiliateAudits = [] }: Props) {
     const router = useRouter();
     const [accepted, setAccepted] = useState<ReservationEntry[]>(initialDraft?.accepted || []);
     const [modified, setModified] = useState<ReservationEntry[]>(initialDraft?.modified || []);
     const [cancelled, setCancelled] = useState<ReservationEntry[]>(initialDraft?.cancelled || []);
     const [retailLeads, setRetailLeads] = useState<RetailLeadEntry[]>(initialDraft?.retailLeads || []);
+    const [affiliateAudits, setAffiliateAudits] = useState<AffiliateAuditEntry[]>(
+        initialDraft?.affiliateAudits || initialAffiliateAudits
+    );
     const [billingReviews, setBillingReviews] = useState<BillingReviewEntry[]>(
         (initialDraft?.billingReviews || []).map((r: { tripNumber: string; reason: string; passengerName?: string; tripDate?: string; reasonOther?: string; amount?: number; notes?: string }) => ({ ...r, reason: r.reason as BillingReviewReason }))
     );
@@ -123,10 +133,11 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
         cancelled,
         retailLeads,
         billingReviews,
+        affiliateAudits,
         handoffNotes,
         metrics,
         narrative,
-    }), [activeShift?.id, accepted, modified, cancelled, retailLeads, billingReviews, handoffNotes, metrics, narrative]);
+    }), [activeShift?.id, accepted, modified, cancelled, retailLeads, billingReviews, affiliateAudits, handoffNotes, metrics, narrative]);
 
     // Server save handler
     const handleServerSave = useCallback(async (data: ShiftReportDraft) => {
@@ -165,13 +176,14 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
             setCancelled(draft.cancelled || []);
             setRetailLeads(draft.retailLeads || []);
             setBillingReviews((draft.billingReviews || []).map(r => ({ ...r, reason: r.reason as BillingReviewReason })));
+            setAffiliateAudits(draft.affiliateAudits || initialAffiliateAudits);
             setHandoffNotes(draft.handoffNotes || "");
             setMetrics(draft.metrics || { calls: 0, emails: 0, totalReservationsHandled: 0 });
             setNarrative(draft.narrative || { comments: "", incidents: "", ideas: "" });
         }
         setDraftDecisionMade(true);
         setShowDraftRecovery(false);
-    }, [restoreDraft]);
+    }, [restoreDraft, initialAffiliateAudits]);
 
     const handleDiscardDraft = useCallback(() => {
         dismissDraft(); // Use dismissDraft to mark as dismissed for this session
@@ -333,8 +345,6 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
         }
     };
 
-    const completedTasks = tasks.filter((t) => t.isCompleted).length;
-    const taskProgress = tasks.length > 0 ? (completedTasks / tasks.length) * 100 : 0;
 
     // Format the last saved time
     const formatLastSaved = (date: Date | null) => {
@@ -570,191 +580,41 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
                             <ReservationSection
                                 title="Accepted"
                                 data={accepted}
-                                setter={setAccepted}
-                                add={() => addReservation(setAccepted)}
-                                update={updateReservation}
-                                remove={removeReservation}
+                                onAdd={() => addReservation(setAccepted)}
+                                onUpdate={(index, field, value) => updateReservation(setAccepted, index, field, value)}
+                                onRemove={(index) => removeReservation(setAccepted, index)}
                                 color="green"
                             />
                             <ReservationSection
                                 title="Modified"
                                 data={modified}
-                                setter={setModified}
-                                add={() => addReservation(setModified)}
-                                update={updateReservation}
-                                remove={removeReservation}
+                                onAdd={() => addReservation(setModified)}
+                                onUpdate={(index, field, value) => updateReservation(setModified, index, field, value)}
+                                onRemove={(index) => removeReservation(setModified, index)}
                                 color="blue"
                             />
                             <ReservationSection
                                 title="Cancelled"
                                 data={cancelled}
-                                setter={setCancelled}
-                                add={() => addReservation(setCancelled)}
-                                update={updateReservation}
-                                remove={removeReservation}
+                                onAdd={() => addReservation(setCancelled)}
+                                onUpdate={(index, field, value) => updateReservation(setCancelled, index, field, value)}
+                                onRemove={(index) => removeReservation(setCancelled, index)}
                                 color="red"
                             />
                         </div>
                     </section>
 
                     {/* Retail Calls Section */}
-                    <section className="report-card">
-                        <div className="card-header">
-                            <div className="card-icon card-icon-purple">
-                                <PhoneCall size={18} />
-                            </div>
-                            <h2 className="card-title">Retail Calls</h2>
-                            <span className="retail-count">{retailLeads.length}</span>
-                            <button
-                                type="button"
-                                onClick={() => setRetailLeads([...retailLeads, { serviceRequested: "", outcome: "WON" }])}
-                                className="add-retail-btn"
-                            >
-                                <Plus size={16} />
-                                Add Call
-                            </button>
-                        </div>
-
-                        {retailLeads.length === 0 ? (
-                            <div className="empty-retail">
-                                <PhoneCall size={32} />
-                                <p>No retail calls logged yet</p>
-                                <button
-                                    type="button"
-                                    onClick={() => setRetailLeads([{ serviceRequested: "", outcome: "WON" }])}
-                                    className="add-retail-btn-large"
-                                >
-                                    <Plus size={18} />
-                                    Log First Call
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="retail-list">
-                                {retailLeads.map((lead, index) => (
-                                    <div key={index} className="retail-item">
-                                        <div className="retail-header">
-                                            <span className="retail-number">Call #{index + 1}</span>
-                                            <button
-                                                type="button"
-                                                onClick={() => setRetailLeads(retailLeads.filter((_, i) => i !== index))}
-                                                className="retail-remove"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
-                                        </div>
-
-                                        <div className="retail-field">
-                                            <label>What did they request?</label>
-                                            <input
-                                                type="text"
-                                                value={lead.serviceRequested}
-                                                onChange={(e) => {
-                                                    const updated = [...retailLeads];
-                                                    updated[index] = { ...lead, serviceRequested: e.target.value };
-                                                    setRetailLeads(updated);
-                                                }}
-                                                placeholder="e.g., Airport transfer, hourly service..."
-                                            />
-                                        </div>
-
-                                        <div className="retail-field">
-                                            <label>Outcome</label>
-                                            <div className="outcome-buttons">
-                                                <button
-                                                    type="button"
-                                                    className={`outcome-btn outcome-won ${lead.outcome === "WON" ? "active" : ""}`}
-                                                    onClick={() => {
-                                                        const updated = [...retailLeads];
-                                                        updated[index] = { ...lead, outcome: "WON", lostReason: undefined, lostReasonOther: undefined };
-                                                        setRetailLeads(updated);
-                                                    }}
-                                                >
-                                                    <ThumbsUp size={14} />
-                                                    <span>Won</span>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className={`outcome-btn outcome-followup ${lead.outcome === "NEEDS_FOLLOW_UP" ? "active" : ""}`}
-                                                    onClick={() => {
-                                                        const updated = [...retailLeads];
-                                                        updated[index] = { ...lead, outcome: "NEEDS_FOLLOW_UP", lostReason: undefined, lostReasonOther: undefined };
-                                                        setRetailLeads(updated);
-                                                    }}
-                                                >
-                                                    <AlertOctagon size={14} />
-                                                    <span>Follow Up</span>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className={`outcome-btn outcome-lost ${lead.outcome === "LOST" ? "active" : ""}`}
-                                                    onClick={() => {
-                                                        const updated = [...retailLeads];
-                                                        updated[index] = { ...lead, outcome: "LOST" };
-                                                        setRetailLeads(updated);
-                                                    }}
-                                                >
-                                                    <ThumbsDown size={14} />
-                                                    <span>Lost</span>
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {lead.outcome === "LOST" && (
-                                            <div className="retail-field">
-                                                <label>Why did we lose it?</label>
-                                                <div className="lost-reason-buttons">
-                                                    {(["VEHICLE_TYPE", "AVAILABILITY", "PRICING", "OTHER"] as const).map((reason) => (
-                                                        <button
-                                                            key={reason}
-                                                            type="button"
-                                                            className={`reason-btn ${lead.lostReason === reason ? "active" : ""}`}
-                                                            onClick={() => {
-                                                                const updated = [...retailLeads];
-                                                                updated[index] = { ...lead, lostReason: reason };
-                                                                setRetailLeads(updated);
-                                                            }}
-                                                        >
-                                                            {reason === "VEHICLE_TYPE" && "Vehicle Type"}
-                                                            {reason === "AVAILABILITY" && "Availability"}
-                                                            {reason === "PRICING" && "Pricing"}
-                                                            {reason === "OTHER" && "Other"}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                                {lead.lostReason === "OTHER" && (
-                                                    <input
-                                                        type="text"
-                                                        value={lead.lostReasonOther || ""}
-                                                        onChange={(e) => {
-                                                            const updated = [...retailLeads];
-                                                            updated[index] = { ...lead, lostReasonOther: e.target.value };
-                                                            setRetailLeads(updated);
-                                                        }}
-                                                        placeholder="Specify other reason..."
-                                                        className="other-reason-input"
-                                                    />
-                                                )}
-                                            </div>
-                                        )}
-
-                                        <div className="retail-field">
-                                            <label>Notes (optional)</label>
-                                            <input
-                                                type="text"
-                                                value={lead.notes || ""}
-                                                onChange={(e) => {
-                                                    const updated = [...retailLeads];
-                                                    updated[index] = { ...lead, notes: e.target.value };
-                                                    setRetailLeads(updated);
-                                                }}
-                                                placeholder="Additional details..."
-                                            />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </section>
+                    <RetailLeadsSection
+                        leads={retailLeads}
+                        onAdd={() => setRetailLeads([...retailLeads, { serviceRequested: "", outcome: "WON" }])}
+                        onUpdate={(index, updates) => {
+                            const updated = [...retailLeads];
+                            updated[index] = { ...updated[index], ...updates };
+                            setRetailLeads(updated);
+                        }}
+                        onRemove={(index) => setRetailLeads(retailLeads.filter((_, i) => i !== index))}
+                    />
 
                     {/* Billing Review Section */}
                     <BillingReviewSection
@@ -768,113 +628,31 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
                         onRemove={(index) => setBillingReviews(billingReviews.filter((_, i) => i !== index))}
                     />
 
+                    {/* Affiliate Audit Section */}
+                    <AffiliateAuditSection
+                        audits={affiliateAudits}
+                        onUpdate={(index, updates) => {
+                            const updated = [...affiliateAudits];
+                            updated[index] = { ...updated[index], ...updates };
+                            setAffiliateAudits(updated);
+                        }}
+                    />
+
                     {/* Notes Section */}
-                    <section className="report-card">
-                        <div className="card-header">
-                            <div className="card-icon card-icon-red">
-                                <AlertCircle size={18} />
-                            </div>
-                            <h2 className="card-title">Notes & Feedback</h2>
-                        </div>
-                        <div className="notes-grid">
-                            <div className="note-field note-field-highlight">
-                                <label className="note-label note-label-warning">
-                                    <MessageSquare size={14} />
-                                    <span>Handoff Notes (for next dispatcher)</span>
-                                </label>
-                                <textarea
-                                    className="note-input"
-                                    value={handoffNotes}
-                                    onChange={(e) => setHandoffNotes(e.target.value)}
-                                    placeholder="Important info for the next dispatcher taking over..."
-                                />
-                            </div>
-                            <div className="note-field">
-                                <label className="note-label note-label-red">
-                                    <AlertCircle size={14} />
-                                    <span>Incidents / Deviations</span>
-                                </label>
-                                <textarea
-                                    className="note-input"
-                                    value={narrative.incidents}
-                                    onChange={(e) => setNarrative({ ...narrative, incidents: e.target.value })}
-                                    placeholder="Report any incidents, deviations, or issues..."
-                                />
-                            </div>
-                            <div className="note-field">
-                                <label className="note-label">
-                                    <MessageSquare size={14} />
-                                    <span>General Comments</span>
-                                </label>
-                                <textarea
-                                    className="note-input"
-                                    value={narrative.comments}
-                                    onChange={(e) => setNarrative({ ...narrative, comments: e.target.value })}
-                                    placeholder="Any other comments about your shift..."
-                                />
-                            </div>
-                            <div className="note-field">
-                                <label className="note-label note-label-accent">
-                                    <Lightbulb size={14} />
-                                    <span>Ideas & Suggestions</span>
-                                </label>
-                                <textarea
-                                    className="note-input"
-                                    value={narrative.ideas}
-                                    onChange={(e) => setNarrative({ ...narrative, ideas: e.target.value })}
-                                    placeholder="Ideas to improve processes or service..."
-                                />
-                            </div>
-                        </div>
-                    </section>
+                    <NarrativeSection
+                        narrative={narrative}
+                        handoffNotes={handoffNotes}
+                        onNarrativeChange={setNarrative}
+                        onHandoffNotesChange={setHandoffNotes}
+                    />
                 </main>
 
                 {/* Sidebar */}
                 <aside className="report-sidebar">
-                    <div className="sidebar-card">
-                        <div className="sidebar-header">
-                            <ClipboardCheck size={18} />
-                            <h3>Shift Tasks</h3>
-                        </div>
-
-                        {tasks.length > 0 && (
-                            <div className="progress-section">
-                                <div className="progress-header">
-                                    <span className="progress-label">Progress</span>
-                                    <span className="progress-value">{completedTasks}/{tasks.length}</span>
-                                </div>
-                                <div className="progress-track">
-                                    <div
-                                        className="progress-bar"
-                                        style={{ width: `${taskProgress}%` }}
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="tasks-list">
-                            {tasks.length === 0 ? (
-                                <div className="empty-tasks">
-                                    <CheckCircle size={24} />
-                                    <p>No tasks assigned</p>
-                                </div>
-                            ) : (
-                                tasks.map((task) => (
-                                    <label key={task.id} className="task-item">
-                                        <input
-                                            type="checkbox"
-                                            checked={task.isCompleted}
-                                            onChange={() => handleToggleTask(task.id, task.isCompleted)}
-                                            className="task-checkbox"
-                                        />
-                                        <span className={`task-text ${task.isCompleted ? "task-completed" : ""}`}>
-                                            {task.content}
-                                        </span>
-                                    </label>
-                                ))
-                            )}
-                        </div>
-                    </div>
+                    <TasksChecklist
+                        tasks={tasks}
+                        onToggleTask={handleToggleTask}
+                    />
 
                     {/* Mobile Submit */}
                     <div className="mobile-submit">
@@ -1887,316 +1665,6 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
     );
 }
 
-// Metric Card Component
-interface MetricCardProps {
-    label: string;
-    value: number;
-    onChange: (v: number) => void;
-    icon: React.ReactNode;
-    color: "blue" | "green" | "amber" | "purple" | "red";
-}
-
-const MetricCard = memo(function MetricCard({ label, value, onChange, icon, color }: MetricCardProps) {
-    const colors = {
-        blue: { bg: "rgba(59, 130, 246, 0.1)", border: "rgba(59, 130, 246, 0.2)", text: "#60a5fa" },
-        green: { bg: "rgba(34, 197, 94, 0.1)", border: "rgba(34, 197, 94, 0.2)", text: "#4ade80" },
-        amber: { bg: "rgba(245, 158, 11, 0.1)", border: "rgba(245, 158, 11, 0.2)", text: "#fbbf24" },
-        purple: { bg: "rgba(168, 85, 247, 0.1)", border: "rgba(168, 85, 247, 0.2)", text: "#c084fc" },
-        red: { bg: "rgba(239, 68, 68, 0.1)", border: "rgba(239, 68, 68, 0.2)", text: "#f87171" },
-    };
-
-    const c = colors[color];
-
-    return (
-        <div style={{
-            padding: "1rem",
-            background: c.bg,
-            border: `1px solid ${c.border}`,
-            borderRadius: "12px",
-        }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
-                <span style={{ color: c.text }}>{icon}</span>
-                <span style={{ fontSize: "0.8rem", fontWeight: 500, color: "var(--text-secondary)" }}>{label}</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                <button
-                    type="button"
-                    onClick={() => onChange(Math.max(0, value - 1))}
-                    style={{
-                        width: "32px",
-                        height: "32px",
-                        border: `1px solid ${c.border}`,
-                        background: "rgba(0, 0, 0, 0.2)",
-                        borderRadius: "8px",
-                        color: c.text,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        transition: "all 0.2s",
-                    }}
-                    aria-label={`Decrease ${label}`}
-                >
-                    <Minus size={16} />
-                </button>
-                <span style={{
-                    flex: 1,
-                    textAlign: "center",
-                    fontSize: "1.75rem",
-                    fontWeight: 700,
-                    color: value > 0 ? c.text : "var(--text-secondary)",
-                }}>
-                    {value}
-                </span>
-                <button
-                    type="button"
-                    onClick={() => onChange(value + 1)}
-                    style={{
-                        width: "32px",
-                        height: "32px",
-                        border: `1px solid ${c.border}`,
-                        background: "rgba(0, 0, 0, 0.2)",
-                        borderRadius: "8px",
-                        color: c.text,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        transition: "all 0.2s",
-                    }}
-                    aria-label={`Increase ${label}`}
-                >
-                    <Plus size={16} />
-                </button>
-            </div>
-        </div>
-    );
-});
-
-// Predefined flag reasons for accounting review
-const FLAG_REASONS = [
-    "Price discrepancy",
-    "Missing payment info",
-    "Affiliate billing issue",
-    "Rate adjustment needed",
-    "Discount applied",
-    "Gratuity issue",
-    "Cancellation fee",
-    "No-show charge",
-    "Extra charges",
-    "Refund request",
-    "Other",
-] as const;
-
-// Reservation Section Component
-interface ReservationSectionProps {
-    title: string;
-    data: ReservationEntry[];
-    setter: React.Dispatch<React.SetStateAction<ReservationEntry[]>>;
-    add: () => void;
-    update: (setter: React.Dispatch<React.SetStateAction<ReservationEntry[]>>, index: number, field: string, value: string | boolean) => void;
-    remove: (setter: React.Dispatch<React.SetStateAction<ReservationEntry[]>>, index: number) => void;
-    color: "green" | "blue" | "red";
-}
-
-function ReservationSection({ title, data, setter, add, update, remove, color }: ReservationSectionProps) {
-    const colors: Record<string, { bg: string; border: string; text: string }> = {
-        green: { bg: "rgba(34, 197, 94, 0.05)", border: "rgba(34, 197, 94, 0.15)", text: "#4ade80" },
-        blue: { bg: "rgba(59, 130, 246, 0.05)", border: "rgba(59, 130, 246, 0.15)", text: "#60a5fa" },
-        red: { bg: "rgba(239, 68, 68, 0.05)", border: "rgba(239, 68, 68, 0.15)", text: "#f87171" },
-    };
-    const c = colors[color] || colors.blue;
-
-    return (
-        <div style={{
-            padding: "1rem",
-            background: c.bg,
-            border: `1px solid ${c.border}`,
-            borderRadius: "12px",
-        }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-                <h3 style={{ fontSize: "0.85rem", fontWeight: 600, color: c.text }}>{title}</h3>
-                <button
-                    onClick={add}
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.25rem",
-                        padding: "0.25rem 0.5rem",
-                        background: "rgba(0, 0, 0, 0.2)",
-                        border: `1px solid ${c.border}`,
-                        borderRadius: "6px",
-                        color: c.text,
-                        fontSize: "0.7rem",
-                        fontWeight: 500,
-                        cursor: "pointer",
-                    }}
-                >
-                    <Plus size={12} /> Add
-                </button>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                {data.map((item, index) => (
-                    <div key={index} style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "0.5rem",
-                        padding: item.flaggedForAccounting ? "0.75rem" : "0",
-                        background: item.flaggedForAccounting ? "rgba(245, 158, 11, 0.08)" : "transparent",
-                        border: item.flaggedForAccounting ? "1px solid rgba(245, 158, 11, 0.25)" : "none",
-                        borderRadius: "8px",
-                        transition: "all 0.2s",
-                    }}>
-                        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                            <input
-                                placeholder="Res #"
-                                value={item.id}
-                                onChange={(e) => update(setter, index, "id", e.target.value)}
-                                style={{
-                                    width: "80px",
-                                    padding: "0.5rem",
-                                    background: "rgba(0, 0, 0, 0.2)",
-                                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                                    borderRadius: "6px",
-                                    color: "var(--text-primary)",
-                                    fontSize: "0.8rem",
-                                }}
-                            />
-                            <input
-                                placeholder="Notes"
-                                value={item.notes}
-                                onChange={(e) => update(setter, index, "notes", e.target.value)}
-                                style={{
-                                    flex: 1,
-                                    padding: "0.5rem",
-                                    background: "rgba(0, 0, 0, 0.2)",
-                                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                                    borderRadius: "6px",
-                                    color: "var(--text-primary)",
-                                    fontSize: "0.8rem",
-                                }}
-                            />
-                            <button
-                                onClick={() => {
-                                    if (item.flaggedForAccounting) {
-                                        update(setter, index, "flaggedForAccounting", false);
-                                        update(setter, index, "flagReason", "");
-                                    } else {
-                                        update(setter, index, "flaggedForAccounting", true);
-                                    }
-                                }}
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "0.375rem",
-                                    padding: "0.375rem 0.625rem",
-                                    background: item.flaggedForAccounting
-                                        ? "rgba(245, 158, 11, 0.25)"
-                                        : "rgba(255, 255, 255, 0.05)",
-                                    border: item.flaggedForAccounting
-                                        ? "1px solid rgba(245, 158, 11, 0.5)"
-                                        : "1px solid rgba(255, 255, 255, 0.1)",
-                                    borderRadius: "6px",
-                                    color: item.flaggedForAccounting ? "#fbbf24" : "var(--text-secondary)",
-                                    cursor: "pointer",
-                                    transition: "all 0.2s",
-                                    fontSize: "0.7rem",
-                                    fontWeight: 500,
-                                    whiteSpace: "nowrap",
-                                }}
-                            >
-                                <Flag size={12} />
-                                {item.flaggedForAccounting ? "Flagged" : "Flag"}
-                            </button>
-                            <button
-                                onClick={() => remove(setter, index)}
-                                style={{
-                                    padding: "0.375rem",
-                                    background: "none",
-                                    border: "none",
-                                    color: "#f87171",
-                                    cursor: "pointer",
-                                }}
-                            >
-                                <Trash2 size={14} />
-                            </button>
-                        </div>
-                        {item.flaggedForAccounting && (
-                            <div style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: "0.5rem",
-                                paddingTop: "0.25rem",
-                            }}>
-                                <div style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "0.5rem",
-                                    fontSize: "0.7rem",
-                                    color: "#fbbf24",
-                                    fontWeight: 500,
-                                }}>
-                                    <AlertOctagon size={12} />
-                                    <span>Flagged for Accounting Review</span>
-                                </div>
-                                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                                    <select
-                                        value={(FLAG_REASONS as readonly string[]).includes(item.flagReason || "") ? item.flagReason : (item.flagReason ? "Other" : "")}
-                                        onChange={(e) => {
-                                            const value = e.target.value;
-                                            if (value === "Other") {
-                                                update(setter, index, "flagReason", "");
-                                            } else {
-                                                update(setter, index, "flagReason", value);
-                                            }
-                                        }}
-                                        style={{
-                                            flex: 1,
-                                            minWidth: "150px",
-                                            padding: "0.5rem",
-                                            background: "rgba(0, 0, 0, 0.3)",
-                                            border: "1px solid rgba(245, 158, 11, 0.3)",
-                                            borderRadius: "6px",
-                                            color: "var(--text-primary)",
-                                            fontSize: "0.75rem",
-                                        }}
-                                    >
-                                        <option value="">Select reason...</option>
-                                        {FLAG_REASONS.map((reason) => (
-                                            <option key={reason} value={reason}>{reason}</option>
-                                        ))}
-                                    </select>
-                                    {(!(FLAG_REASONS as readonly string[]).includes(item.flagReason || "") || item.flagReason === "Other" || !item.flagReason) && (
-                                        <input
-                                            placeholder="Specify reason..."
-                                            value={(FLAG_REASONS as readonly string[]).includes(item.flagReason || "") ? "" : (item.flagReason || "")}
-                                            onChange={(e) => update(setter, index, "flagReason", e.target.value)}
-                                            style={{
-                                                flex: 2,
-                                                minWidth: "150px",
-                                                padding: "0.5rem",
-                                                background: "rgba(0, 0, 0, 0.3)",
-                                                border: "1px solid rgba(245, 158, 11, 0.3)",
-                                                borderRadius: "6px",
-                                                color: "var(--text-primary)",
-                                                fontSize: "0.75rem",
-                                            }}
-                                        />
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                ))}
-                {data.length === 0 && (
-                    <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", fontStyle: "italic", textAlign: "center", padding: "0.5rem" }}>
-                        No entries
-                    </p>
-                )}
-            </div>
-        </div>
-    );
-}
 
 // Add Quote Modal Component
 function AddQuoteModal({

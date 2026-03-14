@@ -160,6 +160,9 @@ model User {
   portalsApproved     Portal[]  @relation("PortalApprovals")
   contactsCreated     Contact[] @relation("ContactsCreated")
   contactsApproved    Contact[] @relation("ContactApprovals")
+  contactTagsCreated    ContactTag[]           @relation("ContactTagsCreated")
+  contactTagAssignments ContactTagAssignment[] @relation("ContactTagAssignments")
+  blastSMSSent          BlastSMSLog[]          @relation("BlastSMSSent")
 
   // Time Off and Shift Swap relations
   timeOffRequests     TimeOffRequest[]
@@ -470,12 +473,30 @@ model Affiliate {
   // House Chauffeur fleet vehicle assignments
   vehicleAssignments VehicleAssignment[]
 
+  // Audit configuration (for shift report audits)
+  auditConfig AffiliateAuditConfig?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([type])
   @@index([isActive])
   @@index([market])
+}
+
+// Configuration for which affiliates to audit in shift reports
+model AffiliateAuditConfig {
+  id             String    @id @default(cuid())
+  affiliateId    String    @unique
+  affiliate      Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  auditFrequency String    @default("EVERY_SHIFT") // EVERY_SHIFT, DAILY, WEEKLY
+  priority       Int       @default(0) // Higher = show first in list
+  notes          String?   @db.Text // Admin notes about this audit item
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([isActive, priority])
 }
 
 model SchedulingRequest {
@@ -1746,6 +1767,60 @@ model Contact {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   isActive        Boolean        @default(true)
+
+  // Tag assignments
+  tags            ContactTagAssignment[]
+}
+
+// Contact tagging system for organizing contacts and blast messaging
+model ContactTag {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  color       String   @default("#3B82F6")
+  description String?
+
+  // Audit
+  createdById String
+  createdBy   User     @relation("ContactTagsCreated", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  assignments ContactTagAssignment[]
+
+  @@index([name])
+}
+
+// Junction table for Contact <-> Tag many-to-many relationship
+model ContactTagAssignment {
+  id           String     @id @default(cuid())
+  contactId    String
+  contact      Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tagId        String
+  tag          ContactTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  assignedById String
+  assignedBy   User       @relation("ContactTagAssignments", fields: [assignedById], references: [id])
+  assignedAt   DateTime   @default(now())
+
+  @@unique([contactId, tagId])
+  @@index([contactId])
+  @@index([tagId])
+}
+
+// Track bulk SMS campaigns for audit purposes
+model BlastSMSLog {
+  id             String   @id @default(cuid())
+  message        String   @db.Text
+  tagIds         String[]
+  recipientCount Int
+  successCount   Int
+  failCount      Int
+  sentById       String
+  sentBy         User     @relation("BlastSMSSent", fields: [sentById], references: [id])
+  createdAt      DateTime @default(now())
+
+  @@index([sentById])
+  @@index([createdAt])
 }
 
 // ============================================

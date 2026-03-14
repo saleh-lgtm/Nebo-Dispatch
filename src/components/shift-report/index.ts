@@ -1,4 +1,6 @@
 // Shift Report Components - v2
+export { default as AffiliateAuditSection } from "./AffiliateAuditSection";
+export type { AffiliateAuditEntry } from "./AffiliateAuditSection";
 export { default as BillingReviewSection } from "./BillingReviewSection";
 export type { BillingReviewEntry } from "./BillingReviewSection";
 export { default as MetricCard } from "./MetricCard";

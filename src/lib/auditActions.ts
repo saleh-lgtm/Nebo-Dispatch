@@ -63,7 +63,10 @@ export type AuditEntity =
     | "TbrTrip"
     | "TbrVehicleMapping"
     | "TbrSyncLog"
-    | "RoutePrice";
+    | "RoutePrice"
+    | "AffiliateAuditConfig"
+    | "Contact"
+    | "Portal";
 
 /**
  * Create an audit log entry
