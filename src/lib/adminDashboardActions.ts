@@ -114,8 +114,8 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
         Promise.all([
             prisma.shift.count({
                 where: {
-                    clockOutTime: null,
-                    clockInTime: { not: null },
+                    clockOut: null,
+                    clockIn: { not: null },
                 },
             }),
             prisma.shiftReport.count({ where: { status: "SUBMITTED" } }),
@@ -343,11 +343,11 @@ export async function getDispatcherAnalytics(): Promise<DispatcherAnalytics[]> {
             taskConfig: true,
             shifts: {
                 where: {
-                    clockInTime: { gte: startOfMonth },
+                    clockIn: { gte: startOfMonth },
                 },
                 select: {
-                    clockInTime: true,
-                    clockOutTime: true,
+                    clockIn: true,
+                    clockOut: true,
                 },
             },
             quotesCreated: {
@@ -375,8 +375,8 @@ export async function getDispatcherAnalytics(): Promise<DispatcherAnalytics[]> {
     return dispatchers.map((dispatcher) => {
         // Calculate hours
         const totalMinutes = dispatcher.shifts.reduce((acc, shift) => {
-            if (shift.clockInTime && shift.clockOutTime) {
-                return acc + (shift.clockOutTime.getTime() - shift.clockInTime.getTime()) / 60000;
+            if (shift.clockIn && shift.clockOut) {
+                return acc + (shift.clockOut.getTime() - shift.clockIn.getTime()) / 60000;
             }
             return acc;
         }, 0);
