@@ -81,7 +81,7 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
             }),
             prisma.tripConfirmation.count({
                 where: {
-                    status: "COMPLETED",
+                    status: "CONFIRMED",
                     completedAt: { gte: startOfDay, lte: endOfDay },
                 },
             }),
