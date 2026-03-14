@@ -149,10 +149,10 @@ export default function LoginPage() {
                     background: var(--bg-base);
                 }
 
-                /* Brand Panel - n8n-inspired dark gradient */
+                /* Brand Panel - Premium dark gradient with blue accents */
                 .login-brand {
-                    background: linear-gradient(135deg, #1a1225 0%, #241a30 50%, #0e0918 100%);
-                    padding: 3rem;
+                    background: linear-gradient(145deg, #0f1629 0%, #151d35 50%, #0a0f1a 100%);
+                    padding: 3.5rem;
                     display: flex;
                     flex-direction: column;
                     justify-content: center;
@@ -163,67 +163,68 @@ export default function LoginPage() {
                 .login-brand::before {
                     content: '';
                     position: absolute;
-                    top: -30%;
-                    right: -20%;
-                    width: 70%;
-                    height: 120%;
-                    background: radial-gradient(ellipse, rgba(238, 79, 39, 0.15) 0%, transparent 60%);
+                    top: -40%;
+                    right: -25%;
+                    width: 80%;
+                    height: 140%;
+                    background: radial-gradient(ellipse, rgba(37, 99, 235, 0.15) 0%, transparent 55%);
                     pointer-events: none;
                 }
 
                 .login-brand::after {
                     content: '';
                     position: absolute;
-                    bottom: -30%;
-                    left: -20%;
-                    width: 60%;
-                    height: 100%;
-                    background: radial-gradient(ellipse, rgba(139, 122, 168, 0.1) 0%, transparent 60%);
+                    bottom: -35%;
+                    left: -25%;
+                    width: 70%;
+                    height: 110%;
+                    background: radial-gradient(ellipse, rgba(59, 130, 246, 0.08) 0%, transparent 55%);
                     pointer-events: none;
                 }
 
                 .brand-content {
                     position: relative;
                     z-index: 1;
-                    max-width: 420px;
+                    max-width: 440px;
                 }
 
                 .brand-icon {
-                    width: 80px;
-                    height: 80px;
-                    background: linear-gradient(135deg, var(--accent-soft), rgba(238, 79, 39, 0.25));
+                    width: 88px;
+                    height: 88px;
+                    background: linear-gradient(145deg, var(--accent-soft), rgba(37, 99, 235, 0.25));
                     border: 1px solid var(--accent-border);
-                    border-radius: 20px;
+                    border-radius: 24px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     color: var(--accent);
-                    margin-bottom: 2rem;
-                    box-shadow: 0 0 40px rgba(238, 79, 39, 0.3);
+                    margin-bottom: 2.5rem;
+                    box-shadow: 0 0 50px rgba(37, 99, 235, 0.35);
                 }
 
                 .brand-title {
-                    font-size: 2.75rem;
+                    font-size: 3rem;
                     font-weight: 800;
-                    background: linear-gradient(135deg, #ffffff 0%, #a8a0b4 100%);
+                    background: linear-gradient(135deg, #f8fafc 0%, #94a3b8 100%);
                     -webkit-background-clip: text;
                     -webkit-text-fill-color: transparent;
                     background-clip: text;
-                    margin-bottom: 0.75rem;
-                    letter-spacing: -0.03em;
+                    margin-bottom: 0.875rem;
+                    letter-spacing: -0.035em;
                 }
 
                 .brand-tagline {
                     font-size: 1.25rem;
                     color: var(--text-secondary);
-                    margin-bottom: 3rem;
+                    margin-bottom: 3.5rem;
                     font-weight: 500;
+                    letter-spacing: -0.01em;
                 }
 
                 .brand-features {
                     display: flex;
                     flex-direction: column;
-                    gap: 1.25rem;
+                    gap: 1.5rem;
                 }
 
                 .feature-item {
@@ -241,24 +242,24 @@ export default function LoginPage() {
                     background: linear-gradient(135deg, var(--accent), var(--accent-hover));
                     border-radius: 50%;
                     flex-shrink: 0;
-                    box-shadow: 0 0 15px rgba(238, 79, 39, 0.5);
+                    box-shadow: 0 0 18px rgba(37, 99, 235, 0.6);
                 }
 
                 .brand-footer {
                     position: absolute;
                     bottom: 2.5rem;
-                    left: 3rem;
+                    left: 3.5rem;
                     color: var(--text-muted);
                     font-size: 0.875rem;
                 }
 
                 /* Form Panel */
                 .login-form-panel {
-                    background: var(--bg-surface);
+                    background: linear-gradient(180deg, var(--bg-surface) 0%, var(--bg-base) 100%);
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    padding: 2.5rem;
+                    padding: 3rem;
                     position: relative;
                 }
 
@@ -269,7 +270,7 @@ export default function LoginPage() {
                     left: 0;
                     width: 1px;
                     height: 100%;
-                    background: linear-gradient(to bottom, transparent, var(--accent-border), transparent);
+                    background: linear-gradient(to bottom, transparent 10%, rgba(37, 99, 235, 0.25) 50%, transparent 90%);
                 }
 
                 .login-form-container {
@@ -282,11 +283,11 @@ export default function LoginPage() {
                 }
 
                 .login-header h2 {
-                    font-size: 2rem;
+                    font-size: 2.125rem;
                     font-weight: 800;
                     color: var(--text-primary);
-                    margin-bottom: 0.625rem;
-                    letter-spacing: -0.02em;
+                    margin-bottom: 0.75rem;
+                    letter-spacing: -0.025em;
                 }
 
                 .login-header p {
@@ -301,7 +302,7 @@ export default function LoginPage() {
                 }
 
                 .login-error {
-                    background: var(--danger-soft);
+                    background: linear-gradient(135deg, var(--danger-soft), rgba(239, 68, 68, 0.2));
                     border: 1px solid var(--danger-border);
                     border-radius: var(--radius-md);
                     padding: 1rem 1.25rem;
@@ -317,7 +318,7 @@ export default function LoginPage() {
                 }
 
                 .form-label {
-                    font-size: 0.75rem;
+                    font-size: 0.6875rem;
                     font-weight: 700;
                     color: var(--text-muted);
                     text-transform: uppercase;
@@ -366,7 +367,7 @@ export default function LoginPage() {
                     font-size: 0.9375rem;
                     font-family: inherit;
                     outline: none;
-                    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+                    transition: all 0.2s ease;
                 }
 
                 .login-input::placeholder {
@@ -375,11 +376,12 @@ export default function LoginPage() {
 
                 .login-input:hover {
                     border-color: var(--border-hover);
+                    background: var(--bg-card-solid);
                 }
 
                 .login-input:focus {
                     border-color: var(--accent);
-                    box-shadow: 0 0 0 3px var(--accent-soft), 0 0 20px rgba(238, 79, 39, 0.15);
+                    box-shadow: 0 0 0 3px var(--accent-soft), 0 0 25px rgba(37, 99, 235, 0.15);
                     background: var(--bg-surface);
                 }
 
@@ -393,20 +395,21 @@ export default function LoginPage() {
                     justify-content: center;
                     gap: 0.625rem;
                     width: 100%;
-                    padding: 1rem 1.5rem;
+                    padding: 1.0625rem 1.5rem;
                     background: linear-gradient(135deg, var(--accent), var(--accent-dim));
                     border: none;
-                    border-radius: var(--radius-md);
+                    border-radius: var(--radius-lg);
                     color: white;
                     font-size: 1rem;
                     font-weight: 700;
                     font-family: inherit;
                     cursor: pointer;
                     transition: all 0.2s ease;
-                    margin-top: 0.75rem;
-                    box-shadow: 0 4px 20px rgba(238, 79, 39, 0.3);
+                    margin-top: 1rem;
+                    box-shadow: 0 4px 24px rgba(37, 99, 235, 0.35);
                     position: relative;
                     overflow: hidden;
+                    letter-spacing: -0.01em;
                 }
 
                 .login-button::before {
@@ -423,7 +426,11 @@ export default function LoginPage() {
                 .login-button:hover:not(:disabled) {
                     background: linear-gradient(135deg, var(--accent-hover), var(--accent));
                     transform: translateY(-2px);
-                    box-shadow: 0 8px 30px rgba(238, 79, 39, 0.4);
+                    box-shadow: 0 8px 36px rgba(37, 99, 235, 0.45);
+                }
+
+                .login-button:active:not(:disabled) {
+                    transform: translateY(0);
                 }
 
                 .login-button:disabled {
@@ -438,7 +445,7 @@ export default function LoginPage() {
                     display: flex;
                     justify-content: center;
                     gap: 0.5rem;
-                    margin-top: 1rem;
+                    margin-top: 1.25rem;
                 }
 
                 .signup-link a {
