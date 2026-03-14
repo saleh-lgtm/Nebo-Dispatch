@@ -1,0 +1,291 @@
+{
+  "name": "TBR Global Trip Scraper",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule - Every 30 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "tbr-sync-trigger",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook - Manual Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 480],
+      "webhookId": "tbr-sync-trigger"
+    },
+    {
+      "parameters": {
+        "content": "## TBR Global Trip Scraper\n\n### How it works:\n1. **Schedule** runs every 30 minutes (or manual trigger)\n2. **Browser** logs into system.tbrglobal.com\n3. **Navigate** to upcoming trips page\n4. **Extract** trip data from page\n5. **POST** to Nebo /api/tbr/ingest API\n6. **Notify** via Slack with results\n\n### Setup Required:\n\n1. **Credentials**: Create HTTP Header Auth credential:\n   - Header Name: `x-tbr-ingest-secret`\n   - Header Value: Your TBR_INGEST_SECRET from Nebo env\n\n2. **Environment Variables** (in n8n):\n   - `TBR_USERNAME`: Your TBR Global email\n   - `TBR_PASSWORD`: Your TBR Global password\n\n3. **First Run**: Test manually to verify TBR login works\n\n### Notes:\n- Add 2-3 second delays between requests to avoid bot detection\n- If TBR has a JSON API, replace browser automation with HTTP Request\n- Check Network tab in browser DevTools to find API endpoints",
+        "height": 520,
+        "width": 400
+      },
+      "id": "sticky-note",
+      "name": "Setup Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [160, 620]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// NOTE: This is a placeholder code node.\n// In production, replace this with actual browser automation (Playwright node)\n// or HTTP requests if TBR has a JSON API.\n\n// For now, this simulates the scraping process.\n// You'll need to inspect TBR's portal to understand its structure.\n\nconst TBR_USERNAME = $env.TBR_USERNAME || '';\nconst TBR_PASSWORD = $env.TBR_PASSWORD || '';\n\nif (!TBR_USERNAME || !TBR_PASSWORD) {\n  throw new Error('TBR credentials not configured. Set TBR_USERNAME and TBR_PASSWORD in n8n environment.');\n}\n\n// Placeholder: In production, this would be the scraped trips\n// The structure should match the IngestedTbrTrip type from Nebo\nconst scrapedTrips = [\n  // Example trip format:\n  // {\n  //   tbrTripId: \"TBR-12345\",\n  //   status: \"Confirmed\",\n  //   passengerName: \"John Doe\",\n  //   passengerPhone: \"+15551234567\",\n  //   passengerEmail: \"john@example.com\",\n  //   passengerCount: 2,\n  //   pickupDatetime: \"2024-03-15T14:00:00Z\",\n  //   pickupAddress: \"123 Main St, Dallas, TX\",\n  //   dropoffAddress: \"DFW Airport, Terminal D\",\n  //   vehicleType: \"Executive Sedan\",\n  //   flightNumber: \"AA1234\",\n  //   notes: \"VIP client, meet at curbside\",\n  //   fareAmount: 150.00\n  // }\n];\n\nreturn {\n  json: {\n    trips: scrapedTrips,\n    source: 'n8n-scraper',\n    scrapedAt: new Date().toISOString()\n  }\n};"
+      },
+      "id": "scrape-tbr",
+      "name": "Scrape TBR Portal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [560, 380],
+      "notesInFlow": true,
+      "notes": "Replace with actual browser automation or HTTP requests"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-trips",
+              "leftValue": "={{ $json.trips.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "has-trips",
+      "name": "Has Trips?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [780, 380]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://neboops.com/api/tbr/ingest",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"trips\": {{ JSON.stringify($json.trips) }},\n  \"source\": \"n8n-scraper\"\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "post-to-nebo",
+      "name": "POST to Nebo API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 280],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "nebo-tbr-auth",
+          "name": "Nebo TBR Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "channel": "#dispatch-alerts",
+        "text": "=:car: *TBR Sync Complete*\n\nTrips Found: {{ $('Scrape TBR Portal').item.json.trips.length }}\nCreated: {{ $json.body?.created || 0 }}\nUpdated: {{ $json.body?.updated || 0 }}\nStatus Changes: {{ $json.body?.statusChanges || 0 }}\n\nTime: {{ $now.format('MMM D, h:mm A') }}",
+        "otherOptions": {}
+      },
+      "id": "slack-success",
+      "name": "Slack - Success",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1220, 280],
+      "credentials": {
+        "slackApi": {
+          "id": "slack-nebo",
+          "name": "Slack Nebo"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "channel": "#dispatch-alerts",
+        "text": "=:white_check_mark: *TBR Sync - No New Trips*\n\nNo trips found in TBR portal.\nTime: {{ $now.format('MMM D, h:mm A') }}",
+        "otherOptions": {}
+      },
+      "id": "slack-no-trips",
+      "name": "Slack - No Trips",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1000, 480],
+      "credentials": {
+        "slackApi": {
+          "id": "slack-nebo",
+          "name": "Slack Nebo"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Sync complete\",\n  \"tripsFound\": {{ $('Scrape TBR Portal').item.json.trips.length }}\n}",
+        "options": {}
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1220, 480]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "trigger",
+              "value": "={{ $('Schedule - Every 30 min').item ? 'schedule' : 'webhook' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "merge-triggers",
+      "name": "Merge Triggers",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [400, 380]
+    }
+  ],
+  "connections": {
+    "Schedule - Every 30 min": {
+      "main": [
+        [
+          {
+            "node": "Merge Triggers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Merge Triggers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Triggers": {
+      "main": [
+        [
+          {
+            "node": "Scrape TBR Portal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrape TBR Portal": {
+      "main": [
+        [
+          {
+            "node": "Has Trips?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Trips?": {
+      "main": [
+        [
+          {
+            "node": "POST to Nebo API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack - No Trips",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST to Nebo API": {
+      "main": [
+        [
+          {
+            "node": "Slack - Success",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "tbr"
+    },
+    {
+      "name": "scraper"
+    }
+  ]
+}

@@ -1,0 +1,238 @@
+{
+  "name": "Manifest Email Ingestion",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "manifest-ingest",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook - Manifest Email",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "manifest-ingest"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "body",
+              "value": "={{ $json.body?.plain || $json.body?.html || $json.plain || $json.html || $json.text || $json.Text || $json.body || '' }}"
+            },
+            {
+              "name": "from",
+              "value": "={{ $json.from || $json.From || $json.envelope?.from || '' }}"
+            },
+            {
+              "name": "subject",
+              "value": "={{ $json.subject || $json.Subject || '' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "extract-email-data",
+      "name": "Extract Email Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-body",
+              "leftValue": "={{ $json.body }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "has-content",
+      "name": "Has Content?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://nebo-dispatch-app.vercel.app/api/manifests/ingest",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"body\": {{ JSON.stringify($json.body) }},\n  \"from\": {{ JSON.stringify($json.from) }},\n  \"subject\": {{ JSON.stringify($json.subject) }}\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "post-to-nebo",
+      "name": "POST to Nebo API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "nebo-manifest-auth",
+          "name": "Nebo Manifest Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Manifest processed\",\n  \"result\": {{ JSON.stringify($json.body) }}\n}",
+        "options": {}
+      },
+      "id": "respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": false,\n  \"error\": \"No email body content provided\"\n}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "respond-error",
+      "name": "Respond Error - No Content",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "channel": "#dispatch-alerts",
+        "text": "=:email: *New Manifest Received*\n\nFrom: {{ $('Extract Email Data').item.json.from }}\nSubject: {{ $('Extract Email Data').item.json.subject }}\n\nResult: {{ $json.body?.message || 'Processed' }}\nTrips Created: {{ $json.body?.created || 0 }}\nDuplicates: {{ $json.body?.duplicate || 0 }}",
+        "otherOptions": {}
+      },
+      "id": "slack-notification",
+      "name": "Slack - Notify Dispatch",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1120, 80],
+      "credentials": {
+        "slackApi": {
+          "id": "slack-nebo",
+          "name": "Slack Nebo"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Manifest Email Ingestion Workflow\n\n### How it works:\n1. **Webhook** receives email from Cloudflare Email Routing\n2. **Extract** normalizes email data (handles CloudMailin, SendGrid, raw formats)\n3. **Validate** checks if body content exists\n4. **POST** sends to Nebo `/api/manifests/ingest` API\n5. **Notify** sends Slack message with results\n\n### Setup Required:\n1. Create HTTP Header Auth credential with:\n   - Header Name: `x-manifest-secret`\n   - Header Value: Your MANIFEST_INGEST_SECRET from Nebo env\n\n2. (Optional) Configure Slack credential\n\n3. Configure Cloudflare Email Routing:\n   - Route manifests@neboops.com → this webhook URL\n\n### Webhook URL:\n`https://neborides.app.n8n.cloud/webhook/manifest-ingest`",
+        "height": 420,
+        "width": 400
+      },
+      "id": "sticky-note",
+      "name": "Setup Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [180, 500]
+    }
+  ],
+  "connections": {
+    "Webhook - Manifest Email": {
+      "main": [
+        [
+          {
+            "node": "Extract Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Email Data": {
+      "main": [
+        [
+          {
+            "node": "Has Content?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Content?": {
+      "main": [
+        [
+          {
+            "node": "POST to Nebo API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error - No Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST to Nebo API": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Slack - Notify Dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "manifests"
+    },
+    {
+      "name": "production"
+    }
+  ]
+}

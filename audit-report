@@ -1,0 +1,123 @@
+COMPREHENSIVE CODEBASE AUDIT REPORT
+Nebo Dispatch App
+I've completed a full audit using 4 specialized skills. Here's the consolidated report:
+
+📊 EXECUTIVE SUMMARY
+Audit Area	Score	Critical Issues	Status
+Code Review	7/10	7 critical	⚠️ Needs attention
+Architecture	7/10	4 critical	⚠️ Needs attention
+Security	5/10	6 critical	🔴 High risk
+React/Next.js	6/10	5 critical	⚠️ Needs optimization
+Database	6/10	14 missing indexes	⚠️ Performance risk
+Overall Health: 6.2/10 - Good foundations, but critical security and performance issues need immediate attention.
+
+🔴 CRITICAL ISSUES (Fix Immediately)
+1. CSRF Protection Missing - CRITICAL
+Impact: All POST/PUT/DELETE endpoints vulnerable to cross-site request forgery
+Fix: Implement CSRF tokens globally using NextAuth's built-in protection
+2. TwiML Injection Vulnerability (route.ts:160)
+Impact: Auto-reply messages embedded in TwiML without XML escaping
+Fix: XML-escape all user-provided data before embedding in TwiML
+3. Secret in URL Parameter (route.ts:118)
+Impact: Secrets logged in server logs, browser history, proxy logs
+Fix: Remove URL parameter authentication immediately
+4. Missing Database Indexes - CRITICAL PERFORMANCE
+User(email) - Auth queries on every request
+Shift(userId, clockOut) - Active shift lookups
+Quote(assignedToId, status) - Dashboard queries
+ShiftTask(shiftId) - Task page loads
+5. Race Condition in Clock-Out (clockActions.ts:264)
+Impact: Deletes task completions for ALL shifts, not just current shift
+Fix: Scope deletion to specific shift ID
+6. Quote Assignment Missing Authorization (quoteActions.ts:414)
+Impact: Any authenticated user can assign quotes to anyone
+Fix: Add role check for ADMIN/SUPER_ADMIN
+🟡 HIGH PRIORITY ISSUES
+Security
+Issue	Location	Impact
+No IP-based rate limiting on login	auth.ts	Distributed brute force
+Development bypass too permissive	Twilio routes	Accidental prod exposure
+CSP allows unsafe-inline/eval	next.config.ts	XSS protection defeated
+Password reset token in plaintext	PasswordResetToken model	Tokens leak in logs
+Performance
+Issue	Location	Impact
+Missing useMemo for filters	DashboardClient, ScheduleClient	Re-renders on every change
+Large icon imports (23+ icons)	Navbar.tsx	Bundle size
+1232 lines inline styles	ScheduleClient.tsx	Not cached
+No dynamic imports for panels	DashboardClient	Initial bundle bloat
+Missing Suspense boundaries	All Client components	No streaming
+Database
+Issue	Location	Impact
+10+ missing cascades	ShiftTask, ShiftReport, Quote	Orphaned records
+N+1 query in analytics	analyticsActions.ts	Memory spike
+No pagination limits enforced	shiftReportActions.ts	Memory exhaustion
+✅ WHAT'S WORKING WELL
+Security Strengths
+✓ JWT-based sessions with 8-hour expiration
+✓ Account lockout after 5 failed attempts
+✓ Twilio signature validation implemented
+✓ Comprehensive security headers in next.config.ts
+✓ Role-based access control (SUPER_ADMIN > ADMIN > ACCOUNTING > DISPATCHER)
+Architecture Strengths
+✓ Clean separation: each action file handles one domain
+✓ Prisma transactions for atomic operations
+✓ Excellent audit logging on significant operations
+✓ Strong type safety with explicit interfaces
+✓ Smart phone number validation with E.164 format
+React/Next.js Strengths
+✓ Proper "use client" boundaries
+✓ Dynamic imports for Navbar and SuperAdminSidebar
+✓ Server Components for layout
+✓ optimizePackageImports configured for lucide-react, recharts
+📋 PRIORITIZED ACTION PLAN
+Week 1: Critical Security Fixes
+ Implement global CSRF protection
+ Remove secret-in-URL authentication
+ Add XML escaping for TwiML responses
+ Hash password reset tokens
+ Fix authorization on quote assignment
+Week 2: Database Performance
+ Add 4 critical indexes (User.email, Shift.userId+clockOut, Quote.assignedToId+status, ShiftTask.shiftId)
+ Add remaining 10 indexes
+ Fix cascade deletes on 10 relations
+ Add pagination limits with max cap
+Week 3: React Optimization
+ Add useMemo for filtered data in DashboardClient, ScheduleClient, NotificationPanel
+ Wrap groupedMessages in ChatView with useMemo
+ Extract inline styles to CSS modules
+ Add dynamic imports for non-critical panels
+ Implement Suspense boundaries
+Week 4: Code Quality
+ Fix clock-out task reset race condition
+ Fix performance score calculation bug
+ Add Zod validation on API inputs
+ Add rate limiting to SMS operations
+ Implement distributed rate limiting (Redis)
+📁 FILES REQUIRING IMMEDIATE ATTENTION
+File	Issues	Priority
+src/app/api/twilio/webhook/route.ts	TwiML injection, missing rate limiting	🔴 CRITICAL
+src/app/api/manifests/ingest/route.ts	Secret in URL, weak rate limiting	🔴 CRITICAL
+src/lib/clockActions.ts	Race condition	🔴 CRITICAL
+src/lib/quoteActions.ts	Missing authorization	🔴 CRITICAL
+prisma/schema.prisma	14 missing indexes, 10 missing cascades	🟠 HIGH
+src/app/dashboard/DashboardClient.tsx	Missing memoization	🟡 MEDIUM
+src/app/schedule/ScheduleClient.tsx	Inline styles, missing memoization	🟡 MEDIUM
+Update Todos
+
+Run Code Review audit (security, performance, quality, testing)
+
+Run Architecture audit (patterns, modularity, standards)
+
+Run Performance audit (Core Web Vitals, bundle size, optimization)
+
+Run React/Next.js Best Practices audit
+
+Compile comprehensive audit report with findings
+🎯 NEXT STEPS
+Would you like me to:
+
+Fix critical security issues - Start with CSRF, TwiML injection, and authorization
+Add missing database indexes - Create a migration with all 14 indexes
+Optimize React performance - Add useMemo/useCallback and dynamic imports
+Generate detailed fix PRs - Create focused pull requests for each category
+Let me know which area you'd like to tackle first, or I can start with the most critical security fixes.

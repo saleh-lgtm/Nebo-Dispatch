@@ -1,0 +1,144 @@
+{
+  "name": "TBR Scraper (Browserless)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 4
+            }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "Every 4 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://chrome.browserless.io/function?token=2U4KGw1phYQBCdv3f7606b1aa01c3044e9e2f3f755d5ed305",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"code\": \"export default async function({ page }) {\\n  const TBR_USERNAME = 'neborides@gmail.com';\\n  const TBR_PASSWORD = 'j28yA1wzK7KA';\\n  \\n  // Go to login page\\n  await page.goto('https://system.tbrglobal.com/login', { waitUntil: 'networkidle0', timeout: 30000 });\\n  \\n  // Wait for and fill login form\\n  await page.waitForSelector('#loginForm_securityUserEmailAddress', { timeout: 10000 });\\n  await page.type('#loginForm_securityUserEmailAddress', TBR_USERNAME);\\n  await page.type('#loginForm_securityUserPassword', TBR_PASSWORD);\\n  \\n  // Click login\\n  await Promise.all([\\n    page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 30000 }),\\n    page.click('input[type=submit][value=Login]')\\n  ]);\\n  \\n  // Navigate to supplier page\\n  await page.goto('https://system.tbrglobal.com/supplier/', { waitUntil: 'networkidle0', timeout: 30000 });\\n  \\n  // Get page info\\n  const currentUrl = page.url();\\n  const pageTitle = await page.title();\\n  \\n  // Get page HTML for debugging\\n  const pageHtml = await page.content();\\n  \\n  // Extract trips from list view\\n  const trips = await page.evaluate(() => {\\n    const results = [];\\n    \\n    // Try multiple selectors for trip rows\\n    const rows = document.querySelectorAll('table tbody tr, .trip-row, .booking-row, .reservation-row, tr[data-id]');\\n    \\n    rows.forEach((row, index) => {\\n      const cells = row.querySelectorAll('td');\\n      const getText = (el) => el?.textContent?.trim() || '';\\n      const getCell = (i) => getText(cells[i]);\\n      \\n      // Try to extract data from visible columns\\n      const trip = {\\n        tbrTripId: row.dataset?.id || row.getAttribute('data-id') || getCell(0) || 'TBR-' + Date.now() + '-' + index,\\n        status: getCell(1) || getText(row.querySelector('.status')),\\n        passengerName: getCell(2) || getText(row.querySelector('.passenger, .name, .client')),\\n        pickupDatetime: getCell(3) || getText(row.querySelector('.date, .pickup-date')),\\n        pickupAddress: getCell(4) || getText(row.querySelector('.pickup, .from')),\\n        dropoffAddress: getCell(5) || getText(row.querySelector('.dropoff, .to')),\\n        vehicleType: getCell(6) || getText(row.querySelector('.vehicle')),\\n        fareAmount: parseFloat((getCell(7) || getText(row.querySelector('.fare, .price'))).replace(/[^0-9.]/g, '')) || null,\\n        passengerPhone: null,\\n        passengerEmail: null,\\n        passengerCount: 1,\\n        flightNumber: null,\\n        notes: null\\n      };\\n      \\n      // Only add if we have some valid data\\n      if (trip.tbrTripId && trip.tbrTripId !== 'TBR-' + Date.now() + '-' + index) {\\n        results.push(trip);\\n      }\\n    });\\n    \\n    return results;\\n  });\\n  \\n  return { \\n    trips,\\n    count: trips.length,\\n    currentUrl,\\n    pageTitle,\\n    htmlPreview: pageHtml.substring(0, 3000),\\n    scrapedAt: new Date().toISOString()\\n  };\\n}\"\n}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "scrape",
+      "name": "Scrape TBR via Browserless",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst trips = data.trips || [];\n\nconsole.log(`Scraped ${trips.length} trips from TBR Global`);\nconsole.log('Current URL:', data.currentUrl);\nconsole.log('Page Title:', data.pageTitle);\n\nif (trips.length === 0) {\n  // Return debug info so we can see what's on the page\n  return [{ json: { trips: [], source: 'browserless-scraper', debug: { currentUrl: data.currentUrl, pageTitle: data.pageTitle, htmlPreview: data.htmlPreview } } }];\n}\n\nconst formatted = trips.map(t => ({\n  tbrTripId: t.tbrTripId,\n  status: t.status || 'Pending',\n  passengerName: t.passengerName || 'Unknown',\n  passengerPhone: t.passengerPhone || null,\n  passengerEmail: t.passengerEmail || null,\n  passengerCount: t.passengerCount || 1,\n  pickupDatetime: t.pickupDatetime,\n  pickupAddress: t.pickupAddress,\n  dropoffAddress: t.dropoffAddress,\n  vehicleType: t.vehicleType || 'Sedan',\n  flightNumber: t.flightNumber || null,\n  notes: t.notes || null,\n  fareAmount: t.fareAmount\n}));\n\nreturn [{ json: { trips: formatted, source: 'browserless-scraper' } }];"
+      },
+      "id": "format",
+      "name": "Format Trips",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://neboops.com/api/tbr/ingest",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-tbr-ingest-secret",
+              "value": "R9mK4pL7xW2nQ5tY8vB1cE6gH3jA0sD4fU9iO7zX2wM5"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}"
+      },
+      "id": "post",
+      "name": "Send to Nebo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconsole.log('TBR Sync Result:', response);\nreturn [{ json: { success: true, ...response } }];"
+      },
+      "id": "log",
+      "name": "Log Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 0]
+    }
+  ],
+  "connections": {
+    "Every 4 Hours": {
+      "main": [
+        [
+          {
+            "node": "Scrape TBR via Browserless",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrape TBR via Browserless": {
+      "main": [
+        [
+          {
+            "node": "Format Trips",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Trips": {
+      "main": [
+        [
+          {
+            "node": "Send to Nebo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to Nebo": {
+      "main": [
+        [
+          {
+            "node": "Log Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
