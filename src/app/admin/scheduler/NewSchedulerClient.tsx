@@ -173,17 +173,19 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
                 shiftEnd.setUTCDate(shiftEnd.getUTCDate() + 1);
             }
 
-            const newSchedule = await createScheduleBlock({
+            const result = await createScheduleBlock({
                 userId: formData.dispatcherId,
                 shiftStart,
                 shiftEnd,
             });
 
-            if (newSchedule) {
-                setSchedules((prev) => [...prev, newSchedule]);
+            if (result.success && result.schedule) {
+                setSchedules((prev) => [...prev, result.schedule!]);
                 setShowAddModal(false);
                 resetForm();
                 addToast("Shift added successfully", "success");
+            } else {
+                addToast(result.error || "Failed to add shift", "error");
             }
         } catch {
             addToast("Failed to add shift", "error");
@@ -208,19 +210,22 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
                 shiftEnd.setUTCDate(shiftEnd.getUTCDate() + 1);
             }
 
-            await updateScheduleBlock(editingShift.id, { shiftStart, shiftEnd });
+            const result = await updateScheduleBlock(editingShift.id, { shiftStart, shiftEnd });
 
-            setSchedules((prev) =>
-                prev.map((s) =>
-                    s.id === editingShift.id
-                        ? { ...s, shiftStart, shiftEnd }
-                        : s
-                )
-            );
-
-            setEditingShift(null);
-            resetForm();
-            addToast("Shift updated successfully", "success");
+            if (result.success) {
+                setSchedules((prev) =>
+                    prev.map((s) =>
+                        s.id === editingShift.id
+                            ? { ...s, shiftStart, shiftEnd }
+                            : s
+                    )
+                );
+                setEditingShift(null);
+                resetForm();
+                addToast("Shift updated successfully", "success");
+            } else {
+                addToast(result.error || "Failed to update shift", "error");
+            }
         } catch {
             addToast("Failed to update shift", "error");
         } finally {
@@ -233,9 +238,13 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
 
         setLoading(true);
         try {
-            await deleteScheduleBlock(id);
-            setSchedules((prev) => prev.filter((s) => s.id !== id));
-            addToast("Shift deleted", "success");
+            const result = await deleteScheduleBlock(id);
+            if (result.success) {
+                setSchedules((prev) => prev.filter((s) => s.id !== id));
+                addToast("Shift deleted", "success");
+            } else {
+                addToast(result.error || "Failed to delete shift", "error");
+            }
         } catch {
             addToast("Failed to delete shift", "error");
         } finally {
@@ -246,10 +255,14 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
     const handlePublish = async () => {
         setLoading(true);
         try {
-            await publishWeekSchedules(weekStart);
-            setSchedules((prev) => prev.map((s) => ({ ...s, isPublished: true })));
-            setIsPublished(true);
-            addToast("Schedule published! Dispatchers can now see their shifts.", "success");
+            const result = await publishWeekSchedules(weekStart);
+            if (result.success) {
+                setSchedules((prev) => prev.map((s) => ({ ...s, isPublished: true })));
+                setIsPublished(true);
+                addToast("Schedule published! Dispatchers can now see their shifts.", "success");
+            } else {
+                addToast(result.error || "Failed to publish schedule", "error");
+            }
         } catch {
             addToast("Failed to publish schedule", "error");
         } finally {
@@ -260,10 +273,14 @@ export default function NewSchedulerClient({ dispatchers, initialSchedules, init
     const handleUnpublish = async () => {
         setLoading(true);
         try {
-            await unpublishWeekSchedules(weekStart);
-            setSchedules((prev) => prev.map((s) => ({ ...s, isPublished: false })));
-            setIsPublished(false);
-            addToast("Schedule unpublished", "info");
+            const result = await unpublishWeekSchedules(weekStart);
+            if (result.success) {
+                setSchedules((prev) => prev.map((s) => ({ ...s, isPublished: false })));
+                setIsPublished(false);
+                addToast("Schedule unpublished", "info");
+            } else {
+                addToast(result.error || "Failed to unpublish schedule", "error");
+            }
         } catch {
             addToast("Failed to unpublish schedule", "error");
         } finally {

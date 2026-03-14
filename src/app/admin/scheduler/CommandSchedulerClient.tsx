@@ -24,6 +24,7 @@ import {
     getWeekSchedules,
     copyPreviousWeekSchedules,
 } from "@/lib/schedulerActions";
+import { useToastContext } from "@/components/ui/ToastProvider";
 import "./scheduler-command.css";
 
 // Types
@@ -323,6 +324,7 @@ interface Props {
 }
 
 export default function CommandSchedulerClient({ dispatchers, initialSchedules, initialWeekStart }: Props) {
+    const { addToast } = useToastContext();
     const [weekStart, setWeekStart] = useState<Date>(new Date(initialWeekStart));
     const [shifts, setShifts] = useState<ShiftBlock[]>(() =>
         schedulesToBlocks(initialSchedules, dispatchers, new Date(initialWeekStart))
@@ -341,6 +343,7 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
     } | null>(null);
     const [ghostPosition, setGhostPosition] = useState({ x: 0, y: 0 });
     const [highlightCell, setHighlightCell] = useState<{ day: number; hour: number } | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
 
     const gridRef = useRef<HTMLDivElement>(null);
 
@@ -497,18 +500,18 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
         const shiftEnd = new Date(shiftStart.getTime() + dragState.duration * 60 * 60 * 1000);
 
         if (dragState.type === "new") {
-            const newSchedule = await createScheduleBlock({
+            const result = await createScheduleBlock({
                 userId: dragState.dispatcherId,
                 shiftStart,
                 shiftEnd,
             });
 
-            if (newSchedule) {
+            if (result.success && result.schedule) {
                 const dispatcherIndex = dispatchers.findIndex((d) => d.id === dragState.dispatcherId);
                 setShifts((prev) => [
                     ...prev,
                     {
-                        id: newSchedule.id,
+                        id: result.schedule!.id,
                         dispatcherId: dragState.dispatcherId,
                         dispatcherName: dragState.dispatcherName,
                         day,
@@ -518,20 +521,27 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                         color: getDispatcherColor(dispatcherIndex),
                     },
                 ]);
+                addToast(`Shift created for ${dragState.dispatcherName}`, "success");
+            } else {
+                addToast(result.error || "Failed to create shift", "error");
             }
         } else if (dragState.type === "move" && dragState.shiftId) {
-            await updateScheduleBlock(dragState.shiftId, {
+            const result = await updateScheduleBlock(dragState.shiftId, {
                 shiftStart,
                 shiftEnd,
             });
 
-            setShifts((prev) =>
-                prev.map((s) =>
-                    s.id === dragState.shiftId
-                        ? { ...s, day, startHour: hour }
-                        : s
-                )
-            );
+            if (result.success) {
+                setShifts((prev) =>
+                    prev.map((s) =>
+                        s.id === dragState.shiftId
+                            ? { ...s, day, startHour: hour }
+                            : s
+                    )
+                );
+            } else {
+                addToast(result.error || "Failed to move shift", "error");
+            }
         }
 
         setDragState(null);
@@ -544,24 +554,43 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
     };
 
     const handleDeleteShift = async (shiftId: string) => {
-        await deleteScheduleBlock(shiftId);
-        setShifts((prev) => prev.filter((s) => s.id !== shiftId));
+        const result = await deleteScheduleBlock(shiftId);
+        if (result.success) {
+            setShifts((prev) => prev.filter((s) => s.id !== shiftId));
+        } else {
+            addToast(result.error || "Failed to delete shift", "error");
+        }
     };
 
     const handlePublish = async () => {
-        await publishWeekSchedules(weekStart);
-        setShifts((prev) => prev.map((s) => ({ ...s, isPublished: true })));
-        setIsPublished(true);
+        setIsLoading(true);
+        const result = await publishWeekSchedules(weekStart);
+        setIsLoading(false);
+
+        if (result.success) {
+            setShifts((prev) => prev.map((s) => ({ ...s, isPublished: true })));
+            setIsPublished(true);
+            addToast("Schedule published! Dispatchers have been notified.", "success");
+        } else {
+            addToast(result.error || "Failed to publish schedule", "error");
+        }
     };
 
     const handleUnpublish = async () => {
-        await unpublishWeekSchedules(weekStart);
-        setShifts((prev) => prev.map((s) => ({ ...s, isPublished: false })));
-        setIsPublished(false);
+        setIsLoading(true);
+        const result = await unpublishWeekSchedules(weekStart);
+        setIsLoading(false);
+
+        if (result.success) {
+            setShifts((prev) => prev.map((s) => ({ ...s, isPublished: false })));
+            setIsPublished(false);
+            addToast("Schedule unpublished", "info");
+        } else {
+            addToast(result.error || "Failed to unpublish schedule", "error");
+        }
     };
 
     const [copying, setCopying] = useState(false);
-    const [copyMessage, setCopyMessage] = useState<string | null>(null);
 
     const handleCopyPreviousWeek = async () => {
         if (shifts.length > 0) {
@@ -572,28 +601,30 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
 
             // Delete all current week schedules
             for (const shift of shifts) {
-                await deleteScheduleBlock(shift.id);
+                const result = await deleteScheduleBlock(shift.id);
+                if (!result.success) {
+                    addToast("Failed to clear existing schedules", "error");
+                    return;
+                }
             }
             setShifts([]);
         }
 
         setCopying(true);
-        setCopyMessage(null);
         try {
             const result = await copyPreviousWeekSchedules(weekStart);
-            setCopyMessage(result.message);
 
-            if (result.copied > 0 && result.schedules) {
+            if (result.success && result.copied > 0 && result.schedules) {
                 // Convert to shift blocks and update state
                 const newBlocks = schedulesToBlocks(result.schedules, dispatchers, weekStart);
                 setShifts(newBlocks);
+                addToast(result.message, "success");
+            } else {
+                addToast(result.message, result.success ? "warning" : "error");
             }
-
-            // Clear message after 3 seconds
-            setTimeout(() => setCopyMessage(null), 3000);
         } catch (error) {
             console.error("Failed to copy schedules:", error);
-            setCopyMessage("Failed to copy schedules");
+            addToast("Failed to copy schedules. Please try again.", "error");
         } finally {
             setCopying(false);
         }
@@ -673,33 +704,25 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                         Export
                     </button>
                     {isPublished ? (
-                        <button onClick={handleUnpublish} className="cmd-btn cmd-btn--warning">
+                        <button
+                            onClick={handleUnpublish}
+                            className="cmd-btn cmd-btn--warning"
+                            disabled={isLoading}
+                        >
                             <Ban size={14} />
-                            Unpublish
+                            {isLoading ? "Saving..." : "Unpublish"}
                         </button>
                     ) : (
-                        <button onClick={handlePublish} className="cmd-btn cmd-btn--primary">
+                        <button
+                            onClick={handlePublish}
+                            className="cmd-btn cmd-btn--primary"
+                            disabled={isLoading || shifts.length === 0}
+                        >
                             <Send size={14} />
-                            Publish Week
+                            {isLoading ? "Publishing..." : "Publish Week"}
                         </button>
                     )}
                 </div>
-                {copyMessage && (
-                    <div className="cmd-toast" style={{
-                        position: "fixed",
-                        bottom: "1rem",
-                        right: "1rem",
-                        padding: "0.75rem 1rem",
-                        background: copyMessage.includes("Copied") ? "rgba(74, 222, 128, 0.2)" : "rgba(251, 191, 36, 0.2)",
-                        border: `1px solid ${copyMessage.includes("Copied") ? "#4ade80" : "#fbbf24"}`,
-                        borderRadius: "6px",
-                        color: copyMessage.includes("Copied") ? "#4ade80" : "#fbbf24",
-                        fontSize: "0.875rem",
-                        zIndex: 1000,
-                    }}>
-                        {copyMessage}
-                    </div>
-                )}
             </header>
 
             {/* Main Layout */}

@@ -269,6 +269,30 @@ export default function ScheduleClient({
                     ))}
                 </nav>
 
+                {/* Mobile Next Shift Card (shows on tablet/mobile) */}
+                {upcomingShifts[0] && (
+                    <div className="mobile-next-shift">
+                        <div className="mobile-next-shift__label">
+                            <CalendarIcon size={12} />
+                            <span>Next Shift</span>
+                        </div>
+                        <div className="mobile-next-shift__content">
+                            <div>
+                                <div className="mobile-next-shift__date">
+                                    {formatDate(upcomingShifts[0].shiftStart)}
+                                </div>
+                                <div className="mobile-next-shift__time">
+                                    {formatTime(upcomingShifts[0].shiftStart)} - {formatTime(upcomingShifts[0].shiftEnd)}
+                                </div>
+                            </div>
+                            <div className="mobile-next-shift__countdown">
+                                <Clock size={12} />
+                                <span>{getTimeUntil(upcomingShifts[0].shiftStart)}</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Content */}
                 <div className="schedule-content">
                     {/* Shifts View */}
@@ -510,6 +534,15 @@ export default function ScheduleClient({
                 </div>
             </aside>
 
+            {/* Mobile FAB */}
+            <button
+                onClick={() => setShowRequestForm(true)}
+                className="mobile-fab"
+                aria-label="New Request"
+            >
+                <Plus size={24} />
+            </button>
+
             {/* Request Modal */}
             {showRequestForm && (
                 <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowRequestForm(false); }}>
@@ -616,8 +649,30 @@ export default function ScheduleClient({
                 @media (max-width: 1024px) {
                     .schedule-layout {
                         grid-template-columns: 1fr;
+                        padding: 1rem;
+                        gap: 1rem;
                     }
                     .schedule-sidebar {
+                        display: none;
+                    }
+                }
+
+                @media (max-width: 640px) {
+                    .schedule-layout {
+                        padding: 0.75rem;
+                        padding-bottom: 5rem; /* Space for mobile nav */
+                    }
+                    .schedule-header h1 {
+                        font-size: 1.25rem;
+                    }
+                    .schedule-header p {
+                        font-size: 0.75rem;
+                    }
+                    .btn {
+                        padding: 0.5rem 0.75rem;
+                        font-size: 0.8125rem;
+                    }
+                    .btn span {
                         display: none;
                     }
                 }
@@ -657,6 +712,15 @@ export default function ScheduleClient({
                     background: var(--bg-secondary);
                     border-radius: var(--radius-lg);
                     width: fit-content;
+                    overflow-x: auto;
+                    -webkit-overflow-scrolling: touch;
+                }
+
+                @media (max-width: 640px) {
+                    .schedule-nav {
+                        width: 100%;
+                        justify-content: stretch;
+                    }
                 }
 
                 .nav-item {
@@ -672,6 +736,18 @@ export default function ScheduleClient({
                     border-radius: var(--radius-md);
                     cursor: pointer;
                     transition: all 0.15s ease;
+                    white-space: nowrap;
+                    flex: 1;
+                    justify-content: center;
+                }
+
+                @media (max-width: 640px) {
+                    .nav-item {
+                        padding: 0.75rem 0.5rem;
+                        font-size: 0.75rem;
+                        flex-direction: column;
+                        gap: 0.25rem;
+                    }
                 }
 
                 .nav-item:hover {
@@ -699,6 +775,62 @@ export default function ScheduleClient({
                     color: white;
                 }
 
+                /* Mobile Next Shift Card */
+                .mobile-next-shift {
+                    display: none;
+                    padding: 1rem;
+                    background: linear-gradient(135deg, var(--primary) 0%, #16A34A 100%);
+                    border-radius: var(--radius-lg);
+                    color: white;
+                    margin-bottom: 1rem;
+                }
+
+                @media (max-width: 1024px) {
+                    .mobile-next-shift {
+                        display: block;
+                    }
+                }
+
+                .mobile-next-shift__label {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.375rem;
+                    font-size: 0.75rem;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                    opacity: 0.9;
+                    margin-bottom: 0.5rem;
+                }
+
+                .mobile-next-shift__content {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+
+                .mobile-next-shift__date {
+                    font-size: 0.875rem;
+                    font-weight: 500;
+                    margin-bottom: 0.125rem;
+                }
+
+                .mobile-next-shift__time {
+                    font-size: 1.25rem;
+                    font-weight: 700;
+                }
+
+                .mobile-next-shift__countdown {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.25rem;
+                    font-size: 0.75rem;
+                    font-weight: 500;
+                    padding: 0.25rem 0.5rem;
+                    background: rgba(255,255,255,0.2);
+                    border-radius: 9999px;
+                }
+
                 /* Content */
                 .schedule-content {
                     background: var(--bg-card);
@@ -706,6 +838,13 @@ export default function ScheduleClient({
                     border-radius: var(--radius-lg);
                     padding: 1.5rem;
                     flex: 1;
+                }
+
+                @media (max-width: 640px) {
+                    .schedule-content {
+                        padding: 1rem;
+                        border-radius: var(--radius-md);
+                    }
                 }
 
                 .content-header {
@@ -727,6 +866,13 @@ export default function ScheduleClient({
                     border-radius: var(--radius-md);
                     cursor: pointer;
                     transition: all 0.15s ease;
+                }
+
+                @media (max-width: 640px) {
+                    .filter-tab {
+                        padding: 0.625rem 0.875rem;
+                        font-size: 0.75rem;
+                    }
                 }
 
                 .filter-tab:hover {
@@ -757,10 +903,22 @@ export default function ScheduleClient({
                     border-radius: var(--radius-md);
                     cursor: pointer;
                     transition: all 0.15s ease;
+                    -webkit-tap-highlight-color: transparent;
+                }
+
+                @media (max-width: 640px) {
+                    .shift-item {
+                        padding: 0.875rem;
+                        gap: 0.75rem;
+                    }
                 }
 
                 .shift-item:hover {
                     border-color: var(--border-hover);
+                }
+
+                .shift-item:active {
+                    transform: scale(0.99);
                 }
 
                 .shift-item.selected {
@@ -782,6 +940,13 @@ export default function ScheduleClient({
                     background: var(--bg-card);
                     border-radius: var(--radius-md);
                     flex-shrink: 0;
+                }
+
+                @media (max-width: 640px) {
+                    .shift-date {
+                        width: 44px;
+                        height: 44px;
+                    }
                 }
 
                 .shift-item.selected .shift-date {
@@ -1155,6 +1320,13 @@ export default function ScheduleClient({
                     padding: 1rem;
                 }
 
+                @media (max-width: 640px) {
+                    .modal-overlay {
+                        align-items: flex-end;
+                        padding: 0;
+                    }
+                }
+
                 .modal-content {
                     width: 100%;
                     max-width: 480px;
@@ -1162,6 +1334,16 @@ export default function ScheduleClient({
                     border: 1px solid var(--border);
                     border-radius: var(--radius-xl);
                     overflow: hidden;
+                    max-height: 90vh;
+                    overflow-y: auto;
+                }
+
+                @media (max-width: 640px) {
+                    .modal-content {
+                        max-width: 100%;
+                        border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+                        max-height: 85vh;
+                    }
                 }
 
                 .modal-header {
@@ -1170,6 +1352,27 @@ export default function ScheduleClient({
                     align-items: center;
                     padding: 1.25rem 1.5rem;
                     border-bottom: 1px solid var(--border);
+                    position: sticky;
+                    top: 0;
+                    background: var(--bg-card);
+                    z-index: 1;
+                }
+
+                @media (max-width: 640px) {
+                    .modal-header {
+                        padding: 1rem;
+                    }
+                    .modal-header::before {
+                        content: '';
+                        position: absolute;
+                        top: 0.5rem;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        width: 2.5rem;
+                        height: 0.25rem;
+                        background: var(--border);
+                        border-radius: 9999px;
+                    }
                 }
 
                 .modal-header h2 {
@@ -1182,9 +1385,14 @@ export default function ScheduleClient({
                     border: none;
                     color: var(--text-secondary);
                     cursor: pointer;
-                    padding: 0.25rem;
+                    padding: 0.5rem;
                     border-radius: var(--radius-sm);
                     transition: all 0.15s ease;
+                    min-width: 44px;
+                    min-height: 44px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
                 }
 
                 .close-btn:hover {
@@ -1197,6 +1405,13 @@ export default function ScheduleClient({
                     display: flex;
                     flex-direction: column;
                     gap: 1rem;
+                }
+
+                @media (max-width: 640px) {
+                    .modal-form {
+                        padding: 1rem;
+                        padding-bottom: 2rem;
+                    }
                 }
 
                 .form-group {
@@ -1228,6 +1443,50 @@ export default function ScheduleClient({
                     justify-content: flex-end;
                     gap: 0.75rem;
                     padding-top: 0.5rem;
+                }
+
+                @media (max-width: 640px) {
+                    .modal-footer {
+                        flex-direction: column-reverse;
+                    }
+                    .modal-footer .btn {
+                        width: 100%;
+                        justify-content: center;
+                        padding: 0.875rem;
+                    }
+                }
+
+                /* Mobile FAB (Floating Action Button) */
+                .mobile-fab {
+                    display: none;
+                    position: fixed;
+                    bottom: 1.5rem;
+                    right: 1.5rem;
+                    width: 56px;
+                    height: 56px;
+                    border-radius: 50%;
+                    background: var(--primary);
+                    color: white;
+                    border: none;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    cursor: pointer;
+                    z-index: 100;
+                    align-items: center;
+                    justify-content: center;
+                    transition: transform 0.2s ease, box-shadow 0.2s ease;
+                }
+
+                .mobile-fab:active {
+                    transform: scale(0.95);
+                }
+
+                @media (max-width: 640px) {
+                    .mobile-fab {
+                        display: flex;
+                    }
+                    .schedule-header .btn {
+                        display: none;
+                    }
                 }
             `}</style>
         </div>

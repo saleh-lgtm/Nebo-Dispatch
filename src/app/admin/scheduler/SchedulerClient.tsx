@@ -396,18 +396,18 @@ export default function SchedulerClient({ dispatchers, initialSchedules, initial
 
         if (dragState.type === "new") {
             // Create new shift
-            const newSchedule = await createScheduleBlock({
+            const result = await createScheduleBlock({
                 userId: dragState.dispatcherId,
                 shiftStart,
                 shiftEnd,
             });
 
-            if (newSchedule) {
+            if (result.success && result.schedule) {
                 const dispatcherIndex = dispatchers.findIndex((d) => d.id === dragState.dispatcherId);
                 setShifts((prev) => [
                     ...prev,
                     {
-                        id: newSchedule.id,
+                        id: result.schedule!.id,
                         dispatcherId: dragState.dispatcherId,
                         dispatcherName: dragState.dispatcherName,
                         day,
@@ -420,18 +420,20 @@ export default function SchedulerClient({ dispatchers, initialSchedules, initial
             }
         } else if (dragState.type === "move" && dragState.shiftId) {
             // Move existing shift
-            await updateScheduleBlock(dragState.shiftId, {
+            const result = await updateScheduleBlock(dragState.shiftId, {
                 shiftStart,
                 shiftEnd,
             });
 
-            setShifts((prev) =>
-                prev.map((s) =>
-                    s.id === dragState.shiftId
-                        ? { ...s, day, startHour: hour }
-                        : s
-                )
-            );
+            if (result.success) {
+                setShifts((prev) =>
+                    prev.map((s) =>
+                        s.id === dragState.shiftId
+                            ? { ...s, day, startHour: hour }
+                            : s
+                    )
+                );
+            }
         }
 
         setDragState(null);
@@ -446,21 +448,27 @@ export default function SchedulerClient({ dispatchers, initialSchedules, initial
 
     // Delete shift
     const handleDeleteShift = async (shiftId: string) => {
-        await deleteScheduleBlock(shiftId);
-        setShifts((prev) => prev.filter((s) => s.id !== shiftId));
+        const result = await deleteScheduleBlock(shiftId);
+        if (result.success) {
+            setShifts((prev) => prev.filter((s) => s.id !== shiftId));
+        }
     };
 
     // Publish/unpublish
     const handlePublish = async () => {
-        await publishWeekSchedules(weekStart);
-        setShifts((prev) => prev.map((s) => ({ ...s, isPublished: true })));
-        setIsPublished(true);
+        const result = await publishWeekSchedules(weekStart);
+        if (result.success) {
+            setShifts((prev) => prev.map((s) => ({ ...s, isPublished: true })));
+            setIsPublished(true);
+        }
     };
 
     const handleUnpublish = async () => {
-        await unpublishWeekSchedules(weekStart);
-        setShifts((prev) => prev.map((s) => ({ ...s, isPublished: false })));
-        setIsPublished(false);
+        const result = await unpublishWeekSchedules(weekStart);
+        if (result.success) {
+            setShifts((prev) => prev.map((s) => ({ ...s, isPublished: false })));
+            setIsPublished(false);
+        }
     };
 
     // Export CSV
