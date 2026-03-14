@@ -1,0 +1,453 @@
+/* Tag Badge */
+.tagBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.tagBadgeMd {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.8rem;
+}
+
+.tagRemove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 0.125rem;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.tagRemove:hover {
+    opacity: 1;
+}
+
+/* Tag Filter */
+.tagFilter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.tagFilterBtn {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 9999px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text-secondary);
+}
+
+.tagFilterBtn:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-hover);
+}
+
+.tagFilterBtnActive {
+    background: var(--primary-soft);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.tagFilterClear {
+    padding: 0.375rem 0.5rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+.tagFilterClear:hover {
+    background: var(--bg-hover);
+}
+
+/* Tag Manager */
+.tagManager {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.tagManagerHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.tagManagerTitle {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.tagList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.tagItem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.tagItemInfo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.tagColorPreview {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.tagItemName {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.tagItemCount {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.tagItemActions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.tagForm {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--bg-muted);
+    border-radius: 8px;
+}
+
+.tagFormRow {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-end;
+}
+
+.tagFormField {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+.tagFormLabel {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.tagFormInput {
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+}
+
+.tagFormInput:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.tagColorInput {
+    width: 44px;
+    height: 36px;
+    padding: 2px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.tagFormActions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+/* Tag Assignment Modal */
+.tagAssignment {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.tagCheckboxList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.tagCheckboxItem {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tagCheckboxItem:hover {
+    background: var(--bg-hover);
+}
+
+.tagCheckboxItemSelected {
+    background: var(--primary-soft);
+    border-color: var(--primary);
+}
+
+.tagCheckbox {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary);
+}
+
+.tagCheckboxLabel {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Blast SMS */
+.blastContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.blastSection {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.blastSectionTitle {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.blastTagGrid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.blastTagItem {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.blastTagItem:hover {
+    background: var(--bg-hover);
+}
+
+.blastTagItemSelected {
+    background: var(--primary-soft);
+    border-color: var(--primary);
+}
+
+.blastMessageArea {
+    width: 100%;
+    min-height: 120px;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    resize: vertical;
+    font-family: inherit;
+}
+
+.blastMessageArea:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.blastMessageInfo {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.blastMessageWarning {
+    color: var(--warning);
+}
+
+.blastPreview {
+    padding: 1rem;
+    background: var(--bg-muted);
+    border-radius: 8px;
+}
+
+.blastPreviewCount {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.blastPreviewLabel {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.blastRecipientsList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 0.75rem;
+}
+
+.blastRecipient {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-card);
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.blastRecipientName {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.blastRecipientPhone {
+    color: var(--text-secondary);
+    font-family: monospace;
+}
+
+.blastActions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
+.blastResults {
+    padding: 1rem;
+    border-radius: 8px;
+}
+
+.blastResultsSuccess {
+    background: var(--success-soft);
+    border: 1px solid var(--success-border);
+}
+
+.blastResultsError {
+    background: var(--danger-soft);
+    border: 1px solid var(--danger-border);
+}
+
+.blastResultsTitle {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.blastResultsStats {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.9rem;
+}
+
+/* Stats cards */
+.statsGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+}
+
+.statCard {
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+
+.statValue {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.statLabel {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+/* Empty state */
+.emptyState {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    color: var(--text-secondary);
+    text-align: center;
+    gap: 0.75rem;
+}
+
+.emptyStateTitle {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.emptyStateText {
+    font-size: 0.875rem;
+}

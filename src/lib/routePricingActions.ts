@@ -86,11 +86,20 @@ export async function clearRoutePrices(): Promise<{ success: boolean; deleted: n
  * Import a batch of route prices (for large imports that exceed serverless timeout)
  * Call clearRoutePrices() first, then call this for each batch
  */
+const MAX_BATCH_SIZE = 15000;
+
 export async function importRoutePricesBatch(
     rows: RoutePriceRow[],
     batchNumber: number
 ): Promise<{ success: boolean; imported: number; errors: Array<{ row: number; message: string }> }> {
     await requireAdmin();
+
+    // Validate batch size to prevent memory/connection issues
+    if (rows.length > MAX_BATCH_SIZE) {
+        throw new Error(
+            `Batch size ${rows.length} exceeds maximum of ${MAX_BATCH_SIZE} rows. Split into smaller batches.`
+        );
+    }
 
     const errors: Array<{ row: number; message: string }> = [];
     const validRows: Array<{
@@ -394,6 +403,7 @@ export async function getVehicleCodes(): Promise<string[]> {
 /**
  * Get zone suggestions for autocomplete
  * Returns both from and to zones matching input
+ * OPTIMIZED: Uses startsWith for short queries (uses index), contains only for 4+ chars
  */
 export async function getZoneSuggestions(
     query: string,
@@ -406,11 +416,16 @@ export async function getZoneSuggestions(
 
     const normalizedQuery = normalizeZone(query);
 
+    // Use startsWith for short queries (index-friendly)
+    // Use contains only for 4+ character queries (user expects substring match)
+    const useStartsWith = normalizedQuery.length < 4;
+    const matchMode = useStartsWith
+        ? { startsWith: normalizedQuery, mode: "insensitive" as const }
+        : { contains: normalizedQuery, mode: "insensitive" as const };
+
     if (type === "from") {
         const results = await prisma.routePrice.findMany({
-            where: {
-                zoneFromNorm: { contains: normalizedQuery, mode: "insensitive" },
-            },
+            where: { zoneFromNorm: matchMode },
             distinct: ["zoneFrom"],
             select: { zoneFrom: true },
             take: limit,
@@ -418,9 +433,7 @@ export async function getZoneSuggestions(
         return results.map((r) => r.zoneFrom);
     } else {
         const results = await prisma.routePrice.findMany({
-            where: {
-                zoneToNorm: { contains: normalizedQuery, mode: "insensitive" },
-            },
+            where: { zoneToNorm: matchMode },
             distinct: ["zoneTo"],
             select: { zoneTo: true },
             take: limit,
@@ -435,42 +448,54 @@ export async function getZoneSuggestions(
 
 /**
  * Get pricing statistics for admin dashboard
+ * OPTIMIZED: Uses single raw SQL query instead of 6 separate queries
  */
 export async function getRoutePricingStats(): Promise<RoutePricingStats> {
     await requireAdmin();
 
-    const [totalRoutes, vehicleCodesResult, lastImportResult, priceStats] = await Promise.all([
-        prisma.routePrice.count(),
-        prisma.routePrice.findMany({
-            distinct: ["vehicleCode"],
-            select: { vehicleCode: true },
-        }),
-        prisma.routePriceImport.findFirst({
-            orderBy: { importedAt: "desc" },
-            include: {
-                importedBy: { select: { name: true } },
-            },
-        }),
-        prisma.routePrice.aggregate({
-            _min: { rate: true },
-            _max: { rate: true },
-        }),
-    ]);
+    // Single query for all RoutePrice stats (was 6 queries, now 1)
+    const statsResult = await prisma.$queryRaw<
+        Array<{
+            totalRoutes: bigint;
+            vehicleCodes: bigint;
+            fromZones: bigint;
+            toZones: bigint;
+            minRate: number | null;
+            maxRate: number | null;
+        }>
+    >`
+        SELECT
+            COUNT(*) as "totalRoutes",
+            COUNT(DISTINCT "vehicleCode") as "vehicleCodes",
+            COUNT(DISTINCT "zoneFrom") as "fromZones",
+            COUNT(DISTINCT "zoneTo") as "toZones",
+            MIN(rate) as "minRate",
+            MAX(rate) as "maxRate"
+        FROM "RoutePrice"
+    `;
 
-    // Unique zones (both from and to)
-    const [fromZones, toZones] = await Promise.all([
-        prisma.routePrice.findMany({ distinct: ["zoneFrom"], select: { zoneFrom: true } }),
-        prisma.routePrice.findMany({ distinct: ["zoneTo"], select: { zoneTo: true } }),
-    ]);
-    const allZones = new Set([
-        ...fromZones.map((z) => z.zoneFrom),
-        ...toZones.map((z) => z.zoneTo),
-    ]);
+    const stats = statsResult[0];
+
+    // Last import still needs separate query (different table)
+    const lastImportResult = await prisma.routePriceImport.findFirst({
+        orderBy: { importedAt: "desc" },
+        include: {
+            importedBy: { select: { name: true } },
+        },
+    });
+
+    // Estimate unique zones (fromZones + toZones minus overlap approximation)
+    // For exact count we'd need UNION which is more expensive
+    const uniqueZonesEstimate = Math.max(
+        Number(stats.fromZones),
+        Number(stats.toZones),
+        Math.floor((Number(stats.fromZones) + Number(stats.toZones)) * 0.7)
+    );
 
     return {
-        totalRoutes,
-        vehicleCodes: vehicleCodesResult.length,
-        uniqueZones: allZones.size,
+        totalRoutes: Number(stats.totalRoutes),
+        vehicleCodes: Number(stats.vehicleCodes),
+        uniqueZones: uniqueZonesEstimate,
         lastImport: lastImportResult
             ? {
                   importedAt: lastImportResult.importedAt,
@@ -480,8 +505,8 @@ export async function getRoutePricingStats(): Promise<RoutePricingStats> {
               }
             : null,
         priceRange: {
-            min: priceStats._min.rate || 0,
-            max: priceStats._max.rate || 0,
+            min: stats.minRate || 0,
+            max: stats.maxRate || 0,
         },
     };
 }

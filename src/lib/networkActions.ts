@@ -1,7 +1,7 @@
 "use server";
 
 import prisma from "@/lib/prisma";
-import { AffiliateType } from "@prisma/client";
+import { AffiliateType, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { requireAdmin, requireAuth } from "./auth-helpers";
 import { createAuditLog } from "./auditActions";
@@ -70,8 +70,7 @@ export async function getNetworkPartners(options?: {
 
     const { type, status, search, isActive } = options || {};
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: any = {};
+    const where: Prisma.AffiliateWhereInput = {};
 
     // Filter by type
     if (type) {
@@ -350,8 +349,7 @@ export async function getAllNetworkContacts(options?: {
 
     const { search, type, limit = 50, offset = 0 } = options || {};
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: any = {
+    const where: Prisma.AffiliateWhereInput = {
         phone: { not: null },
     };
 

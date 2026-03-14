@@ -639,60 +639,83 @@ export async function markExpiredConfirmations() {
         return { count: 0, accountabilityRecords: 0 };
     }
 
-    let accountabilityRecords = 0;
+    // OPTIMIZATION: Fetch ALL active shifts once instead of per confirmation
+    // Find the date range that covers all confirmation windows
+    const earliestDue = new Date(Math.min(...toExpire.map(c => c.dueAt.getTime())));
+    const latestPickup = new Date(Math.max(...toExpire.map(c => c.pickupAt.getTime())));
+
+    const activeShifts = await prisma.shift.findMany({
+        where: {
+            // Shift started before the latest pickup
+            clockIn: { lte: latestPickup },
+            OR: [
+                { clockOut: null }, // Still active
+                { clockOut: { gte: earliestDue } }, // Ended after earliest due time
+            ],
+            // Only include DISPATCHER and ADMIN roles (exclude SUPER_ADMIN)
+            user: {
+                role: { in: ["DISPATCHER", "ADMIN"] },
+                isActive: true,
+            },
+        },
+        select: {
+            id: true,
+            userId: true,
+            clockIn: true,
+            clockOut: true, // Need this to check overlap per confirmation
+        },
+    });
+
+    // Build all accountability records in memory
+    const accountabilityData: Array<{
+        confirmationId: string;
+        dispatcherId: string;
+        shiftId: string;
+        shiftStartedAt: Date;
+        confirmationDueAt: Date;
+        confirmationExpiredAt: Date;
+    }> = [];
 
     for (const confirmation of toExpire) {
-        // Find all shifts that were active during the confirmation window
-        // Window: from dueAt (2 hours before pickup) to pickupAt
-        const activeShifts = await prisma.shift.findMany({
-            where: {
-                // Shift must have been active during the confirmation window
-                clockIn: { lte: confirmation.pickupAt },
-                OR: [
-                    { clockOut: null }, // Still active
-                    { clockOut: { gte: confirmation.dueAt } }, // Ended after due time
-                ],
-                // Only include DISPATCHER and ADMIN roles (exclude SUPER_ADMIN)
-                user: {
-                    role: { in: ["DISPATCHER", "ADMIN"] },
-                    isActive: true,
-                },
-            },
-            select: {
-                id: true,
-                userId: true,
-                clockIn: true,
-            },
-        });
-
-        // Create accountability records for each dispatcher on duty
         for (const shift of activeShifts) {
-            try {
-                await prisma.missedConfirmationAccountability.create({
-                    data: {
-                        confirmationId: confirmation.id,
-                        dispatcherId: shift.userId,
-                        shiftId: shift.id,
-                        shiftStartedAt: shift.clockIn,
-                        confirmationDueAt: confirmation.dueAt,
-                        confirmationExpiredAt: now,
-                    },
+            // Check if this shift was active during this specific confirmation window
+            const shiftWasActive =
+                shift.clockIn <= confirmation.pickupAt &&
+                (!shift.clockOut || shift.clockOut >= confirmation.dueAt);
+
+            if (shiftWasActive) {
+                accountabilityData.push({
+                    confirmationId: confirmation.id,
+                    dispatcherId: shift.userId,
+                    shiftId: shift.id,
+                    shiftStartedAt: shift.clockIn,
+                    confirmationDueAt: confirmation.dueAt,
+                    confirmationExpiredAt: now,
                 });
-                accountabilityRecords++;
-            } catch {
-                // Unique constraint violation - already recorded, skip
             }
         }
-
-        // Update confirmation status to EXPIRED
-        await prisma.tripConfirmation.update({
-            where: { id: confirmation.id },
-            data: {
-                status: "EXPIRED",
-                archivedAt: now,
-            },
-        });
     }
+
+    // OPTIMIZATION: Create all accountability records in parallel
+    let accountabilityRecords = 0;
+    if (accountabilityData.length > 0) {
+        const createPromises = accountabilityData.map(data =>
+            prisma.missedConfirmationAccountability.create({ data }).catch(() => null)
+        );
+        const results = await Promise.all(createPromises);
+        accountabilityRecords = results.filter(r => r !== null).length;
+    }
+
+    // OPTIMIZATION: Update all confirmations in a single query
+    await prisma.tripConfirmation.updateMany({
+        where: {
+            id: { in: toExpire.map(c => c.id) },
+        },
+        data: {
+            status: "EXPIRED",
+            archivedAt: now,
+        },
+    });
 
     return { count: toExpire.length, accountabilityRecords };
 }

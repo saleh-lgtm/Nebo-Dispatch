@@ -5,7 +5,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { createAuditLog } from "./auditActions";
 import { revalidatePath } from "next/cache";
-import { TbrTripStatus, LaSyncStatus } from "@prisma/client";
+import { TbrTripStatus, LaSyncStatus, Prisma } from "@prisma/client";
 
 // Types for TBR trip filters
 export interface TbrTripFilters {
@@ -78,8 +78,7 @@ export async function getTbrTrips(filters: TbrTripFilters = {}) {
     } = filters;
 
     // Build where clause
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: Record<string, any> = {
+    const where: Prisma.TbrTripWhereInput = {
         archivedAt: null,
     };
 

@@ -18,6 +18,7 @@ import {
     RefreshCw,
     MessageCircle,
     BarChart3,
+    Users,
 } from "lucide-react";
 import {
     sendCustomSMS,
@@ -29,6 +30,7 @@ import {
 } from "@/lib/twilioActions";
 import ConversationList from "@/components/sms/ConversationList";
 import ChatView from "@/components/sms/ChatView";
+import BlastSMS from "@/components/sms/BlastSMS";
 
 interface SMSLog {
     id: string;
@@ -66,7 +68,7 @@ interface Props {
     initialStats: SMSStats;
 }
 
-type TabType = "dashboard" | "conversations";
+type TabType = "dashboard" | "conversations" | "blast";
 
 export default function SMSClient({ initialLogs, totalLogs, initialStats }: Props) {
     const [activeTab, setActiveTab] = useState<TabType>("dashboard");
@@ -304,6 +306,13 @@ export default function SMSClient({ initialLogs, totalLogs, initialStats }: Prop
                     <MessageCircle size={16} />
                     Conversations
                 </button>
+                <button
+                    className={`tab ${activeTab === "blast" ? "active" : ""}`}
+                    onClick={() => setActiveTab("blast")}
+                >
+                    <Users size={16} />
+                    Blast SMS
+                </button>
             </div>
 
             {activeTab === "dashboard" ? (
@@ -518,7 +527,7 @@ export default function SMSClient({ initialLogs, totalLogs, initialStats }: Prop
                         </section>
                     </div>
                 </>
-            ) : (
+            ) : activeTab === "conversations" ? (
                 /* Conversations Tab */
                 <div className="conversations-container">
                     <div className={`conversations-sidebar ${selectedPhone ? "hidden-mobile" : ""}`}>
@@ -570,7 +579,12 @@ export default function SMSClient({ initialLogs, totalLogs, initialStats }: Prop
                         )}
                     </div>
                 </div>
-            )}
+            ) : activeTab === "blast" ? (
+                /* Blast SMS Tab */
+                <div className="blast-container">
+                    <BlastSMS />
+                </div>
+            ) : null}
 
             <style jsx>{`
                 .sms-page {
@@ -1095,6 +1109,14 @@ export default function SMSClient({ initialLogs, totalLogs, initialStats }: Prop
                     overflow: hidden;
                     height: calc(100vh - 280px);
                     min-height: 500px;
+                }
+
+                /* Blast SMS Tab */
+                .blast-container {
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-lg);
+                    padding: 1.5rem;
                 }
 
                 .conversations-sidebar {

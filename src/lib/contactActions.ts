@@ -313,3 +313,102 @@ export async function rejectContact(id: string, reason?: string) {
     revalidatePath("/admin/approvals");
     return contact;
 }
+
+/**
+ * Get all approved contacts with their tags
+ */
+export async function getContactsWithTags() {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+        throw new Error("Unauthorized");
+    }
+
+    const contacts = await prisma.contact.findMany({
+        where: {
+            isActive: true,
+            approvalStatus: "APPROVED",
+        },
+        orderBy: [{ company: "asc" }, { name: "asc" }],
+        include: {
+            createdBy: { select: { id: true, name: true } },
+            tags: {
+                include: {
+                    tag: { select: { id: true, name: true, color: true } },
+                },
+            },
+        },
+    });
+
+    return contacts;
+}
+
+/**
+ * Get all contacts with tags (admin - includes pending)
+ */
+export async function getAllContactsWithTags() {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+        throw new Error("Unauthorized");
+    }
+
+    const isAdmin = ["SUPER_ADMIN", "ADMIN"].includes(session.user.role || "");
+    if (!isAdmin) {
+        throw new Error("Admin access required");
+    }
+
+    const contacts = await prisma.contact.findMany({
+        where: { isActive: true },
+        orderBy: [{ createdAt: "desc" }],
+        include: {
+            createdBy: { select: { id: true, name: true } },
+            approvedBy: { select: { id: true, name: true } },
+            tags: {
+                include: {
+                    tag: { select: { id: true, name: true, color: true } },
+                },
+            },
+        },
+    });
+
+    return contacts;
+}
+
+/**
+ * Filter contacts by tag IDs
+ */
+export async function getContactsByTagFilter(tagIds: string[]) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+        throw new Error("Unauthorized");
+    }
+
+    const where: {
+        isActive: boolean;
+        approvalStatus: "APPROVED";
+        tags?: { some: { tagId: { in: string[] } } };
+    } = {
+        isActive: true,
+        approvalStatus: "APPROVED",
+    };
+
+    if (tagIds.length > 0) {
+        where.tags = {
+            some: { tagId: { in: tagIds } },
+        };
+    }
+
+    const contacts = await prisma.contact.findMany({
+        where,
+        orderBy: [{ company: "asc" }, { name: "asc" }],
+        include: {
+            createdBy: { select: { id: true, name: true } },
+            tags: {
+                include: {
+                    tag: { select: { id: true, name: true, color: true } },
+                },
+            },
+        },
+    });
+
+    return contacts;
+}
