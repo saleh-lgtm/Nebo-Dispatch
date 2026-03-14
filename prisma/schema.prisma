@@ -217,6 +217,12 @@ model User {
   // Route pricing imports
   routePriceImports      RoutePriceImport[] @relation("RoutePriceImporter")
 
+  // Dispatcher permissions and task config
+  featureAccessGrants    DispatcherFeatureAccess[] @relation("DispatcherFeatureAccess")
+  featureAccessGranted   DispatcherFeatureAccess[] @relation("DispatcherFeatureGranter")
+  taskConfig             DispatcherTaskConfig?     @relation("DispatcherTaskConfig")
+  taskConfigsConfigured  DispatcherTaskConfig[]    @relation("TaskConfigurer")
+
   // CRITICAL INDEXES for performance
   @@index([email])                      // Auth queries on every request
   @@index([role, isActive, createdAt])  // Admin dashboards, user listings
@@ -1860,4 +1866,65 @@ model RoutePriceImport {
   importedAt    DateTime @default(now())
 
   @@index([importedAt])
+}
+
+// ============================================
+// DISPATCHER PERMISSIONS & TASK CONFIGURATION
+// ============================================
+
+// Available features that can be configured for dispatchers
+enum DispatcherFeature {
+  QUOTES           // Create/manage quotes
+  CONTACTS         // View/manage contacts
+  SMS              // Send SMS messages
+  FLEET            // View fleet information
+  SCHEDULER        // View schedule
+  REPORTS          // View/submit shift reports
+  DIRECTORY        // View company directory
+  CONFIRMATIONS    // Handle trip confirmations
+  TBR_TRIPS        // View TBR trips
+  NOTES            // View/create global notes
+  TASKS            // View assigned tasks
+  ANALYTICS        // View analytics dashboard
+}
+
+// Permission level for dispatcher features
+enum PermissionLevel {
+  NONE      // No access
+  READ      // View only
+  EDIT      // Full access (view + modify)
+}
+
+// Per-dispatcher feature access control
+model DispatcherFeatureAccess {
+  id           String            @id @default(cuid())
+  userId       String
+  user         User              @relation("DispatcherFeatureAccess", fields: [userId], references: [id], onDelete: Cascade)
+  feature      DispatcherFeature
+  permission   PermissionLevel   @default(READ)
+  grantedById  String
+  grantedBy    User              @relation("DispatcherFeatureGranter", fields: [grantedById], references: [id])
+  grantedAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@unique([userId, feature])
+  @@index([userId])
+  @@index([feature])
+}
+
+// Dispatcher task configuration (primary/secondary assignments)
+model DispatcherTaskConfig {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation("DispatcherTaskConfig", fields: [userId], references: [id], onDelete: Cascade)
+  primaryTask    String?  // Main responsibility (e.g., "TBR Trips", "Retail Quotes")
+  secondaryTask  String?  // Secondary responsibility
+  notes          String?  @db.Text
+  configuredById String
+  configuredBy   User     @relation("TaskConfigurer", fields: [configuredById], references: [id])
+  configuredAt   DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([primaryTask])
+  @@index([secondaryTask])
 }
