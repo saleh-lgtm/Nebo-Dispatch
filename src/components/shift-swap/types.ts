@@ -37,6 +37,7 @@ export interface SwapRequest {
 export interface SwapFormData {
   myShiftId: string;
   targetShiftId: string;
+  targetUserId?: string;
   reason: string;
 }
 

@@ -9,6 +9,7 @@
 
 // Components
 export { default as ConfirmationCard } from "./ConfirmationCard";
+export { default as ConfirmationModal } from "./ConfirmationModal";
 
 // Types
 export type { Confirmation, ConfirmationStatus, StatusOption } from "./types";

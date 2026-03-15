@@ -6,6 +6,8 @@
 
 // Components
 export { default as SwapRequestCard } from "./SwapRequestCard";
+export { default as SwapRequestForm } from "./SwapRequestForm";
+export { default as SwapActions } from "./SwapActions";
 
 // Types
 export type {
