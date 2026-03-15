@@ -3,16 +3,48 @@ import prisma from "@/lib/prisma";
 import { geocodeTripAddresses } from "@/lib/geocoding";
 
 /**
+ * Format phone number to E.164 format (+1XXXXXXXXXX)
+ */
+function formatPhoneE164(phone: string | null | undefined): string {
+    if (!phone) return "";
+
+    // Remove all non-digit characters
+    const digits = phone.replace(/\D/g, "");
+
+    // If it starts with 1 and has 11 digits, add +
+    if (digits.length === 11 && digits.startsWith("1")) {
+        return `+${digits}`;
+    }
+
+    // If it has 10 digits, assume US and add +1
+    if (digits.length === 10) {
+        return `+1${digits}`;
+    }
+
+    // If it already has + at the start, keep it
+    if (phone.startsWith("+")) {
+        return `+${digits}`;
+    }
+
+    // Return as-is with + prefix if we have digits
+    return digits.length > 0 ? `+${digits}` : "";
+}
+
+/**
  * POST /api/tbr/push-to-la
  *
  * Proxy endpoint to push TBR trips to LimoAnywhere via Zapier webhook.
  * - Checks for duplicates (already pushed trips)
  * - Geocodes pickup and dropoff addresses
+ * - Formats phone to E.164
  * - Forwards to Zapier with lat/lng
  */
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
+
+        // Format phone number to E.164
+        const formattedPhone = formatPhoneE164(body.passengerPhone);
 
         // Check if trip exists and hasn't been pushed already
         if (body.neboTripId) {
@@ -99,9 +131,10 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // Prepare payload with geocoded data
+        // Prepare payload with geocoded data and formatted phone
         const zapierPayload = {
             ...body,
+            passengerPhone: formattedPhone, // E.164 format
             pickupLatitude,
             pickupLongitude,
             dropoffLatitude,
