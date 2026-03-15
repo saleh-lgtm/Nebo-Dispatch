@@ -488,6 +488,8 @@ model Affiliate {
   @@index([type])
   @@index([isActive])
   @@index([market])
+  @@index([type, isActive, isApproved])  // Common filter combo
+  @@index([name])                         // Search by name
 }
 
 // Configuration for which affiliates to audit in shift reports
@@ -1780,6 +1782,12 @@ model Contact {
 
   // Tag assignments
   tags            ContactTagAssignment[]
+
+  // INDEXES for performance
+  @@index([name])                         // Search by name
+  @@index([approvalStatus, isActive])     // Filter approved/active contacts
+  @@index([createdById, createdAt])       // User's contacts
+  @@index([phone])                        // Lookup by phone for SMS
 }
 
 // Contact tagging system for organizing contacts and blast messaging
