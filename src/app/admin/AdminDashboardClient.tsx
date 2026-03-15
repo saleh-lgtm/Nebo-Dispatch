@@ -25,9 +25,8 @@ import {
     DispatcherAnalytics,
     updateDispatcherFeatureAccess,
     updateDispatcherTaskConfig,
-    DISPATCHER_FEATURES,
-    TASK_PRESETS,
 } from "@/lib/adminDashboardActions";
+import { DISPATCHER_FEATURES, TASK_PRESETS } from "@/lib/adminConstants";
 import { DispatcherFeature, PermissionLevel } from "@prisma/client";
 import styles from "./AdminDashboard.module.css";
 
