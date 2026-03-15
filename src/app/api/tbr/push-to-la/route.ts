@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { geocodeTripAddresses } from "@/lib/geocoding";
+import { addTripToGoogleSheet } from "@/lib/googleSheets";
 
 /**
  * Format phone number to E.164 format (+1XXXXXXXXXX)
@@ -33,11 +34,11 @@ function formatPhoneE164(phone: string | null | undefined): string {
 /**
  * POST /api/tbr/push-to-la
  *
- * Proxy endpoint to push TBR trips to LimoAnywhere via Zapier webhook.
+ * Push TBR trips to LimoAnywhere via Google Sheets (for Zapier trigger)
  * - Checks for duplicates (already pushed trips)
  * - Geocodes pickup and dropoff addresses
  * - Formats phone to E.164
- * - Forwards to Zapier with lat/lng
+ * - Adds row to Google Sheet → Zapier picks up → Creates LA reservation
  */
 export async function POST(request: NextRequest) {
     try {
@@ -82,16 +83,6 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        const zapierUrl = process.env.ZAPIER_LA_WEBHOOK_URL || process.env.NEXT_PUBLIC_ZAPIER_LA_WEBHOOK_URL;
-
-        if (!zapierUrl) {
-            console.error("Zapier webhook URL not configured");
-            return NextResponse.json(
-                { error: "Zapier webhook not configured" },
-                { status: 500 }
-            );
-        }
-
         // Geocode addresses
         let pickupLatitude: number | null = null;
         let pickupLongitude: number | null = null;
@@ -131,72 +122,125 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // Prepare payload with geocoded data and formatted phone
-        const zapierPayload = {
-            ...body,
-            passengerPhone: formattedPhone, // E.164 format
-            pickupLatitude,
-            pickupLongitude,
-            dropoffLatitude,
-            dropoffLongitude,
-        };
+        // Try Google Sheets first (free Zapier trigger)
+        const googleSheetsConfigured = !!(
+            process.env.GOOGLE_SHEETS_SPREADSHEET_ID &&
+            process.env.GOOGLE_SHEETS_CREDENTIALS
+        );
 
-        console.log("Pushing to Zapier:", {
-            url: zapierUrl,
-            tbrTripId: body.tbrTripId,
-            passenger: `${body.firstName} ${body.lastName}`,
-            pickupCoords: pickupLatitude ? `${pickupLatitude}, ${pickupLongitude}` : "N/A",
-            dropoffCoords: dropoffLatitude ? `${dropoffLatitude}, ${dropoffLongitude}` : "N/A",
-        });
+        if (googleSheetsConfigured) {
+            console.log("Using Google Sheets integration...");
 
-        // Forward request to Zapier
-        const zapierResponse = await fetch(zapierUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(zapierPayload),
-        });
+            const sheetResult = await addTripToGoogleSheet({
+                tbrTripId: body.tbrTripId,
+                neboTripId: body.neboTripId,
+                firstName: body.firstName,
+                lastName: body.lastName,
+                passengerPhone: formattedPhone,
+                passengerEmail: body.passengerEmail || "",
+                pickupDatetime: body.pickupDatetime,
+                pickupAddress: body.pickupAddress,
+                pickupLatitude,
+                pickupLongitude,
+                dropoffAddress: body.dropoffAddress,
+                dropoffLatitude,
+                dropoffLongitude,
+                vehicleType: body.vehicleType || "",
+                passengerCount: body.passengerCount || 1,
+                flightNumber: body.flightNumber || "",
+                specialNotes: body.specialNotes || "",
+                fareAmount: body.fareAmount || "",
+            });
 
-        if (!zapierResponse.ok) {
-            const errorText = await zapierResponse.text();
-            console.error("Zapier error:", errorText);
-            return NextResponse.json(
-                { error: `Zapier error: ${zapierResponse.statusText}`, details: errorText },
-                { status: zapierResponse.status }
-            );
+            if (!sheetResult.success) {
+                return NextResponse.json(
+                    { error: "Failed to add to Google Sheet", details: sheetResult.error },
+                    { status: 500 }
+                );
+            }
+
+            // Generate confirmation based on sheet row
+            const reservationId = `SHEET-${sheetResult.rowNumber || Date.now().toString().slice(-6)}`;
+            const confirmationCode = `CONF-${body.tbrTripId}`;
+
+            console.log(`Trip added to Google Sheet row ${sheetResult.rowNumber}`);
+
+            return NextResponse.json({
+                success: true,
+                method: "google_sheets",
+                reservationId,
+                confirmationCode,
+                sheetRow: sheetResult.rowNumber,
+                geocoded: {
+                    pickup: pickupLatitude ? { lat: pickupLatitude, lng: pickupLongitude } : null,
+                    dropoff: dropoffLatitude ? { lat: dropoffLatitude, lng: dropoffLongitude } : null,
+                },
+                message: "Trip added to Google Sheet. Zapier will create the LA reservation.",
+            });
         }
 
-        // Try to parse Zapier response
-        let zapierResult: Record<string, unknown> = {};
-        try {
-            zapierResult = await zapierResponse.json();
-        } catch {
-            // Zapier might return empty response - that's OK
+        // Fall back to direct Zapier webhook if configured
+        const zapierUrl = process.env.ZAPIER_LA_WEBHOOK_URL || process.env.NEXT_PUBLIC_ZAPIER_LA_WEBHOOK_URL;
+
+        if (zapierUrl) {
+            console.log("Using direct Zapier webhook...");
+
+            const zapierPayload = {
+                ...body,
+                passengerPhone: formattedPhone,
+                pickupLatitude,
+                pickupLongitude,
+                dropoffLatitude,
+                dropoffLongitude,
+            };
+
+            const zapierResponse = await fetch(zapierUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(zapierPayload),
+            });
+
+            if (!zapierResponse.ok) {
+                const errorText = await zapierResponse.text();
+                return NextResponse.json(
+                    { error: `Zapier error: ${zapierResponse.statusText}`, details: errorText },
+                    { status: zapierResponse.status }
+                );
+            }
+
+            let zapierResult: Record<string, unknown> = {};
+            try {
+                zapierResult = await zapierResponse.json();
+            } catch {
+                // Empty response is OK
+            }
+
+            const reservationId =
+                (zapierResult.reservationId as string) ||
+                (zapierResult.reservation_id as string) ||
+                `ZAP-${Date.now().toString().slice(-8)}`;
+
+            const confirmationCode =
+                (zapierResult.confirmationCode as string) ||
+                `CONF-${body.tbrTripId}`;
+
+            return NextResponse.json({
+                success: true,
+                method: "zapier_webhook",
+                reservationId,
+                confirmationCode,
+                geocoded: {
+                    pickup: pickupLatitude ? { lat: pickupLatitude, lng: pickupLongitude } : null,
+                    dropoff: dropoffLatitude ? { lat: dropoffLatitude, lng: dropoffLongitude } : null,
+                },
+            });
         }
 
-        console.log("Zapier response:", zapierResult);
-
-        // Generate reservation ID if Zapier doesn't return one
-        const reservationId =
-            (zapierResult.reservationId as string) ||
-            (zapierResult.reservation_id as string) ||
-            (zapierResult.id as string) ||
-            `ZAP-${Date.now().toString().slice(-8)}`;
-
-        const confirmationCode =
-            (zapierResult.confirmationCode as string) ||
-            (zapierResult.confirmation_code as string) ||
-            `CONF-${body.tbrTripId || "TBR"}`;
-
-        return NextResponse.json({
-            success: true,
-            reservationId,
-            confirmationCode,
-            geocoded: {
-                pickup: pickupLatitude ? { lat: pickupLatitude, lng: pickupLongitude } : null,
-                dropoff: dropoffLatitude ? { lat: dropoffLatitude, lng: dropoffLongitude } : null,
-            },
-            zapierResponse: zapierResult,
-        });
+        // No integration configured
+        return NextResponse.json(
+            { error: "No LimoAnywhere integration configured. Set up Google Sheets or Zapier webhook." },
+            { status: 500 }
+        );
     } catch (error) {
         console.error("Push to LA error:", error);
         return NextResponse.json(
