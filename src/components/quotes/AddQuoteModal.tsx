@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
-import { createQuote } from "@/lib/quoteActions";
+import { createQuote } from "@/lib/domains/quotes";
 import { useSession } from "next-auth/react";
 import styles from "./AddQuoteModal.module.css";
 

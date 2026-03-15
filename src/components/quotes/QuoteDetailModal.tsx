@@ -25,7 +25,7 @@ import {
     setQuoteOutcome,
     addQuoteNote,
     getQuoteWithHistory,
-} from "@/lib/quoteActions";
+} from "@/lib/domains/quotes";
 import { Quote, statusColors, formatTimeSince, formatTimeUntilExpiry } from "./types";
 import styles from "./QuoteDetailModal.module.css";
 

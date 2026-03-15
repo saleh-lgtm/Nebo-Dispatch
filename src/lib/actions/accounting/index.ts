@@ -8,8 +8,8 @@
  * - Hours tracking
  */
 
-// Re-export from existing files
-export * from "../../quoteActions";
+// Re-export from domains
+export * from "../../domains/quotes";
 export * from "../../accountingActions";
 export * from "../../billingReviewActions";
 export * from "../../hoursActions";

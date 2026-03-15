@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { ClipboardCheck, Send, Clock, Phone, Bookmark, TrendingUp, Cloud, CloudOff, Save, RefreshCw } from "lucide-react";
 import { toggleTask, saveShiftReport, saveShiftReportDraft, deleteShiftReportDraft, type ShiftReportDraft } from "@/lib/actions";
-import { createQuote } from "@/lib/quoteActions";
+import { createQuote } from "@/lib/domains/quotes";
 import { useAutoSave } from "@/hooks/useAutoSave";
 
 // Import extracted components

@@ -3,7 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getDashboardNotes } from "@/lib/notesActions";
-import { getPendingQuotes } from "@/lib/quoteActions";
+import { getPendingQuotes } from "@/lib/domains/quotes";
 import { getOnlineUsers, getActiveShiftUsers } from "@/lib/presenceActions";
 import { getUpcomingEvents } from "@/lib/eventActions";
 import { getUserNextShift } from "@/lib/schedulerActions";

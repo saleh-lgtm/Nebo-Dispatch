@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
-import { getShiftQuotes } from "@/lib/quoteActions";
+import { getShiftQuotes } from "@/lib/domains/quotes";
 import { getShiftReportDraft } from "@/lib/actions";
 import { getAffiliatesForShiftAudit } from "@/lib/affiliateAuditActions";
 import dynamic from "next/dynamic";

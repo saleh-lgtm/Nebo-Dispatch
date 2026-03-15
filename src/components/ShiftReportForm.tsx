@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, ClipboardCheck, Send, AlertCircle, Bookmark, Phone, Mail, FileText, TrendingUp, Clock, X, DollarSign, User, Cloud, CloudOff, RefreshCw, StickyNote, Bell } from "lucide-react";
 import { toggleTask, saveShiftReport, saveShiftReportDraft, deleteShiftReportDraft, type ShiftReportDraft } from "@/lib/actions";
-import { createQuote } from "@/lib/quoteActions";
+import { createQuote } from "@/lib/domains/quotes";
 import { createBillingReviews } from "@/lib/billingReviewActions";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import AffiliateAuditSection, { type AffiliateAuditEntry } from "./shift-report/AffiliateAuditSection";
