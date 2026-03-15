@@ -37,6 +37,10 @@ import {
     Shield,
     Briefcase,
     Contact,
+    Gauge,
+    Tags,
+    Cog,
+    FileSearch,
 } from "lucide-react";
 import NotificationBell from "./NotificationBell";
 import ClockButton from "./ClockButton";
@@ -194,54 +198,63 @@ export default function Sidebar({ user }: Props) {
                         collapsed={collapsed}
                         onClick={isMobile ? closeMobileMenu : undefined}
                     />
-                </NavGroup>
-
-                {/* Scheduling */}
-                <NavGroup title="Scheduling" collapsed={collapsed}>
-                    {isDispatcher && (
-                        <>
-                            <NavItem
-                                href="/schedule"
-                                icon={<Calendar size={18} />}
-                                label="My Schedule"
-                                collapsed={collapsed}
-                                onClick={isMobile ? closeMobileMenu : undefined}
-                            />
-                            <div className={styles.clockWrapper}>
-                                <ClockButton />
-                            </div>
-                            <NavItem
-                                href="/reports/shift"
-                                icon={<ClipboardList size={18} />}
-                                label="Shift Report"
-                                collapsed={collapsed}
-                                onClick={isMobile ? closeMobileMenu : undefined}
-                            />
-                        </>
-                    )}
                     {isAdmin && (
-                        <>
-                            <NavItem
-                                href="/admin/scheduler"
-                                icon={<CalendarClock size={18} />}
-                                label="Schedule Builder"
-                                collapsed={collapsed}
-                                onClick={isMobile ? closeMobileMenu : undefined}
-                            />
-                            <NavItem
-                                href="/admin/requests"
-                                icon={<FileEdit size={18} />}
-                                label="Time Off & Swaps"
-                                collapsed={collapsed}
-                                onClick={isMobile ? closeMobileMenu : undefined}
-                            />
-                        </>
+                        <NavItem
+                            href="/admin"
+                            icon={<Gauge size={18} />}
+                            label="Admin Dashboard"
+                            collapsed={collapsed}
+                            onClick={isMobile ? closeMobileMenu : undefined}
+                        />
                     )}
                 </NavGroup>
 
-                {/* People & Team */}
+                {/* My Shift - Dispatchers only */}
+                {isDispatcher && (
+                    <NavGroup title="My Shift" collapsed={collapsed}>
+                        <NavItem
+                            href="/schedule"
+                            icon={<Calendar size={18} />}
+                            label="My Schedule"
+                            collapsed={collapsed}
+                            onClick={isMobile ? closeMobileMenu : undefined}
+                        />
+                        <div className={styles.clockWrapper}>
+                            <ClockButton />
+                        </div>
+                        <NavItem
+                            href="/reports/shift"
+                            icon={<ClipboardList size={18} />}
+                            label="Shift Report"
+                            collapsed={collapsed}
+                            onClick={isMobile ? closeMobileMenu : undefined}
+                        />
+                    </NavGroup>
+                )}
+
+                {/* Scheduling - Admin only */}
                 {isAdmin && (
-                    <NavGroup title="People" collapsed={collapsed}>
+                    <NavGroup title="Scheduling" collapsed={collapsed}>
+                        <NavItem
+                            href="/admin/scheduler"
+                            icon={<CalendarClock size={18} />}
+                            label="Schedule Builder"
+                            collapsed={collapsed}
+                            onClick={isMobile ? closeMobileMenu : undefined}
+                        />
+                        <NavItem
+                            href="/admin/requests"
+                            icon={<FileEdit size={18} />}
+                            label="Time Off & Swaps"
+                            collapsed={collapsed}
+                            onClick={isMobile ? closeMobileMenu : undefined}
+                        />
+                    </NavGroup>
+                )}
+
+                {/* Team Management - Admin only */}
+                {isAdmin && (
+                    <NavGroup title="Team" collapsed={collapsed}>
                         {isSuperAdmin && (
                             <NavItem
                                 href="/admin/users"
@@ -299,13 +312,22 @@ export default function Sidebar({ user }: Props) {
                         onClick={isMobile ? closeMobileMenu : undefined}
                     />
                     {isAdmin && (
-                        <NavItem
-                            href="/admin/sms"
-                            icon={<MessageSquare size={18} />}
-                            label="SMS Dashboard"
-                            collapsed={collapsed}
-                            onClick={isMobile ? closeMobileMenu : undefined}
-                        />
+                        <>
+                            <NavItem
+                                href="/admin/sms"
+                                icon={<MessageSquare size={18} />}
+                                label="SMS Dashboard"
+                                collapsed={collapsed}
+                                onClick={isMobile ? closeMobileMenu : undefined}
+                            />
+                            <NavItem
+                                href="/admin/contacts"
+                                icon={<Tags size={18} />}
+                                label="Contacts & Tags"
+                                collapsed={collapsed}
+                                onClick={isMobile ? closeMobileMenu : undefined}
+                            />
+                        </>
                     )}
                 </NavGroup>
 
@@ -333,22 +355,6 @@ export default function Sidebar({ user }: Props) {
                         onClick={isMobile ? closeMobileMenu : undefined}
                     />
                     <NavItem
-                        href={isAdmin ? "/admin/sops" : "/sops"}
-                        icon={<BookOpen size={18} />}
-                        label="SOPs"
-                        collapsed={collapsed}
-                        onClick={isMobile ? closeMobileMenu : undefined}
-                    />
-                    {isAdmin && (
-                        <NavItem
-                            href="/admin/pricing"
-                            icon={<DollarSign size={18} />}
-                            label="Route Pricing"
-                            collapsed={collapsed}
-                            onClick={isMobile ? closeMobileMenu : undefined}
-                        />
-                    )}
-                    <NavItem
                         href="/portals"
                         icon={<Globe size={18} />}
                         label="Portals"
@@ -369,6 +375,31 @@ export default function Sidebar({ user }: Props) {
                         collapsed={collapsed}
                         onClick={isMobile ? closeMobileMenu : undefined}
                     />
+                    {isAdmin && (
+                        <NavItem
+                            href="/admin/tbr-settings"
+                            icon={<Cog size={18} />}
+                            label="TBR Settings"
+                            collapsed={collapsed}
+                            onClick={isMobile ? closeMobileMenu : undefined}
+                        />
+                    )}
+                    <NavItem
+                        href={isAdmin ? "/admin/sops" : "/sops"}
+                        icon={<BookOpen size={18} />}
+                        label="SOPs"
+                        collapsed={collapsed}
+                        onClick={isMobile ? closeMobileMenu : undefined}
+                    />
+                    {isAdmin && (
+                        <NavItem
+                            href="/admin/pricing"
+                            icon={<DollarSign size={18} />}
+                            label="Route Pricing"
+                            collapsed={collapsed}
+                            onClick={isMobile ? closeMobileMenu : undefined}
+                        />
+                    )}
                 </NavGroup>
 
                 {/* Reports & Analytics */}
@@ -390,6 +421,13 @@ export default function Sidebar({ user }: Props) {
                                     collapsed={collapsed}
                                     onClick={isMobile ? closeMobileMenu : undefined}
                                 />
+                                <NavItem
+                                    href="/admin/affiliate-audit"
+                                    icon={<FileSearch size={18} />}
+                                    label="Affiliate Audit"
+                                    collapsed={collapsed}
+                                    onClick={isMobile ? closeMobileMenu : undefined}
+                                />
                             </>
                         )}
                         {hasAccountingAccess && (
@@ -404,8 +442,8 @@ export default function Sidebar({ user }: Props) {
                     </NavGroup>
                 )}
 
-                {/* Settings & System */}
-                <NavGroup title="Settings" collapsed={collapsed}>
+                {/* System */}
+                <NavGroup title="System" collapsed={collapsed}>
                     {isSuperAdmin && (
                         <NavItem
                             href="/admin/audit"
