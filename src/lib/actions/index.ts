@@ -8,6 +8,7 @@
  *   // Import from specific domain (recommended)
  *   import { createActiveShift } from "@/lib/actions/shift";
  *   import { sendSMS } from "@/lib/actions/communication";
+ *   import { getUnifiedEntities } from "@/lib/actions/entity";
  *
  *   // Or import from main barrel (for backward compatibility)
  *   import { createActiveShift, sendSMS } from "@/lib/actions";
@@ -19,6 +20,7 @@
  *   - task: Shift & admin tasks
  *   - communication: SMS, notifications
  *   - affiliate: Affiliates, pricing, network
+ *   - entity: UNIFIED contacts & affiliates (new!)
  *   - operations: Fleet, drivers, confirmations
  *   - content: SOPs, notes, events
  *   - accounting: Quotes, accounting, hours
@@ -32,6 +34,7 @@ export * from "./scheduling";
 export * from "./task";
 export * from "./communication";
 export * from "./affiliate";
+export * from "./entity";
 export * from "./operations";
 export * from "./content";
 export * from "./accounting";
