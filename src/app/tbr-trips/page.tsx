@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getTbrTrips, getTbrDashboardStats } from "@/lib/tbrTripActions";
+import { getTbrTrips, getTbrDashboardStats } from "@/lib/domains/tbr";
 import TbrTripsClient from "./TbrTripsClient";
 
 export const metadata = {

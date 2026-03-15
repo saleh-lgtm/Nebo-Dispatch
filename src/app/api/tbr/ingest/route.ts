@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { processTbrIngest, IngestedTbrTrip } from "@/lib/tbrTripActions";
+import { processTbrIngest, type IngestedTbrTrip } from "@/lib/domains/tbr";
 import { sendSMS } from "@/lib/twilioActions";
 
 // Simple in-memory rate limiter

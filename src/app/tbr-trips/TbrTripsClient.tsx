@@ -20,7 +20,7 @@ import {
     ChevronRight,
     Loader2,
 } from "lucide-react";
-import { getTbrTrips, getTbrDashboardStats, updateLaReservationId, markPushFailed } from "@/lib/tbrTripActions";
+import { getTbrTrips, getTbrDashboardStats, updateLaReservationId, markPushFailed } from "@/lib/domains/tbr";
 import { getVehicleMapping } from "@/lib/vehicleMappingActions";
 import styles from "./TbrTrips.module.css";
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTbrDashboardStats, getTbrSyncLogs } from "@/lib/tbrTripActions";
+import { getTbrDashboardStats, getTbrSyncLogs } from "@/lib/domains/tbr";
 
 /**
  * POST /api/tbr/sync
