@@ -40,17 +40,13 @@ import {
 } from "@/lib/networkActions";
 import { useToast } from "@/hooks/useToast";
 import Modal from "@/components/ui/Modal";
-import AffiliatePricingGrid from "@/components/AffiliatePricingGrid";
-import AffiliateAttachments from "@/components/affiliates/AffiliateAttachments";
+import {
+    AffiliatePricingGrid,
+    AffiliateAttachments,
+    type PricingEntry,
+} from "@/components/affiliates";
 import PartnerForm from "./components/PartnerForm";
 import ContactBookView from "./components/ContactBookView";
-
-interface PricingEntry {
-    id: string;
-    serviceType: string;
-    flatRate: number;
-    notes: string | null;
-}
 
 interface AttachmentEntry {
     id: string;

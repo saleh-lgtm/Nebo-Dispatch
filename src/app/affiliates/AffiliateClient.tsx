@@ -27,17 +27,13 @@ import { submitAffiliate } from "@/lib/actions";
 import { approveAffiliate, rejectAffiliate, deleteAffiliate, updateAffiliate } from "@/lib/affiliateActions";
 import { useToast } from "@/hooks/useToast";
 import Modal from "@/components/ui/Modal";
-import AffiliatePricingGrid from "@/components/AffiliatePricingGrid";
-import AffiliateAttachments from "@/components/affiliates/AffiliateAttachments";
+import {
+    AffiliatePricingGrid,
+    AffiliateAttachments,
+    type PricingEntry,
+} from "@/components/affiliates";
 
 type AffiliateType = "FARM_IN" | "FARM_OUT";
-
-interface PricingEntry {
-    id: string;
-    serviceType: string;
-    flatRate: number;
-    notes: string | null;
-}
 
 interface AttachmentEntry {
     id: string;

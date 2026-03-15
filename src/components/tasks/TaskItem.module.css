@@ -1,0 +1,242 @@
+.item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.item:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.item.overdue {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.item.completed {
+  opacity: 0.7;
+}
+
+.main {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+}
+
+.checkbox {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  border-radius: 8px;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.6));
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.checkbox:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary, #ffffff);
+}
+
+.checkbox:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.checked {
+  color: #22c55e;
+}
+
+.spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary, #ffffff);
+}
+
+.titleCompleted {
+  text-decoration: line-through;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.6));
+}
+
+.priority {
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.high {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.medium {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+}
+
+.normal {
+  background: rgba(107, 114, 128, 0.15);
+  color: #9ca3af;
+}
+
+.description {
+  font-size: 0.8rem;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.6));
+  margin: 0 0 0.5rem 0;
+  line-height: 1.4;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.due,
+.completedBadge,
+.from {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.6));
+}
+
+.due {
+  color: #60a5fa;
+}
+
+.dueOverdue {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.completedBadge {
+  color: #4ade80;
+}
+
+.expandBtn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.5));
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.expandBtn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary, #ffffff);
+}
+
+.expand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.notesWrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.5));
+}
+
+.notesInput {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-primary, #ffffff);
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.notesInput::placeholder {
+  color: var(--text-secondary, rgba(255, 255, 255, 0.4));
+}
+
+.completeBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.875rem;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 6px;
+  color: #4ade80;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.completeBtn:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.25);
+}
+
+.completeBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.completionNotes {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(34, 197, 94, 0.05);
+  font-size: 0.8rem;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+}
+
+.completionNotes svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #4ade80;
+}
