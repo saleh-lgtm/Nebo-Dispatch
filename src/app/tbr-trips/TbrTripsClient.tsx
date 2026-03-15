@@ -290,12 +290,22 @@ export default function TbrTripsClient({ initialTrips, totalTrips, stats: initia
                 return;
             }
 
+            // Parse name into first and last name
+            const nameParts = pushData.passengerName.trim().split(/\s+/);
+            const firstName = nameParts[0] || "";
+            const lastName = nameParts.slice(1).join(" ") || nameParts[0] || "";
+
             const response = await fetch(webhookUrl, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     tbrTripId: selectedTrip.tbrTripId,
                     neboTripId: selectedTrip.id,
+                    firstName: firstName,
+                    lastName: lastName,
+                    passengerPhone: selectedTrip.passengerPhone || "",
+                    passengerEmail: selectedTrip.passengerEmail || "",
+                    billingContactId: "30019",
                     ...pushData,
                 }),
             });

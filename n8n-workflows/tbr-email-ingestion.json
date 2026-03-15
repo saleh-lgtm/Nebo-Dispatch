@@ -1,0 +1,354 @@
+{
+  "name": "TBR Email Ingestion (with PDF)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "tbr-email-ingest",
+        "responseMode": "responseNode",
+        "options": {
+          "binaryData": true,
+          "rawBody": true
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook - TBR Email",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "tbr-email-ingest"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract email data and PDF attachments\nconst input = $input.first().json;\n\n// Get email body\nconst body = input.body?.plain || input.body?.html || input.plain || input.html || input.text || input.Text || input.body || '';\nconst from = input.from || input.From || input.envelope?.from || '';\nconst subject = input.subject || input.Subject || '';\n\n// Get attachments (PDF)\nlet pdfBase64 = null;\nlet pdfFilename = null;\n\n// Check for attachments in various formats\nconst attachments = input.attachments || input.Attachments || [];\n\nfor (const att of attachments) {\n  const filename = att.filename || att.name || att.fileName || '';\n  const contentType = att.contentType || att.type || att.mimeType || '';\n  \n  if (filename.toLowerCase().endsWith('.pdf') || contentType.includes('pdf')) {\n    pdfBase64 = att.content || att.data || att.base64 || null;\n    pdfFilename = filename;\n    break;\n  }\n}\n\n// Also check binary data from webhook\nconst binary = $input.first().binary;\nif (!pdfBase64 && binary) {\n  for (const key of Object.keys(binary)) {\n    const binaryData = binary[key];\n    if (binaryData.mimeType?.includes('pdf') || binaryData.fileName?.endsWith('.pdf')) {\n      pdfBase64 = binaryData.data;\n      pdfFilename = binaryData.fileName;\n      break;\n    }\n  }\n}\n\nreturn [{\n  json: {\n    body,\n    from,\n    subject,\n    hasPdf: !!pdfBase64,\n    pdfFilename,\n    pdfBase64\n  }\n}];"
+      },
+      "id": "extract-email-data",
+      "name": "Extract Email + PDF",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-body",
+              "leftValue": "={{ $json.body }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "has-content",
+      "name": "Has Content?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 4096,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"text\",\n          \"text\": \"Extract all trip details from this TBR Global email and PDF attachment. Return a JSON array of trips.\\n\\nFor each trip, extract:\\n- tbrTripId: The trip/booking ID from TBR (like 12-6298294)\\n- status: Trip status (Confirmed, Pending, Cancelled, Modified) - assume Confirmed if new job\\n- passengerName: Full passenger name\\n- passengerPhone: Phone number if available\\n- passengerEmail: Email if available\\n- passengerCount: Number of passengers (default 1)\\n- pickupDatetime: Pickup date and time in ISO format (YYYY-MM-DDTHH:MM:SS)\\n- pickupAddress: Full pickup address with city, state\\n- dropoffAddress: Full dropoff address with city, state\\n- vehicleType: Type of vehicle (SUV, Sedan, etc.)\\n- flightNumber: Flight number if available\\n- notes: Any special instructions or notes\\n- fareAmount: Trip fare/price if shown (number only)\\n\\nReturn ONLY valid JSON array, no explanation. Example:\\n[{\\\"tbrTripId\\\": \\\"12-6298294\\\", \\\"status\\\": \\\"Confirmed\\\", ...}]\\n\\nEmail subject: {{ $json.subject }}\\n\\nEmail body:\\n{{ $json.body }}\\n\\n{{ $json.hasPdf ? 'PDF attachment content is provided as an image below.' : 'No PDF attached.' }}\"\n        }{{ $json.hasPdf ? ',\\n        {\\n          \"type\": \"image\",\\n          \"source\": {\\n            \"type\": \"base64\",\\n            \"media_type\": \"application/pdf\",\\n            \"data\": \"' + $json.pdfBase64 + '\"\\n          }\\n        }' : '' }}\n      ]\n    }\n  ]\n}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "ai-extract-trips",
+      "name": "AI - Extract Trips (with PDF)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "anthropic-header-auth",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const aiResponse = $input.first().json;\n\n// Parse the AI response from Claude API\nlet trips = [];\ntry {\n  // Claude API returns: { content: [{ type: 'text', text: '...' }] }\n  let content = '';\n  \n  if (aiResponse.content && Array.isArray(aiResponse.content)) {\n    // Find the text content block\n    const textBlock = aiResponse.content.find(c => c.type === 'text');\n    content = textBlock?.text || '';\n  } else if (typeof aiResponse.content === 'string') {\n    content = aiResponse.content;\n  } else if (aiResponse.message?.content) {\n    content = aiResponse.message.content;\n  } else if (aiResponse.text) {\n    content = aiResponse.text;\n  }\n  \n  // Remove markdown code blocks if present\n  content = content.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  \n  // Parse JSON\n  trips = JSON.parse(content);\n  \n  if (!Array.isArray(trips)) {\n    trips = [trips];\n  }\n  \n  // Validate and clean up each trip\n  trips = trips.map(t => ({\n    tbrTripId: t.tbrTripId || 'UNKNOWN',\n    status: t.status || 'Confirmed',\n    passengerName: t.passengerName || 'Unknown',\n    passengerPhone: t.passengerPhone || null,\n    passengerEmail: t.passengerEmail || null,\n    passengerCount: t.passengerCount || 1,\n    pickupDatetime: t.pickupDatetime,\n    pickupAddress: t.pickupAddress || '',\n    dropoffAddress: t.dropoffAddress || '',\n    vehicleType: t.vehicleType || 'Sedan',\n    flightNumber: t.flightNumber || null,\n    notes: t.notes || null,\n    fareAmount: typeof t.fareAmount === 'number' ? t.fareAmount : null\n  }));\n  \n} catch (e) {\n  console.log('Failed to parse AI response:', e.message);\n  console.log('Raw response:', JSON.stringify(aiResponse).substring(0, 500));\n  trips = [];\n}\n\nconsole.log(`Extracted ${trips.length} trips from TBR email`);\n\nreturn [{ \n  json: { \n    trips,\n    source: 'tbr-email',\n    extractedAt: new Date().toISOString()\n  } \n}];"
+      },
+      "id": "parse-ai-response",
+      "name": "Parse AI Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-trips",
+              "leftValue": "={{ $json.trips.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "has-trips",
+      "name": "Has Trips?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1340, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://neboops.com/api/tbr/ingest",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-tbr-ingest-secret",
+              "value": "={{ $env.TBR_INGEST_SECRET }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "save-to-nebo",
+      "name": "Save to Nebo DB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 100]
+    },
+    {
+      "parameters": {
+        "content": "## TODO: Push to LimoAnywhere\n\nThis node will push trips to LimoAnywhere.\n\nOptions:\n1. LA API (if available)\n2. LA email intake\n\nNeed LA API credentials or email format to complete this step.",
+        "height": 180,
+        "width": 300
+      },
+      "id": "la-todo",
+      "name": "TODO - LimoAnywhere",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"TBR email processed\",\n  \"tripsExtracted\": {{ $json.trips?.length || 0 }}\n}",
+        "options": {}
+      },
+      "id": "respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1780, 100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": true,\n  \"message\": \"No trips found in email\",\n  \"tripsExtracted\": 0\n}",
+        "options": {}
+      },
+      "id": "respond-no-trips",
+      "name": "Respond - No Trips",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1560, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": false,\n  \"error\": \"No email body content\"\n}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "respond-error",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "channel": "#dispatch-alerts",
+        "text": "=:email: *TBR Email Processed*\n\nFrom: {{ $('Extract Email Data').item.json.from }}\nSubject: {{ $('Extract Email Data').item.json.subject }}\n\nTrips Extracted: {{ $json.trips?.length || 0 }}\nSaved to Nebo: {{ $('Save to Nebo DB').item.json.created || 0 }} new",
+        "otherOptions": {}
+      },
+      "id": "slack-notification",
+      "name": "Slack - Notify",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1780, -20],
+      "credentials": {
+        "slackApi": {
+          "id": "slack-nebo",
+          "name": "Slack Nebo"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## TBR Email Ingestion (with PDF)\n\n### Flow:\n1. **Webhook** receives email + PDF from Cloudflare\n2. **Extract** gets email body + PDF attachment (base64)\n3. **AI** Claude reads email + PDF together\n4. **Parse** converts AI response to JSON trips\n5. **Save** trips to Nebo database\n6. **TODO** Push to LimoAnywhere\n7. **Notify** via Slack\n\n### Setup Required:\n\n1. **HTTP Header Auth credential**:\n   - Name: `Anthropic API Key`\n   - Header: `x-api-key`\n   - Value: Your Anthropic API key (sk-ant-...)\n\n2. **Environment variable**: TBR_INGEST_SECRET\n\n3. **Cloudflare Email Routing**:\n   - Add address: tbr@neboops.com\n   - Route to Worker that forwards email + attachments\n\n4. **Slack credential** (optional)\n\n### Webhook URL:\n`https://neborides.app.n8n.cloud/webhook/tbr-email-ingest`\n\n### Cloudflare Worker must send:\n```json\n{\n  \"from\": \"sender@email.com\",\n  \"subject\": \"...\",\n  \"body\": \"email text\",\n  \"attachments\": [{\n    \"filename\": \"trip.pdf\",\n    \"contentType\": \"application/pdf\",\n    \"content\": \"base64-encoded-pdf\"\n  }]\n}\n```",
+        "height": 620,
+        "width": 400
+      },
+      "id": "sticky-note",
+      "name": "Setup Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [180, 480]
+    }
+  ],
+  "connections": {
+    "Webhook - TBR Email": {
+      "main": [
+        [
+          {
+            "node": "Extract Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Email Data": {
+      "main": [
+        [
+          {
+            "node": "Has Content?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Content?": {
+      "main": [
+        [
+          {
+            "node": "AI - Extract Trips",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI - Extract Trips": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [
+          {
+            "node": "Has Trips?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Trips?": {
+      "main": [
+        [
+          {
+            "node": "Save to Nebo DB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond - No Trips",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Nebo DB": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Slack - Notify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "tbr"
+    },
+    {
+      "name": "email"
+    }
+  ]
+}
