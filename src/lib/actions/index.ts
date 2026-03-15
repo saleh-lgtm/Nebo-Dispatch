@@ -34,7 +34,78 @@ export * from "./scheduling";
 export * from "./task";
 export * from "./communication";
 export * from "./affiliate";
-export * from "./entity";
+
+// Entity module - exclude conflicting exports that exist in communication
+// (smsContactActions exports getContacts/updateContact for SMS contacts,
+//  contactActions exports getContacts/updateContact for regular contacts)
+export {
+  // Type exports
+  type EntityType,
+  type AffiliateSubType,
+  type UnifiedApprovalStatus,
+  type EntityTag,
+  type EntitySmsStats,
+  type ContactMetadata,
+  type AffiliateMetadata,
+  type QuoteMetadata,
+  type EntityMetadata,
+  type UnifiedEntity,
+  type UnifiedEntityQuery,
+  type UnifiedEntityResult,
+  type CreateUnifiedEntityData,
+  type UpdateUnifiedEntityData,
+  type UnifiedEntityStats,
+  type BlastSmsRecipient,
+  type BlastSmsPreview,
+  // Type guards
+  isContactMetadata,
+  isAffiliateMetadata,
+  isQuoteMetadata,
+  parseEntityId,
+  createEntityId,
+  // Service functions
+  getUnifiedEntities,
+  getUnifiedEntity,
+  getUnifiedEntityStats,
+  createUnifiedEntity,
+  updateUnifiedEntity,
+  deleteUnifiedEntity,
+  approveUnifiedEntity,
+  rejectUnifiedEntity,
+  getEntityTags,
+  assignTagsToUnifiedEntity,
+  previewBlastSmsRecipients,
+  getEntitiesForBlastSms,
+  // Contact actions (renamed to avoid conflict with SMS contacts)
+  getContacts as getContactEntities,
+  getAllContacts,
+  getPendingContacts,
+  getMyContacts,
+  createContact,
+  updateContact as updateContactEntity,
+  deleteContact,
+  approveContact,
+  rejectContact,
+  getContactsWithTags,
+  getAllContactsWithTags,
+  getContactsByTagFilter,
+  // Tag actions
+  getTags,
+  getTag,
+  createTag,
+  updateTag,
+  deleteTag,
+  assignTagsToContact,
+  addTagToContact,
+  removeTagFromContact,
+  getContactsByTags,
+  // Blast SMS
+  previewBlastSMS,
+  sendBlastSMS,
+  getBlastSMSHistory,
+  getBlastSMSStats,
+} from "./entity";
+
 export * from "./operations";
 export * from "./content";
 export * from "./accounting";
