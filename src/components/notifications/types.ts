@@ -5,6 +5,9 @@ import {
   BookOpen,
   AlertCircle,
   Bell,
+  RefreshCw,
+  CheckCircle,
+  XCircle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -31,6 +34,7 @@ export interface NotificationIconConfig {
  * Icon configuration by notification type
  */
 export const NOTIFICATION_ICONS: Record<string, NotificationIconConfig> = {
+  // Shift related
   SHIFT_REMINDER: {
     icon: Clock,
     color: "#3b82f6",
@@ -41,11 +45,66 @@ export const NOTIFICATION_ICONS: Record<string, NotificationIconConfig> = {
     color: "#f59e0b",
     bg: "rgba(245, 158, 11, 0.15)",
   },
+  SCHEDULE_PUBLISHED: {
+    icon: Clock,
+    color: "#3b82f6",
+    bg: "rgba(59, 130, 246, 0.15)",
+  },
+
+  // Shift swap related
+  SHIFT_SWAP_REQUEST: {
+    icon: RefreshCw,
+    color: "#f59e0b",
+    bg: "rgba(245, 158, 11, 0.15)",
+  },
+  SHIFT_SWAP_RESPONSE: {
+    icon: RefreshCw,
+    color: "#3b82f6",
+    bg: "rgba(59, 130, 246, 0.15)",
+  },
+  SHIFT_SWAP_APPROVED: {
+    icon: CheckCircle,
+    color: "#22c55e",
+    bg: "rgba(34, 197, 94, 0.15)",
+  },
+  SHIFT_SWAP_REJECTED: {
+    icon: XCircle,
+    color: "#ef4444",
+    bg: "rgba(239, 68, 68, 0.15)",
+  },
+
+  // Time off related
+  TIME_OFF_APPROVED: {
+    icon: CheckCircle,
+    color: "#22c55e",
+    bg: "rgba(34, 197, 94, 0.15)",
+  },
+  TIME_OFF_REJECTED: {
+    icon: XCircle,
+    color: "#ef4444",
+    bg: "rgba(239, 68, 68, 0.15)",
+  },
+
+  // Task related
   TASK_ASSIGNED: {
     icon: ClipboardList,
     color: "#22c55e",
     bg: "rgba(34, 197, 94, 0.15)",
   },
+  TASK_DUE_SOON: {
+    icon: ClipboardList,
+    color: "#f59e0b",
+    bg: "rgba(245, 158, 11, 0.15)",
+  },
+
+  // SOP related
+  SOP_REQUIRES_ACK: {
+    icon: BookOpen,
+    color: "#8b5cf6",
+    bg: "rgba(139, 92, 246, 0.15)",
+  },
+
+  // General
   ANNOUNCEMENT: {
     icon: BookOpen,
     color: "#8b5cf6",
