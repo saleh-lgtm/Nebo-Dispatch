@@ -1650,7 +1650,11 @@ model TbrTrip {
   // Trip Details
   pickupDatetime    DateTime
   pickupAddress     String         @db.Text
+  pickupLatitude    Float?         // Geocoded latitude
+  pickupLongitude   Float?         // Geocoded longitude
   dropoffAddress    String         @db.Text
+  dropoffLatitude   Float?         // Geocoded latitude
+  dropoffLongitude  Float?         // Geocoded longitude
   vehicleType       String?        // TBR vehicle type (e.g., "Executive Sedan")
   flightNumber      String?
   specialNotes      String?        @db.Text

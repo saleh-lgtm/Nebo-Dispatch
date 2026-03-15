@@ -291,11 +291,19 @@ export default function TbrTripsClient({ initialTrips, totalTrips, stats: initia
 
             const result = await response.json();
 
+            // Handle duplicate (already pushed)
+            if (response.status === 409) {
+                setPushError(`This trip was already pushed to LimoAnywhere. Reservation ID: ${result.reservationId}`);
+                await refreshData();
+                return;
+            }
+
             if (!response.ok) {
                 throw new Error(result.error || `Push failed: ${response.statusText}`);
             }
 
             console.log("Push to LA result:", result);
+            console.log("Geocoded:", result.geocoded);
 
             // Update trip with LA reservation ID
             await updateLaReservationId(
