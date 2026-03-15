@@ -268,34 +268,13 @@ export default function TbrTripsClient({ initialTrips, totalTrips, stats: initia
         setPushError(null);
 
         try {
-            // Call Zapier webhook via n8n (or direct if configured)
-            const webhookUrl = process.env.NEXT_PUBLIC_ZAPIER_LA_WEBHOOK_URL;
-
-            if (!webhookUrl) {
-                // Simulate success for now - in production this would call the actual webhook
-                // For demo purposes, we'll generate a fake LA reservation ID
-                const fakeReservationId = `LA-${Date.now().toString().slice(-6)}`;
-
-                await updateLaReservationId(
-                    selectedTrip.id,
-                    fakeReservationId,
-                    `CONF-${fakeReservationId}`
-                );
-
-                // Refresh data
-                await refreshData();
-
-                setShowPushModal(false);
-                setSelectedTrip(null);
-                return;
-            }
-
             // Parse name into first and last name
             const nameParts = pushData.passengerName.trim().split(/\s+/);
             const firstName = nameParts[0] || "";
             const lastName = nameParts.slice(1).join(" ") || nameParts[0] || "";
 
-            const response = await fetch(webhookUrl, {
+            // Call our proxy API to push to Zapier (avoids CORS issues)
+            const response = await fetch("/api/tbr/push-to-la", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -310,33 +289,19 @@ export default function TbrTripsClient({ initialTrips, totalTrips, stats: initia
                 }),
             });
 
+            const result = await response.json();
+
             if (!response.ok) {
-                throw new Error(`Push failed: ${response.statusText}`);
+                throw new Error(result.error || `Push failed: ${response.statusText}`);
             }
 
-            // Zapier returns various formats - try to parse, but don't require specific fields
-            let reservationId = `ZAP-${Date.now().toString().slice(-8)}`;
-            let confirmationCode = `CONF-${selectedTrip.tbrTripId}`;
-
-            try {
-                const result = await response.json();
-                // Use Zapier's response if it has reservation info
-                if (result.reservationId) reservationId = result.reservationId;
-                if (result.reservation_id) reservationId = result.reservation_id;
-                if (result.id) reservationId = result.id;
-                if (result.confirmationCode) confirmationCode = result.confirmationCode;
-                if (result.confirmation_code) confirmationCode = result.confirmation_code;
-                console.log("Zapier response:", result);
-            } catch {
-                // Zapier might return empty or non-JSON response - that's OK
-                console.log("Zapier acknowledged (no JSON body)");
-            }
+            console.log("Push to LA result:", result);
 
             // Update trip with LA reservation ID
             await updateLaReservationId(
                 selectedTrip.id,
-                reservationId,
-                confirmationCode
+                result.reservationId,
+                result.confirmationCode
             );
 
             // Refresh data
