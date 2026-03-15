@@ -112,11 +112,8 @@ export {
 } from "./actions";
 
 // ============================================
-// SERVICE EXPORTS (for advanced use/testing)
+// SERVICE EXPORTS
 // ============================================
-
-export {
-  // Service functions
-  queryQuotes,
-  getActiveShift,
-} from "./service";
+// NOTE: Service functions (queryQuotes, getActiveShift) are NOT exported
+// from the barrel to prevent client-side bundling of Prisma.
+// Import directly from "@/lib/domains/quotes/service" for server-side use only.

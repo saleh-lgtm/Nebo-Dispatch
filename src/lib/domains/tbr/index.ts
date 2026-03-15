@@ -103,13 +103,8 @@ export {
 } from "./actions";
 
 // ============================================
-// SERVICE EXPORTS (for advanced use/testing)
+// SERVICE EXPORTS
 // ============================================
-
-export {
-  // Business logic
-  mapTbrStatus,
-  requiresAlert,
-  isEligibleForPush,
-  buildWhereClause,
-} from "./service";
+// NOTE: Service functions (mapTbrStatus, requiresAlert, isEligibleForPush, buildWhereClause)
+// are NOT exported from the barrel to prevent client-side bundling of Prisma.
+// Import directly from "@/lib/domains/tbr/service" for server-side use only.
