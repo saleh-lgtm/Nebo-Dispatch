@@ -115,7 +115,7 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
             prisma.shift.count({
                 where: {
                     clockOut: null,
-                    clockIn: { not: null },
+                    NOT: { clockIn: null },
                 },
             }),
             prisma.shiftReport.count({ where: { status: "SUBMITTED" } }),
