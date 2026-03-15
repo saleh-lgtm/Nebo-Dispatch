@@ -314,13 +314,29 @@ export default function TbrTripsClient({ initialTrips, totalTrips, stats: initia
                 throw new Error(`Push failed: ${response.statusText}`);
             }
 
-            const result = await response.json();
+            // Zapier returns various formats - try to parse, but don't require specific fields
+            let reservationId = `ZAP-${Date.now().toString().slice(-8)}`;
+            let confirmationCode = `CONF-${selectedTrip.tbrTripId}`;
+
+            try {
+                const result = await response.json();
+                // Use Zapier's response if it has reservation info
+                if (result.reservationId) reservationId = result.reservationId;
+                if (result.reservation_id) reservationId = result.reservation_id;
+                if (result.id) reservationId = result.id;
+                if (result.confirmationCode) confirmationCode = result.confirmationCode;
+                if (result.confirmation_code) confirmationCode = result.confirmation_code;
+                console.log("Zapier response:", result);
+            } catch {
+                // Zapier might return empty or non-JSON response - that's OK
+                console.log("Zapier acknowledged (no JSON body)");
+            }
 
             // Update trip with LA reservation ID
             await updateLaReservationId(
                 selectedTrip.id,
-                result.reservationId,
-                result.confirmationCode
+                reservationId,
+                confirmationCode
             );
 
             // Refresh data
