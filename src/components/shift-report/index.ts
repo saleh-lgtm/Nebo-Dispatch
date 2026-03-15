@@ -10,3 +10,5 @@ export { default as NarrativeSection } from "./NarrativeSection";
 export { default as TasksChecklist } from "./TasksChecklist";
 export { default as QuotesSection } from "./QuotesSection";
 export type { QuoteFormData } from "./QuotesSection";
+export { default as AddQuoteModal } from "./AddQuoteModal";
+export type { QuoteFormData as AddQuoteFormData } from "./AddQuoteModal";
