@@ -265,6 +265,13 @@ export default function Sidebar({ user }: Props) {
                             />
                         )}
                         <NavItem
+                            href="/admin/dispatchers"
+                            icon={<Users size={18} />}
+                            label="Dispatchers"
+                            collapsed={collapsed}
+                            onClick={isMobile ? closeMobileMenu : undefined}
+                        />
+                        <NavItem
                             href="/admin/approvals"
                             icon={<UserPlus size={18} />}
                             label="Approvals"
