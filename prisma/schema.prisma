@@ -426,6 +426,8 @@ model TaskItem {
   template   TaskTemplate @relation(fields: [templateId], references: [id])
   content    String
   order      Int          @default(0)
+
+  @@index([templateId, order])
 }
 
 model ShiftTask {
@@ -454,6 +456,8 @@ model CourtReport {
   caseDetails String   @db.Text
   actionTaken String   @db.Text
   createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 model Schedule {
@@ -581,6 +585,10 @@ model SchedulingRequest {
   adminNotes String?  @db.Text
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([type, status])
+  @@index([createdAt])
 }
 
 model Task {
@@ -594,6 +602,10 @@ model Task {
   status      TaskStatus @default(PENDING)
   dueDate     DateTime?
   createdAt   DateTime   @default(now())
+
+  @@index([userId, status, createdAt])
+  @@index([adminId])
+  @@index([dueDate])
 }
 
 model GlobalNote {
@@ -1799,6 +1811,8 @@ model Portal {
   updatedAt   DateTime @updatedAt
   createdById String?
   createdBy   User?    @relation("PortalCreatedBy", fields: [createdById], references: [id])
+
+  @@index([isActive, sortOrder])
 }
 
 // Customer contacts directory
