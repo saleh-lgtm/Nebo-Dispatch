@@ -25,7 +25,7 @@ function formatPhoneE164(phone: string | null | undefined): string {
 /**
  * POST /api/tbr/push-to-la
  *
- * Push TBR trips to Google Sheet via Apps Script (for Zapier trigger)
+ * Push TBR trips to Google Sheet via Apps Script
  */
 export async function POST(request: NextRequest) {
     try {

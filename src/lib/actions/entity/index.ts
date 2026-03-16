@@ -146,10 +146,10 @@ export {
   getContactsByTags,
 } from "../../tagActions";
 
-// Re-export blast SMS actions
+// Re-export enhanced blast SMS actions
 export {
-  previewBlastSMS,
-  sendBlastSMS,
-  getBlastSMSHistory,
-  getBlastSMSStats,
+  getBlastRecipients,
+  previewEnhancedBlastSMS,
+  sendEnhancedBlastSMS,
+  getBlastTags,
 } from "../../blastSMSActions";

@@ -62,11 +62,9 @@ export {
 // ============================================
 
 export {
-  // Blast operations
-  previewBlastSMS,
-  sendBlastSMS,
-
-  // History & stats
-  getBlastSMSHistory,
-  getBlastSMSStats,
+  // Enhanced Blast operations
+  getBlastRecipients,
+  previewEnhancedBlastSMS,
+  sendEnhancedBlastSMS,
+  getBlastTags,
 } from "../../blastSMSActions";

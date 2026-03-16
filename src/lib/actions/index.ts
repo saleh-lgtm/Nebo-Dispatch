@@ -99,11 +99,11 @@ export {
   addTagToContact,
   removeTagFromContact,
   getContactsByTags,
-  // Blast SMS
-  previewBlastSMS,
-  sendBlastSMS,
-  getBlastSMSHistory,
-  getBlastSMSStats,
+  // Enhanced Blast SMS
+  getBlastRecipients,
+  previewEnhancedBlastSMS,
+  sendEnhancedBlastSMS,
+  getBlastTags,
 } from "./entity";
 
 export * from "./operations";
