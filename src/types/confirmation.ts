@@ -3,9 +3,15 @@
 import type { UserReference } from "./user";
 
 /**
- * Confirmation status
+ * Confirmation status — matches ConfirmationStatus enum in prisma/schema.prisma
  */
-export type ConfirmationStatus = "PENDING" | "CONFIRMED" | "FAILED" | "SKIPPED";
+export type ConfirmationStatus =
+    | "PENDING"      // Waiting for dispatcher to confirm
+    | "CONFIRMED"    // Driver confirmed
+    | "NO_ANSWER"    // Driver didn't answer
+    | "CANCELLED"    // Trip was cancelled
+    | "RESCHEDULED"  // Pickup time changed
+    | "EXPIRED";     // Confirmation window passed without action
 
 /**
  * Trip confirmation for dispatcher follow-up
@@ -17,7 +23,7 @@ export interface TripConfirmation {
     dueAt: Date | string;
     passengerName: string;
     driverName: string;
-    status: ConfirmationStatus | string;
+    status: ConfirmationStatus;
     completedAt: Date | string | null;
     completedBy: UserReference | null;
     notes?: string | null;
