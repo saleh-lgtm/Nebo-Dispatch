@@ -4,6 +4,27 @@ Permanent session history. Newest entries at top.
 
 ---
 
+### Session — 2026-03-16 ~Evening
+**Focus:** Server action hardening — 3 more files (54 functions): notesActions, sopActions, calendarExportActions
+**Changes:**
+- Modified: src/lib/notesActions.ts (14 functions hardened)
+- Modified: src/lib/sopActions.ts (35 functions hardened)
+- Modified: src/lib/calendarExportActions.ts (5 functions hardened)
+- Modified: src/lib/schemas.ts (~15 new Zod schemas: SOP, announcement, calendar, quiz)
+- Modified: 12 consumer files to handle new `{ success, data, error }` return shape:
+  - src/app/dashboard/page.tsx
+  - src/app/admin/notes/NotesClient.tsx, page.tsx
+  - src/app/admin/sops/SOPsAdminClient.tsx, page.tsx
+  - src/app/sops/page.tsx, SOPsClient.tsx, [slug]/page.tsx, [slug]/SOPDetailClient.tsx
+  - src/components/ShiftNotesCard.tsx
+  - src/app/schedule/ScheduleClient.tsx
+  - src/app/api/calendar/[userId]/route.ts
+- Commit: 01b3a28 fix: harden 3 server action files (23/45) — add Zod, try/catch, return shape
+**Decisions:** sopActions is the largest single file (35 functions) — all quiz, version, favorites, search, related SOPs wrapped
+**Issues Found:** SOPsAdminClient.tsx needed updates for new return shape (caught by TypeScript). All checks pass (TypeScript ✅, ESLint ✅, Build ✅)
+
+---
+
 ### Session — 2026-03-16 ~4pm
 **Focus:** Server action hardening — 10 more files (73 functions), Zod validation, try/catch, standard return shape
 **Changes:**
