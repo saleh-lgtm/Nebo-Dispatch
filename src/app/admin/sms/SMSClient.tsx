@@ -30,7 +30,7 @@ import {
 } from "@/lib/twilioActions";
 import ConversationList from "@/components/sms/ConversationList";
 import ChatView from "@/components/sms/ChatView";
-import BlastSMS from "@/components/sms/BlastSMS";
+import EnhancedBlastSMS from "@/components/sms/EnhancedBlastSMS";
 
 interface SMSLog {
     id: string;
@@ -582,7 +582,7 @@ export default function SMSClient({ initialLogs, totalLogs, initialStats }: Prop
             ) : activeTab === "blast" ? (
                 /* Blast SMS Tab */
                 <div className="blast-container">
-                    <BlastSMS />
+                    <EnhancedBlastSMS />
                 </div>
             ) : null}
 

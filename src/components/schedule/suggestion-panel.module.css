@@ -1,0 +1,235 @@
+.panel {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+}
+
+.title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.headerActions {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.refreshBtn,
+.collapseBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all 0.15s;
+}
+
+.refreshBtn:hover,
+.collapseBtn:hover {
+    background: var(--bg-hover);
+    color: var(--text);
+}
+
+.refreshBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.spinning {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.content {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.loading,
+.empty {
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+.section {
+    padding: 0.5rem;
+}
+
+.sectionTitle {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 0.25rem 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.item {
+    padding: 0.75rem;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    border-left: 3px solid;
+}
+
+.item.high {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: var(--error, #ef4444);
+}
+
+.item.medium {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: var(--warning, #f59e0b);
+}
+
+.item.low {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: var(--info, #3b82f6);
+}
+
+.itemHeader {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.375rem;
+}
+
+.iconHigh {
+    color: var(--error, #ef4444);
+}
+
+.iconMedium {
+    color: var(--warning, #f59e0b);
+}
+
+.iconLow {
+    color: var(--info, #3b82f6);
+}
+
+.typeLabel {
+    font-size: 0.625rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    flex: 1;
+}
+
+.dismissBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--text-muted);
+    opacity: 0.5;
+    transition: all 0.15s;
+}
+
+.dismissBtn:hover {
+    opacity: 1;
+    background: var(--bg-secondary);
+}
+
+.message {
+    font-size: 0.8125rem;
+    margin: 0 0 0.5rem 0;
+    line-height: 1.4;
+}
+
+.actionInfo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border);
+}
+
+.actionDetail {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.applyBtn {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.375rem 0.625rem;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.applyBtn:hover {
+    background: var(--primary-dark);
+}
+
+/* Collapsed state */
+.collapsedBtn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.875rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: var(--text);
+    transition: all 0.15s;
+}
+
+.collapsedBtn:hover {
+    background: var(--bg-secondary);
+}
+
+.badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 6px;
+    background: var(--primary);
+    color: white;
+    border-radius: 9px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+}

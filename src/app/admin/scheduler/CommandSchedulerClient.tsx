@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useCallback, useMemo } from "react";
+import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import {
     ChevronLeft,
     ChevronRight,
@@ -14,6 +14,7 @@ import {
     GripVertical,
     Radar,
     Copy,
+    Loader2,
 } from "lucide-react";
 import {
     createScheduleBlock,
@@ -25,6 +26,7 @@ import {
     copyPreviousWeekSchedules,
 } from "@/lib/schedulerActions";
 import { useToastContext } from "@/components/ui/ToastProvider";
+import { useRealtimeSchedule } from "@/hooks/useRealtimeSchedule";
 import "./scheduler-command.css";
 
 // Types
@@ -60,7 +62,7 @@ interface ShiftBlock {
 const DAYS_IN_WEEK = 7;
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAY_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const SHIFT_START = 23;
+const SHIFT_START = 0; // Start at 12am (midnight)
 const COMPANY_TIMEZONE = "America/Chicago";
 
 // Command Center color palette - vibrant, glowing colors
@@ -344,8 +346,52 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
     const [ghostPosition, setGhostPosition] = useState({ x: 0, y: 0 });
     const [highlightCell, setHighlightCell] = useState<{ day: number; hour: number } | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [isNavigating, setIsNavigating] = useState(false);
+    const [actionInProgress, setActionInProgress] = useState<string | null>(null); // Tracks shift ID being modified
+    const [focusedCell, setFocusedCell] = useState<{ day: number; hour: number } | null>(null);
 
     const gridRef = useRef<HTMLDivElement>(null);
+
+    // Keyboard navigation handler for grid cells
+    const handleCellKeyDown = useCallback((e: React.KeyboardEvent, day: number, hour: number) => {
+        const hourIndex = GRID_HOURS.indexOf(hour);
+        let newDay = day;
+        let newHourIndex = hourIndex;
+
+        switch (e.key) {
+            case "ArrowUp":
+                e.preventDefault();
+                newHourIndex = Math.max(0, hourIndex - 1);
+                break;
+            case "ArrowDown":
+                e.preventDefault();
+                newHourIndex = Math.min(23, hourIndex + 1);
+                break;
+            case "ArrowLeft":
+                e.preventDefault();
+                newDay = Math.max(0, day - 1);
+                break;
+            case "ArrowRight":
+                e.preventDefault();
+                newDay = Math.min(6, day + 1);
+                break;
+            case "Enter":
+            case " ":
+                e.preventDefault();
+                // Could trigger shift creation here if dispatcher selected
+                break;
+            default:
+                return;
+        }
+
+        const newHour = GRID_HOURS[newHourIndex];
+        setFocusedCell({ day: newDay, hour: newHour });
+
+        // Focus the new cell
+        const cellId = `cell-${newDay}-${newHour}`;
+        const cell = document.getElementById(cellId);
+        cell?.focus();
+    }, []);
 
     const overlapPositions = useMemo(() => calculateOverlapPositions(shifts), [shifts]);
 
@@ -364,24 +410,50 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
         setIsPublished(schedules.some((s) => s.isPublished));
     }, [dispatchers]);
 
+    // Real-time schedule updates - reload when changes detected from other sessions
+    const handleRealtimeChange = useCallback(() => {
+        loadWeekSchedules(weekStart);
+    }, [loadWeekSchedules, weekStart]);
+
+    useRealtimeSchedule({
+        weekStart,
+        onAnyChange: handleRealtimeChange,
+        enabled: true,
+    });
+
     const goToPrevWeek = async () => {
-        const newWeek = new Date(weekStart);
-        newWeek.setUTCDate(newWeek.getUTCDate() - 7);
-        setWeekStart(newWeek);
-        await loadWeekSchedules(newWeek);
+        setIsNavigating(true);
+        try {
+            const newWeek = new Date(weekStart);
+            newWeek.setUTCDate(newWeek.getUTCDate() - 7);
+            setWeekStart(newWeek);
+            await loadWeekSchedules(newWeek);
+        } finally {
+            setIsNavigating(false);
+        }
     };
 
     const goToNextWeek = async () => {
-        const newWeek = new Date(weekStart);
-        newWeek.setUTCDate(newWeek.getUTCDate() + 7);
-        setWeekStart(newWeek);
-        await loadWeekSchedules(newWeek);
+        setIsNavigating(true);
+        try {
+            const newWeek = new Date(weekStart);
+            newWeek.setUTCDate(newWeek.getUTCDate() + 7);
+            setWeekStart(newWeek);
+            await loadWeekSchedules(newWeek);
+        } finally {
+            setIsNavigating(false);
+        }
     };
 
     const goToToday = async () => {
-        const newWeek = getWeekStart(new Date());
-        setWeekStart(newWeek);
-        await loadWeekSchedules(newWeek);
+        setIsNavigating(true);
+        try {
+            const newWeek = getWeekStart(new Date());
+            setWeekStart(newWeek);
+            await loadWeekSchedules(newWeek);
+        } finally {
+            setIsNavigating(false);
+        }
     };
 
     const formatWeekRange = () => {
@@ -554,11 +626,16 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
     };
 
     const handleDeleteShift = async (shiftId: string) => {
-        const result = await deleteScheduleBlock(shiftId);
-        if (result.success) {
-            setShifts((prev) => prev.filter((s) => s.id !== shiftId));
-        } else {
-            addToast(result.error || "Failed to delete shift", "error");
+        setActionInProgress(shiftId);
+        try {
+            const result = await deleteScheduleBlock(shiftId);
+            if (result.success) {
+                setShifts((prev) => prev.filter((s) => s.id !== shiftId));
+            } else {
+                addToast(result.error || "Failed to delete shift", "error");
+            }
+        } finally {
+            setActionInProgress(null);
         }
     };
 
@@ -674,18 +751,18 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                 </div>
 
                 <div className="cmd-header__nav">
-                    <button onClick={goToPrevWeek} className="cmd-nav-btn">
-                        <ChevronLeft size={18} />
+                    <button onClick={goToPrevWeek} className="cmd-nav-btn" disabled={isNavigating}>
+                        {isNavigating ? <Loader2 size={18} className="cmd-spin" /> : <ChevronLeft size={18} />}
                     </button>
                     <div className="cmd-week-display">
                         <span className="cmd-week-display__label">Week</span>
                         <span className="cmd-week-display__range">{formatWeekRange()}</span>
                     </div>
-                    <button onClick={goToNextWeek} className="cmd-nav-btn">
-                        <ChevronRight size={18} />
+                    <button onClick={goToNextWeek} className="cmd-nav-btn" disabled={isNavigating}>
+                        {isNavigating ? <Loader2 size={18} className="cmd-spin" /> : <ChevronRight size={18} />}
                     </button>
-                    <button onClick={goToToday} className="cmd-today-btn">
-                        Today
+                    <button onClick={goToToday} className="cmd-today-btn" disabled={isNavigating}>
+                        {isNavigating ? "Loading..." : "Today"}
                     </button>
                 </div>
 
@@ -828,11 +905,20 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
 
                 {/* Grid Container */}
                 <div className="cmd-grid-container">
+                    {isNavigating && (
+                        <div className="cmd-grid-loading">
+                            <Loader2 size={32} className="cmd-spin cmd-grid-loading__spinner" />
+                        </div>
+                    )}
                     <div className="cmd-grid-wrapper" ref={gridRef}>
-                        <div className="cmd-grid">
+                        <div
+                            className="cmd-grid"
+                            role="grid"
+                            aria-label="Weekly schedule grid - drag dispatchers to create shifts"
+                        >
                             {/* Corner */}
-                            <div className="cmd-grid__corner">
-                                <Clock size={16} className="cmd-grid__corner-icon" />
+                            <div className="cmd-grid__corner" role="presentation">
+                                <Clock size={16} className="cmd-grid__corner-icon" aria-hidden="true" />
                             </div>
 
                             {/* Day Headers */}
@@ -843,6 +929,8 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                                     <div
                                         key={day}
                                         className={`cmd-day-header ${today ? 'cmd-day-header--today' : ''}`}
+                                        role="columnheader"
+                                        aria-label={`${DAY_FULL[i]}, ${date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}`}
                                     >
                                         <span className="cmd-day-header__name">{day}</span>
                                         <span className="cmd-day-header__date">{date.getUTCDate()}</span>
@@ -851,20 +939,28 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                             })}
 
                             {/* Time labels and cells */}
-                            {GRID_HOURS.map((hour) => (
+                            {GRID_HOURS.map((hour, rowIndex) => (
                                 <React.Fragment key={`row-${hour}`}>
                                     <div
                                         className={`cmd-time-label ${hour === 23 || hour === 7 || hour === 15 ? 'cmd-time-label--shift-start' : ''}`}
+                                        role="rowheader"
+                                        aria-label={formatHourFull(hour)}
                                     >
                                         {formatHour(hour)}
                                     </div>
 
                                     {Array.from({ length: DAYS_IN_WEEK }).map((_, dayIndex) => (
                                         <div
+                                            id={`cell-${dayIndex}-${hour}`}
                                             key={`cell-${dayIndex}-${hour}`}
-                                            className={`cmd-cell ${hour === 23 || hour === 7 || hour === 15 ? 'cmd-cell--shift-boundary' : ''} ${highlightCell?.day === dayIndex && highlightCell?.hour === hour ? 'cmd-cell--highlight' : ''}`}
+                                            className={`cmd-cell ${hour === 23 || hour === 7 || hour === 15 ? 'cmd-cell--shift-boundary' : ''} ${highlightCell?.day === dayIndex && highlightCell?.hour === hour ? 'cmd-cell--highlight' : ''} ${focusedCell?.day === dayIndex && focusedCell?.hour === hour ? 'cmd-cell--focused' : ''}`}
+                                            role="gridcell"
+                                            tabIndex={rowIndex === 0 && dayIndex === 0 ? 0 : -1}
+                                            aria-label={`${DAY_FULL[dayIndex]} at ${formatHourFull(hour)}. Press Enter to create shift.`}
                                             onDragOver={(e) => handleCellDragOver(dayIndex, hour, e)}
                                             onDrop={() => handleCellDrop(dayIndex, hour)}
+                                            onKeyDown={(e) => handleCellKeyDown(e, dayIndex, hour)}
+                                            onFocus={() => setFocusedCell({ day: dayIndex, hour })}
                                         />
                                     ))}
                                 </React.Fragment>
@@ -891,15 +987,20 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                                 const height = shift.duration * 28;
                                 const hasOverlap = overlapTotal > 1;
 
+                                const isBeingDeleted = actionInProgress === shift.id;
                                 const classNames = ["cmd-shift"];
                                 if (shift.isCrossMidnight) classNames.push("cmd-shift--cross-midnight");
                                 if (shift.isContinuation) classNames.push("cmd-shift--continuation");
                                 if (hasOverlap) classNames.push("cmd-shift--overlap");
+                                if (isBeingDeleted) classNames.push("cmd-shift--deleting");
 
                                 return (
                                     <div
                                         key={shift.id}
                                         className={classNames.join(" ")}
+                                        role="button"
+                                        tabIndex={0}
+                                        aria-label={`${shift.dispatcherName}'s shift on ${DAY_FULL[shift.day]}, ${formatHourFull(shift.startHour)} to ${formatHourFull(shift.startHour + shift.duration)}, ${shift.duration} hours${shift.isPublished ? ', published' : ', draft'}. Drag to move.`}
                                         style={{
                                             '--shift-color': shift.color,
                                             top: `${top}px`,
@@ -908,23 +1009,30 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                                             height: `${height}px`,
                                             color: getContrastColor(shift.color),
                                         } as React.CSSProperties}
-                                        draggable={!shift.isContinuation}
+                                        draggable={!shift.isContinuation && !isBeingDeleted}
                                         onDragStart={(e) => !shift.isContinuation && handleShiftDragStart(shift, e)}
                                         onDragEnd={handleDragEnd}
                                     >
-                                        <span className="cmd-shift__name">{shift.dispatcherName}</span>
-                                        <span className="cmd-shift__time">
-                                            {formatHourFull(shift.startHour)} – {formatHourFull(shift.startHour + shift.duration)}
-                                        </span>
-                                        {!shift.isContinuation && (
+                                        {isBeingDeleted ? (
+                                            <Loader2 size={16} className="cmd-spin cmd-shift__loader" />
+                                        ) : (
+                                            <>
+                                                <span className="cmd-shift__name">{shift.dispatcherName}</span>
+                                                <span className="cmd-shift__time">
+                                                    {formatHourFull(shift.startHour)} – {formatHourFull(shift.startHour + shift.duration)}
+                                                </span>
+                                            </>
+                                        )}
+                                        {!shift.isContinuation && !isBeingDeleted && (
                                             <button
                                                 className="cmd-shift__delete"
+                                                aria-label={`Delete ${shift.dispatcherName}'s shift`}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     handleDeleteShift(shift.id);
                                                 }}
                                             >
-                                                <X size={10} />
+                                                <X size={10} aria-hidden="true" />
                                             </button>
                                         )}
                                     </div>

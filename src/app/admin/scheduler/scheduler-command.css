@@ -750,6 +750,18 @@
     box-shadow: inset 0 0 0 1px var(--cmd-cyan);
 }
 
+.cmd-cell--focused,
+.cmd-cell:focus {
+    outline: 2px solid var(--cmd-cyan);
+    outline-offset: -2px;
+    background: rgba(0, 240, 255, 0.05);
+}
+
+.cmd-cell:focus-visible {
+    outline: 2px solid var(--cmd-cyan);
+    outline-offset: -2px;
+}
+
 .cmd-cell--shift-boundary {
     border-top: 1px solid rgba(0, 240, 255, 0.12);
 }
@@ -964,4 +976,66 @@
         width: 100%;
         justify-content: center;
     }
+}
+
+/* ============================================
+   LOADING STATES
+   ============================================ */
+
+/* Spin animation for loading indicators */
+@keyframes cmd-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.cmd-spin {
+    animation: cmd-spin 1s linear infinite;
+}
+
+/* Navigation button disabled state */
+.cmd-nav-btn:disabled,
+.cmd-today-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Shift being deleted */
+.cmd-shift--deleting {
+    opacity: 0.5;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cmd-shift__loader {
+    color: inherit;
+}
+
+/* Grid loading overlay */
+.cmd-grid-loading {
+    position: absolute;
+    inset: 0;
+    background: rgba(5, 7, 10, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(2px);
+}
+
+.cmd-grid-loading__spinner {
+    color: var(--cmd-cyan);
+    width: 32px;
+    height: 32px;
+}
+
+/* Button loading states */
+.cmd-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.cmd-btn--ghost:disabled {
+    opacity: 0.5;
 }

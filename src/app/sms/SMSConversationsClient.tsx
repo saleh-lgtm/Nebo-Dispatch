@@ -10,6 +10,7 @@ import {
     Plus,
     Wifi,
     WifiOff,
+    Users,
 } from "lucide-react";
 import {
     getConversations,
@@ -18,7 +19,10 @@ import {
 } from "@/lib/twilioActions";
 import ConversationList from "@/components/sms/ConversationList";
 import ChatView from "@/components/sms/ChatView";
+import EnhancedBlastSMS from "@/components/sms/EnhancedBlastSMS";
 import { useRealtimeSMS } from "@/hooks/useRealtimeSMS";
+
+type TabType = "conversations" | "blast";
 
 interface SMSLog {
     id: string;
@@ -40,6 +44,7 @@ interface Conversation {
 }
 
 export default function SMSConversationsClient() {
+    const [activeTab, setActiveTab] = useState<TabType>("conversations");
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
     const [conversationMessages, setConversationMessages] = useState<SMSLog[]>([]);
@@ -234,7 +239,26 @@ export default function SMSConversationsClient() {
                 </div>
             </header>
 
-            {/* Conversations Container */}
+            {/* Tabs */}
+            <div className="tabs">
+                <button
+                    className={`tab ${activeTab === "conversations" ? "active" : ""}`}
+                    onClick={() => setActiveTab("conversations")}
+                >
+                    <MessageCircle size={16} />
+                    Conversations
+                </button>
+                <button
+                    className={`tab ${activeTab === "blast" ? "active" : ""}`}
+                    onClick={() => setActiveTab("blast")}
+                >
+                    <Users size={16} />
+                    Blast SMS
+                </button>
+            </div>
+
+            {activeTab === "conversations" ? (
+            /* Conversations Container */
             <div className="conversations-container">
                 <div className={`conversations-sidebar ${selectedPhone ? "hidden-mobile" : ""}`}>
                     <div className="conversations-header">
@@ -313,6 +337,12 @@ export default function SMSConversationsClient() {
                     )}
                 </div>
             </div>
+            ) : activeTab === "blast" ? (
+            /* Blast SMS Tab */
+            <div className="blast-container">
+                <EnhancedBlastSMS />
+            </div>
+            ) : null}
 
             <style jsx>{`
                 .sms-conversations-page {
@@ -328,8 +358,53 @@ export default function SMSConversationsClient() {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
-                    margin-bottom: 1.5rem;
+                    margin-bottom: 1rem;
                     flex-shrink: 0;
+                }
+
+                /* Tabs */
+                .tabs {
+                    display: flex;
+                    gap: 0.5rem;
+                    margin-bottom: 1rem;
+                    border-bottom: 1px solid var(--border);
+                    padding-bottom: 0;
+                    flex-shrink: 0;
+                }
+
+                .tab {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.75rem 1.25rem;
+                    background: none;
+                    border: none;
+                    border-bottom: 2px solid transparent;
+                    color: var(--text-secondary);
+                    font-size: 0.875rem;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.15s;
+                    margin-bottom: -1px;
+                }
+
+                .tab:hover {
+                    color: var(--text-primary);
+                }
+
+                .tab.active {
+                    color: var(--primary);
+                    border-bottom-color: var(--primary);
+                }
+
+                /* Blast Container */
+                .blast-container {
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-lg);
+                    padding: 1.5rem;
+                    flex: 1;
+                    overflow-y: auto;
                 }
 
                 .header-content {

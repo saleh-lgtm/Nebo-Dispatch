@@ -164,6 +164,10 @@ model User {
   contactTagAssignments ContactTagAssignment[] @relation("ContactTagAssignments")
   blastSMSSent          BlastSMSLog[]          @relation("BlastSMSSent")
 
+  // Affiliate tagging
+  affiliateTagsCreated    AffiliateTag[]           @relation("AffiliateTagsCreated")
+  affiliateTagAssignments AffiliateTagAssignment[] @relation("AffiliateTagAssignments")
+
   // Time Off and Shift Swap relations
   timeOffRequests     TimeOffRequest[]
   timeOffReviewed     TimeOffRequest[]     @relation("TimeOffReviewer")
@@ -223,10 +227,44 @@ model User {
   taskConfig             DispatcherTaskConfig?     @relation("DispatcherTaskConfig")
   taskConfigsConfigured  DispatcherTaskConfig[]    @relation("TaskConfigurer")
 
+  // Dispatcher scheduling preferences
+  dispatcherPreferences  DispatcherPreferences?
+
+  // Schedule templates
+  scheduleTemplatesCreated ScheduleTemplate[] @relation("ScheduleTemplateCreator")
+
   // CRITICAL INDEXES for performance
   @@index([email])                      // Auth queries on every request
   @@index([role, isActive, createdAt])  // Admin dashboards, user listings
   @@index([approvalStatus])             // Approval workflows
+}
+
+// Dispatcher scheduling preferences for shift assignments
+model DispatcherPreferences {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Day preferences (JSON array of day names: ["Monday", "Tuesday", etc.])
+  preferredDays   String[] @default([])
+
+  // Shift time preferences (JSON array: ["Morning", "Evening", "Night", "Overnight"])
+  preferredShifts String[] @default([])
+
+  // Weekly hour constraints
+  maxHoursWeek    Int?     // Maximum hours per week
+  minHoursWeek    Int?     // Minimum hours per week
+
+  // Additional notes/constraints
+  notes           String?  @db.Text
+
+  // Availability blackout dates (stored as ISO date strings)
+  blackoutDates   String[] @default([])
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model Shift {
@@ -435,6 +473,8 @@ model Schedule {
 
   @@index([weekStart])
   @@index([userId, weekStart])
+  @@index([userId, shiftStart])      // User schedule lookups by date range
+  @@index([shiftStart, isPublished]) // Week-view queries for published schedules
 }
 
 model Affiliate {
@@ -482,6 +522,9 @@ model Affiliate {
   // Audit configuration (for shift report audits)
   auditConfig AffiliateAuditConfig?
 
+  // Tag assignments for blast SMS
+  tags AffiliateTagAssignment[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -490,6 +533,7 @@ model Affiliate {
   @@index([market])
   @@index([type, isActive, isApproved])  // Common filter combo
   @@index([name])                         // Search by name
+  @@index([isActive, isApproved, phone])  // Blast SMS queries
 }
 
 // Configuration for which affiliates to audit in shift reports
@@ -1829,16 +1873,54 @@ model ContactTagAssignment {
 model BlastSMSLog {
   id             String   @id @default(cuid())
   message        String   @db.Text
-  tagIds         String[]
+  tagIds         String[] // Contact tag IDs (backward compatible)
+  affiliateTagIds String[] @default([]) // Affiliate tag IDs
   recipientCount Int
   successCount   Int
   failCount      Int
+  contactCount   Int      @default(0) // Contacts included in this blast
+  affiliateCount Int      @default(0) // Affiliates included in this blast
   sentById       String
   sentBy         User     @relation("BlastSMSSent", fields: [sentById], references: [id])
   createdAt      DateTime @default(now())
 
   @@index([sentById])
   @@index([createdAt])
+}
+
+// Affiliate tagging system (mirrors ContactTag pattern)
+model AffiliateTag {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  color       String   @default("#3B82F6")
+  description String?
+
+  // Audit
+  createdById String
+  createdBy   User     @relation("AffiliateTagsCreated", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  assignments AffiliateTagAssignment[]
+
+  @@index([name])
+}
+
+// Junction table for Affiliate <-> Tag many-to-many relationship
+model AffiliateTagAssignment {
+  id           String       @id @default(cuid())
+  affiliateId  String
+  affiliate    Affiliate    @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  tagId        String
+  tag          AffiliateTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  assignedById String
+  assignedBy   User         @relation("AffiliateTagAssignments", fields: [assignedById], references: [id])
+  assignedAt   DateTime     @default(now())
+
+  @@unique([affiliateId, tagId])
+  @@index([affiliateId])
+  @@index([tagId])
 }
 
 // ============================================
@@ -1939,4 +2021,54 @@ model DispatcherTaskConfig {
 
   @@index([primaryTask])
   @@index([secondaryTask])
+}
+
+// ============================================
+// SCHEDULE TEMPLATES
+// ============================================
+
+// Reusable weekly schedule templates for quick scheduling
+model ScheduleTemplate {
+  id          String                  @id @default(cuid())
+  name        String
+  description String?
+  isActive    Boolean                 @default(true)
+
+  // Creator
+  createdById String
+  createdBy   User                    @relation("ScheduleTemplateCreator", fields: [createdById], references: [id])
+
+  // Template shifts
+  shifts      ScheduleTemplateShift[]
+
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  @@index([isActive])
+  @@index([createdById])
+}
+
+// Individual shift definitions within a template
+model ScheduleTemplateShift {
+  id            String           @id @default(cuid())
+  templateId    String
+  template      ScheduleTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  // Day of week (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+  dayOfWeek     Int
+
+  // Time in hours from midnight (e.g., 8.5 = 8:30 AM, 14 = 2:00 PM)
+  startHour     Float
+
+  // Duration in hours (e.g., 8 = 8 hours, 4.5 = 4 hours 30 minutes)
+  durationHours Float
+
+  // Optional default dispatcher assignment
+  dispatcherId  String?
+
+  // Display order within the template
+  order         Int              @default(0)
+
+  @@index([templateId])
+  @@index([dayOfWeek])
 }

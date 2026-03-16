@@ -66,7 +66,8 @@ export type AuditEntity =
     | "RoutePrice"
     | "AffiliateAuditConfig"
     | "Contact"
-    | "Portal";
+    | "Portal"
+    | "DispatcherPreferences";
 
 /**
  * Create an audit log entry

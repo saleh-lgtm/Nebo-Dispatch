@@ -16,10 +16,16 @@ import {
     ChevronRight,
     Plus,
     Filter,
+    CalendarPlus,
+    Copy,
+    Check,
+    Download,
 } from "lucide-react";
 import { createDetailedRequest } from "@/lib/requestActions";
+import { getCalendarSubscriptionUrl, getCalendarDownloadUrl } from "@/lib/calendarExportActions";
 import TimeOffPanel from "@/components/TimeOffPanel";
 import ShiftSwapPanel from "@/components/ShiftSwapPanel";
+import styles from "./schedule.module.css";
 
 interface Schedule {
     id: string;
@@ -121,6 +127,11 @@ export default function ScheduleClient({
     const [selectedShift, setSelectedShift] = useState<Schedule | null>(upcomingShifts[0] || null);
     const [showRequestForm, setShowRequestForm] = useState(false);
     const [requests, setRequests] = useState<Request[]>(initialRequests);
+    const [showCalendarModal, setShowCalendarModal] = useState(false);
+    const [calendarUrl, setCalendarUrl] = useState<string | null>(null);
+    const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+    const [urlCopied, setUrlCopied] = useState(false);
+    const [loadingCalendar, setLoadingCalendar] = useState(false);
 
     // Form state
     const [requestType, setRequestType] = useState<"HOURS_MODIFICATION" | "SCHEDULE_CHANGE" | "REVIEW">("SCHEDULE_CHANGE");
@@ -129,6 +140,38 @@ export default function ScheduleClient({
     const [requestedStart, setRequestedStart] = useState("");
     const [requestedEnd, setRequestedEnd] = useState("");
     const [loading, setLoading] = useState(false);
+
+    const handleOpenCalendarModal = async () => {
+        setShowCalendarModal(true);
+        if (!calendarUrl) {
+            setLoadingCalendar(true);
+            try {
+                const [subUrl, dlUrl] = await Promise.all([
+                    getCalendarSubscriptionUrl(userId),
+                    getCalendarDownloadUrl(userId),
+                ]);
+                setCalendarUrl(subUrl);
+                setDownloadUrl(dlUrl);
+            } catch (error) {
+                console.error("Failed to get calendar URL:", error);
+            } finally {
+                setLoadingCalendar(false);
+            }
+        }
+    };
+
+    const handleCopyCalendarUrl = async () => {
+        if (!calendarUrl) return;
+        try {
+            // Convert webcal:// back to https:// for copying
+            const httpsUrl = calendarUrl.replace(/^webcal:\/\//, "https://");
+            await navigator.clipboard.writeText(httpsUrl);
+            setUrlCopied(true);
+            setTimeout(() => setUrlCopied(false), 2000);
+        } catch (error) {
+            console.error("Failed to copy URL:", error);
+        }
+    };
 
     const handleSubmitRequest = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -530,6 +573,10 @@ export default function ScheduleClient({
                             <ArrowLeftRight size={16} />
                             <span>Swap Shift</span>
                         </button>
+                        <button onClick={handleOpenCalendarModal} className="action-btn action-btn--secondary">
+                            <CalendarPlus size={16} />
+                            <span>Subscribe to Calendar</span>
+                        </button>
                     </div>
                 </div>
             </aside>
@@ -542,6 +589,74 @@ export default function ScheduleClient({
             >
                 <Plus size={24} />
             </button>
+
+            {/* Calendar Subscription Modal */}
+            {showCalendarModal && (
+                <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowCalendarModal(false); }}>
+                    <div className="modal-content modal-content--small">
+                        <div className="modal-header">
+                            <h2>Subscribe to Calendar</h2>
+                            <button onClick={() => setShowCalendarModal(false)} className="close-btn">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="modal-body">
+                            {loadingCalendar ? (
+                                <div className="calendar-loading">
+                                    <div className="spinner" />
+                                    <p>Generating calendar link...</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <p className="calendar-info">
+                                        Subscribe to your schedule in your favorite calendar app (Google Calendar, Apple Calendar, Outlook, etc.)
+                                    </p>
+
+                                    <div className="calendar-url-container">
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value={calendarUrl?.replace(/^webcal:\/\//, "https://") || ""}
+                                            className="calendar-url-input"
+                                            onClick={(e) => (e.target as HTMLInputElement).select()}
+                                        />
+                                        <button
+                                            onClick={handleCopyCalendarUrl}
+                                            className="copy-btn"
+                                            title="Copy URL"
+                                        >
+                                            {urlCopied ? <Check size={16} /> : <Copy size={16} />}
+                                        </button>
+                                    </div>
+
+                                    <div className="calendar-actions">
+                                        <a
+                                            href={calendarUrl || "#"}
+                                            className="calendar-btn calendar-btn--primary"
+                                        >
+                                            <CalendarPlus size={16} />
+                                            Open in Calendar App
+                                        </a>
+                                        <a
+                                            href={downloadUrl || "#"}
+                                            className="calendar-btn calendar-btn--secondary"
+                                            download="nebo-schedule.ics"
+                                        >
+                                            <Download size={16} />
+                                            Download .ics File
+                                        </a>
+                                    </div>
+
+                                    <p className="calendar-note">
+                                        Note: Changes to your schedule will automatically sync when you subscribe.
+                                    </p>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Request Modal */}
             {showRequestForm && (
@@ -1487,6 +1602,129 @@ export default function ScheduleClient({
                     .schedule-header .btn {
                         display: none;
                     }
+                }
+
+                /* Calendar Modal Styles */
+                .modal-content--small {
+                    max-width: 420px;
+                }
+
+                .modal-body {
+                    padding: 1.5rem;
+                }
+
+                .calendar-loading {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 1rem;
+                    padding: 2rem;
+                }
+
+                .calendar-loading .spinner {
+                    width: 32px;
+                    height: 32px;
+                    border: 3px solid var(--border);
+                    border-top-color: var(--primary);
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                }
+
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+
+                .calendar-info {
+                    color: var(--text-secondary);
+                    font-size: 0.875rem;
+                    line-height: 1.5;
+                    margin-bottom: 1rem;
+                }
+
+                .calendar-url-container {
+                    display: flex;
+                    gap: 0.5rem;
+                    margin-bottom: 1rem;
+                }
+
+                .calendar-url-input {
+                    flex: 1;
+                    padding: 0.75rem;
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-md);
+                    color: var(--text-primary);
+                    font-size: 0.8rem;
+                    font-family: monospace;
+                }
+
+                .copy-btn {
+                    padding: 0.75rem;
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-md);
+                    color: var(--text-secondary);
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+                }
+
+                .copy-btn:hover {
+                    background: var(--bg-hover);
+                    color: var(--text-primary);
+                }
+
+                .calendar-actions {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.75rem;
+                    margin-bottom: 1rem;
+                }
+
+                .calendar-btn {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 0.5rem;
+                    padding: 0.875rem 1rem;
+                    border-radius: var(--radius-md);
+                    font-weight: 500;
+                    font-size: 0.875rem;
+                    text-decoration: none;
+                    transition: all 0.15s ease;
+                }
+
+                .calendar-btn--primary {
+                    background: var(--primary);
+                    color: white;
+                }
+
+                .calendar-btn--primary:hover {
+                    background: var(--primary-hover);
+                }
+
+                .calendar-btn--secondary {
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border);
+                    color: var(--text-primary);
+                }
+
+                .calendar-btn--secondary:hover {
+                    background: var(--bg-hover);
+                }
+
+                .calendar-note {
+                    font-size: 0.75rem;
+                    color: var(--text-dim);
+                    text-align: center;
+                }
+
+                .action-btn--secondary {
+                    background: var(--bg-secondary) !important;
+                    border-color: var(--border) !important;
+                }
+
+                .action-btn--secondary:hover {
+                    background: var(--bg-hover) !important;
                 }
             `}</style>
         </div>
