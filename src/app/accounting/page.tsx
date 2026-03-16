@@ -57,7 +57,7 @@ export default async function AccountingPage() {
             totalFlags={flaggedData.total}
             userRole={session.user.role}
             isAdmin={isAdmin}
-            affiliates={affiliatesData}
+            affiliates={affiliatesData.success ? affiliatesData.data : []}
         />
     );
 }

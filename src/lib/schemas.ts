@@ -207,6 +207,219 @@ export const createEventSchema = z.object({
 
 export const updateEventSchema = createEventSchema.partial();
 
+// ===== REQUEST SCHEMAS =====
+
+export const createDetailedRequestSchema = z.object({
+    userId: z.string().min(1, "User ID is required"),
+    type: z.enum(["HOURS_MODIFICATION", "SCHEDULE_CHANGE", "REVIEW"]),
+    reason: z.string().min(10, "Please provide a detailed reason"),
+    scheduleId: z.string().optional(),
+    requestedStart: z.coerce.date().optional(),
+    requestedEnd: z.coerce.date().optional(),
+});
+
+export const userIdParamSchema = z.object({
+    userId: z.string().min(1, "User ID is required"),
+});
+
+// ===== TASK SCHEMAS =====
+
+export const createAdminTaskSchema = z.object({
+    title: z.string().min(2, "Title must be at least 2 characters").max(200),
+    description: z.string().max(2000).optional(),
+    assignToAll: z.boolean(),
+    assignedToId: z.string().optional(),
+    priority: z.number().min(0).max(10).optional(),
+    dueDate: z.coerce.date().optional(),
+});
+
+export const updateAdminTaskSchema = createAdminTaskSchema.partial();
+
+export const completeTaskSchema = z.object({
+    taskId: z.string().min(1, "Task ID is required"),
+    notes: z.string().max(1000).optional(),
+});
+
+export const getRecentCompletionsSchema = z.object({
+    limit: z.number().min(1).max(100).optional(),
+});
+
+// ===== FLEET SCHEMAS =====
+
+export const createVehicleSchema = z.object({
+    name: z.string().min(2, "Name is required").max(100),
+    type: z.enum(["SEDAN", "SUV", "VAN", "LIMOUSINE", "STRETCH_LIMO", "SPRINTER", "MINI_BUS", "COACH", "OTHER"]),
+    make: z.string().min(1, "Make is required").max(50),
+    model: z.string().min(1, "Model is required").max(50),
+    year: z.number().min(1900).max(2100),
+    color: z.string().max(30).optional(),
+    licensePlate: z.string().min(1, "License plate is required").max(20),
+    vin: z.string().min(1, "VIN is required").max(20),
+    passengerCapacity: z.number().min(1).max(100).optional(),
+    luggageCapacity: z.number().min(0).max(100).optional(),
+    notes: z.string().max(2000).optional(),
+});
+
+export const updateVehicleSchema = createVehicleSchema.partial();
+
+export const updateVehicleStatusSchema = z.object({
+    id: z.string().min(1, "Vehicle ID is required"),
+    status: z.enum(["ACTIVE", "MAINTENANCE", "INACTIVE", "RETIRED"]),
+});
+
+export const createPermitSchema = z.object({
+    vehicleId: z.string().min(1, "Vehicle ID is required"),
+    permitType: z.string().min(1, "Permit type is required").max(100),
+    permitNumber: z.string().max(100).optional(),
+    issuingAuthority: z.string().max(200).optional(),
+    issueDate: z.coerce.date().optional(),
+    expirationDate: z.coerce.date(),
+    notes: z.string().max(1000).optional(),
+    fileUrl: z.string().max(500).optional(),
+    fileName: z.string().max(200).optional(),
+    fileSize: z.number().optional(),
+});
+
+export const updatePermitSchema = createPermitSchema.partial().omit({ vehicleId: true });
+
+export const createInsuranceSchema = z.object({
+    vehicleId: z.string().min(1, "Vehicle ID is required"),
+    insuranceType: z.string().min(1, "Insurance type is required").max(100),
+    provider: z.string().min(1, "Provider is required").max(200),
+    policyNumber: z.string().max(100).optional(),
+    coverageAmount: z.number().optional(),
+    issueDate: z.coerce.date().optional(),
+    expirationDate: z.coerce.date(),
+    notes: z.string().max(1000).optional(),
+    fileUrl: z.string().max(500).optional(),
+    fileName: z.string().max(200).optional(),
+    fileSize: z.number().optional(),
+});
+
+export const updateInsuranceSchema = createInsuranceSchema.partial().omit({ vehicleId: true });
+
+export const createRegistrationSchema = z.object({
+    vehicleId: z.string().min(1, "Vehicle ID is required"),
+    state: z.string().min(1, "State is required").max(50),
+    registrationNumber: z.string().max(50).optional(),
+    issueDate: z.coerce.date().optional(),
+    expirationDate: z.coerce.date(),
+    notes: z.string().max(1000).optional(),
+    fileUrl: z.string().max(500).optional(),
+    fileName: z.string().max(200).optional(),
+    fileSize: z.number().optional(),
+});
+
+export const updateRegistrationSchema = createRegistrationSchema.partial().omit({ vehicleId: true });
+
+export const createVehicleDocumentSchema = z.object({
+    vehicleId: z.string().min(1, "Vehicle ID is required"),
+    documentType: z.string().min(1, "Document type is required").max(100),
+    title: z.string().min(1, "Title is required").max(200),
+    description: z.string().max(1000).optional(),
+    fileUrl: z.string().min(1, "File URL is required").max(500),
+    fileName: z.string().min(1, "File name is required").max(200),
+    fileSize: z.number().optional(),
+    mimeType: z.string().max(100).optional(),
+});
+
+export const getVehicleFiltersSchema = z.object({
+    status: z.enum(["ACTIVE", "MAINTENANCE", "INACTIVE", "RETIRED"]).optional(),
+    type: z.enum(["SEDAN", "SUV", "VAN", "LIMOUSINE", "STRETCH_LIMO", "SPRINTER", "MINI_BUS", "COACH", "OTHER"]).optional(),
+    search: z.string().max(100).optional(),
+});
+
+export const daysAheadSchema = z.object({
+    daysAhead: z.number().min(1).max(365).optional(),
+});
+
+// ===== DRIVER SCHEMAS =====
+
+export const driverVehicleSchema = z.object({
+    vehicleType: z.string().max(50).optional(),
+    make: z.string().max(50).optional(),
+    model: z.string().max(50).optional(),
+    year: z.number().min(1900).max(2100).optional(),
+    color: z.string().max(30).optional(),
+    licensePlate: z.string().max(20).optional(),
+    passengerCapacity: z.number().min(1).max(100).optional(),
+    insuranceExpiry: z.coerce.date().optional(),
+    notes: z.string().max(1000).optional(),
+});
+
+export const schedulePreferencesSchema = z.object({
+    preferredDays: z.array(z.string()).optional(),
+    preferredShifts: z.array(z.string()).optional(),
+    maxHoursWeek: z.number().min(0).max(168).optional(),
+    timezone: z.string().max(50).optional(),
+    notes: z.string().max(1000).optional(),
+});
+
+export const vehicleAssignmentSchema = z.object({
+    vehicleId: z.string().min(1, "Vehicle ID is required"),
+    startDate: z.coerce.date(),
+    endDate: z.coerce.date().optional(),
+    isPrimary: z.boolean().optional(),
+    notes: z.string().max(1000).optional(),
+});
+
+export const updateVehicleAssignmentSchema = z.object({
+    endDate: z.coerce.date().optional(),
+    isPrimary: z.boolean().optional(),
+    notes: z.string().max(1000).optional(),
+});
+
+// ===== AFFILIATE PRICING SCHEMAS =====
+
+export const pricingInputSchema = z.object({
+    affiliateId: z.string().min(1, "Affiliate ID is required"),
+    serviceType: z.string().min(1, "Service type is required").max(100),
+    flatRate: z.number().min(0, "Flat rate must be positive"),
+    notes: z.string().max(1000).optional(),
+});
+
+export const routePriceInputSchema = z.object({
+    affiliateId: z.string().min(1, "Affiliate ID is required"),
+    pickupLocation: z.string().min(1, "Pickup location is required").max(200),
+    dropoffLocation: z.string().min(1, "Dropoff location is required").max(200),
+    vehicleType: z.string().max(50).optional(),
+    price: z.number().min(0, "Price must be positive"),
+    notes: z.string().max(1000).optional(),
+});
+
+export const bulkPricingSchema = z.object({
+    affiliateId: z.string().min(1, "Affiliate ID is required"),
+    entries: z.array(z.object({
+        serviceType: z.string().min(1).max(100),
+        flatRate: z.number().min(0),
+        notes: z.string().max(1000).optional(),
+    })),
+});
+
+export const bulkRoutePricesSchema = z.object({
+    affiliateId: z.string().min(1, "Affiliate ID is required"),
+    routes: z.array(z.object({
+        pickupLocation: z.string().min(1).max(200),
+        dropoffLocation: z.string().min(1).max(200),
+        vehicleType: z.string().max(50).optional(),
+        price: z.number().min(0),
+        notes: z.string().max(1000).optional(),
+    })),
+});
+
+export const copyPricingSchema = z.object({
+    sourceAffiliateId: z.string().min(1, "Source affiliate ID is required"),
+    targetAffiliateId: z.string().min(1, "Target affiliate ID is required"),
+});
+
+export const idParamSchema = z.object({
+    id: z.string().min(1, "ID is required"),
+});
+
+export const affiliateIdParamSchema = z.object({
+    affiliateId: z.string().min(1, "Affiliate ID is required"),
+});
+
 // ===== HELPER FUNCTIONS =====
 
 export type LoginInput = z.infer<typeof loginSchema>;
@@ -226,6 +439,21 @@ export type UpdateContactInput = z.infer<typeof updateContactSchema>;
 export type CreateNotificationInput = z.infer<typeof createNotificationSchema>;
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 export type UpdateEventInput = z.infer<typeof updateEventSchema>;
+export type CreateDetailedRequestInput = z.infer<typeof createDetailedRequestSchema>;
+export type CreateAdminTaskInput = z.infer<typeof createAdminTaskSchema>;
+export type UpdateAdminTaskInput = z.infer<typeof updateAdminTaskSchema>;
+export type CompleteTaskInput = z.infer<typeof completeTaskSchema>;
+export type CreateVehicleInput = z.infer<typeof createVehicleSchema>;
+export type UpdateVehicleInput = z.infer<typeof updateVehicleSchema>;
+export type CreatePermitInput = z.infer<typeof createPermitSchema>;
+export type CreateInsuranceInput = z.infer<typeof createInsuranceSchema>;
+export type CreateRegistrationInput = z.infer<typeof createRegistrationSchema>;
+export type CreateVehicleDocumentInput = z.infer<typeof createVehicleDocumentSchema>;
+export type DriverVehicleInput = z.infer<typeof driverVehicleSchema>;
+export type SchedulePreferencesInput = z.infer<typeof schedulePreferencesSchema>;
+export type VehicleAssignmentInput = z.infer<typeof vehicleAssignmentSchema>;
+export type PricingInput = z.infer<typeof pricingInputSchema>;
+export type RoutePriceInput = z.infer<typeof routePriceInputSchema>;
 
 /**
  * Validate data against a schema and return typed result or errors

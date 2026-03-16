@@ -5,10 +5,15 @@ import FleetClient from "./FleetClient";
 export default async function FleetPage() {
     await requireAdmin();
 
-    const [vehicles, stats] = await Promise.all([
+    const [vehiclesResult, statsResult] = await Promise.all([
         getVehicles(),
         getFleetStats(),
     ]);
 
-    return <FleetClient initialVehicles={vehicles} stats={stats} />;
+    return (
+        <FleetClient
+            initialVehicles={vehiclesResult.success ? vehiclesResult.data : []}
+            stats={statsResult.success ? statsResult.data : { totalVehicles: 0, activeVehicles: 0, expiringDocuments: 0, expiredDocuments: 0 }}
+        />
+    );
 }

@@ -119,6 +119,10 @@ export default function AffiliatePricingTab({ affiliates: initialAffiliates, isA
                 notes: newFlatRate.notes || undefined,
             });
 
+            if (!result.success || !result.data) {
+                throw new Error(result.error || "Failed to add flat rate");
+            }
+
             setAffiliates(
                 affiliates.map((a) =>
                     a.id === newFlatRate.affiliateId
@@ -127,7 +131,7 @@ export default function AffiliatePricingTab({ affiliates: initialAffiliates, isA
                               pricingGrid: [
                                   ...a.pricingGrid,
                                   {
-                                      id: result.id,
+                                      id: result.data.id,
                                       serviceType: newFlatRate.serviceType,
                                       flatRate: parseFloat(newFlatRate.flatRate),
                                       notes: newFlatRate.notes || null,
@@ -225,6 +229,10 @@ export default function AffiliatePricingTab({ affiliates: initialAffiliates, isA
                 notes: newRoute.notes || undefined,
             });
 
+            if (!result.success || !result.data) {
+                throw new Error(result.error || "Failed to add route price");
+            }
+
             setAffiliates(
                 affiliates.map((a) =>
                     a.id === newRoute.affiliateId
@@ -233,7 +241,7 @@ export default function AffiliatePricingTab({ affiliates: initialAffiliates, isA
                               routePricing: [
                                   ...a.routePricing,
                                   {
-                                      id: result.id,
+                                      id: result.data.id,
                                       pickupLocation: newRoute.pickupLocation,
                                       dropoffLocation: newRoute.dropoffLocation,
                                       vehicleType: newRoute.vehicleType || null,

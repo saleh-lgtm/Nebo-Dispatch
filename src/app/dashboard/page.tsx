@@ -170,10 +170,10 @@ export default async function DashboardPage() {
         ),
 
         // Tasks assigned to this user
-        safePromise(getMyTasks(session.user.id), []),
+        safePromise(getMyTasks(session.user.id).then(r => r.success ? r.data : []), []),
 
         // Task progress for admins
-        safePromise(isAdmin ? getTaskProgress() : Promise.resolve([]), []),
+        safePromise(isAdmin ? getTaskProgress().then(r => r.success ? r.data : []) : Promise.resolve([]), []),
 
         // Upcoming 2-hour confirmations (next 6 trips)
         safePromise(getUpcomingConfirmations(6), []),

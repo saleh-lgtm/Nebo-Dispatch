@@ -11,11 +11,11 @@ export default async function VehicleDetailPage({ params }: Props) {
     await requireAdmin();
 
     const { vehicleId } = await params;
-    const vehicle = await getVehicleById(vehicleId);
+    const result = await getVehicleById(vehicleId);
 
-    if (!vehicle) {
+    if (!result.success || !result.data) {
         notFound();
     }
 
-    return <VehicleDetailClient vehicle={vehicle} />;
+    return <VehicleDetailClient vehicle={result.data} />;
 }

@@ -94,10 +94,14 @@ export default function AffiliatePricingGrid({
         notes: newEntry.notes || undefined,
       });
 
+      if (!result.success || !result.data) {
+        throw new Error(result.error || "Failed to add pricing");
+      }
+
       setPricing([
         ...pricing,
         {
-          id: result.id,
+          id: result.data.id,
           serviceType: newEntry.serviceType,
           flatRate: parseFloat(newEntry.flatRate),
           notes: newEntry.notes || null,

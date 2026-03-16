@@ -58,9 +58,9 @@ export default async function SchedulePage() {
     return (
         <ScheduleClient
             initialSchedule={schedule}
-            requests={requests}
-            upcomingShifts={upcomingShifts}
-            pastShifts={pastShifts}
+            requests={requests.success ? requests.data : []}
+            upcomingShifts={upcomingShifts.success ? upcomingShifts.data : []}
+            pastShifts={pastShifts.success ? pastShifts.data : []}
             myTimeOffRequests={myTimeOffRequests}
             pendingTimeOffRequests={pendingTimeOffRequests}
             swapRequestsData={swapRequestsData}

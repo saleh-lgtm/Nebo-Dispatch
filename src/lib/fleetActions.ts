@@ -7,6 +7,21 @@ import { revalidatePath } from "next/cache";
 import { VehicleType, VehicleStatus } from "@prisma/client";
 import { deleteFile } from "./storageActions";
 import { STORAGE_BUCKETS } from "./supabase";
+import {
+    createVehicleSchema,
+    updateVehicleSchema,
+    updateVehicleStatusSchema,
+    createPermitSchema,
+    updatePermitSchema,
+    createInsuranceSchema,
+    updateInsuranceSchema,
+    createRegistrationSchema,
+    updateRegistrationSchema,
+    createVehicleDocumentSchema,
+    getVehicleFiltersSchema,
+    daysAheadSchema,
+    idParamSchema,
+} from "./schemas";
 
 // ============================================
 // TYPES
@@ -81,117 +96,168 @@ export interface CreateDocumentData {
 // ============================================
 
 export async function createVehicle(data: CreateVehicleData) {
-    const session = await requireAdmin();
+    try {
+        const session = await requireAdmin();
 
-    const vehicle = await prisma.fleetVehicle.create({
-        data: {
-            ...data,
-            createdById: session.user.id,
-        },
-    });
+        // Validate input
+        const parseResult = createVehicleSchema.safeParse(data);
+        if (!parseResult.success) {
+            return { success: false, error: parseResult.error.issues[0]?.message || "Invalid input" };
+        }
 
-    await createAuditLog(
-        session.user.id,
-        "CREATE",
-        "FleetVehicle",
-        vehicle.id,
-        { name: vehicle.name, type: vehicle.type, licensePlate: vehicle.licensePlate }
-    );
+        const vehicle = await prisma.fleetVehicle.create({
+            data: {
+                ...data,
+                createdById: session.user.id,
+            },
+        });
 
-    revalidatePath("/fleet");
-    return vehicle;
+        await createAuditLog(
+            session.user.id,
+            "CREATE",
+            "FleetVehicle",
+            vehicle.id,
+            { name: vehicle.name, type: vehicle.type, licensePlate: vehicle.licensePlate }
+        );
+
+        revalidatePath("/fleet");
+        return { success: true, data: vehicle };
+    } catch (error) {
+        console.error("createVehicle error:", error);
+        return { success: false, error: "Failed to create vehicle" };
+    }
 }
 
 export async function updateVehicle(id: string, data: Partial<CreateVehicleData>) {
-    const session = await requireAdmin();
+    try {
+        const session = await requireAdmin();
 
-    const vehicle = await prisma.fleetVehicle.update({
-        where: { id },
-        data,
-    });
+        // Validate ID
+        const idResult = idParamSchema.safeParse({ id });
+        if (!idResult.success) {
+            return { success: false, error: "Invalid vehicle ID" };
+        }
 
-    await createAuditLog(
-        session.user.id,
-        "UPDATE",
-        "FleetVehicle",
-        vehicle.id,
-        { name: vehicle.name, ...data }
-    );
+        // Validate input
+        const parseResult = updateVehicleSchema.safeParse(data);
+        if (!parseResult.success) {
+            return { success: false, error: parseResult.error.issues[0]?.message || "Invalid input" };
+        }
 
-    revalidatePath("/fleet");
-    revalidatePath(`/fleet/${id}`);
-    return vehicle;
+        const vehicle = await prisma.fleetVehicle.update({
+            where: { id },
+            data,
+        });
+
+        await createAuditLog(
+            session.user.id,
+            "UPDATE",
+            "FleetVehicle",
+            vehicle.id,
+            { name: vehicle.name, ...data }
+        );
+
+        revalidatePath("/fleet");
+        revalidatePath(`/fleet/${id}`);
+        return { success: true, data: vehicle };
+    } catch (error) {
+        console.error("updateVehicle error:", error);
+        return { success: false, error: "Failed to update vehicle" };
+    }
 }
 
 export async function updateVehicleStatus(id: string, status: VehicleStatus) {
-    const session = await requireAdmin();
+    try {
+        const session = await requireAdmin();
 
-    const vehicle = await prisma.fleetVehicle.update({
-        where: { id },
-        data: { status },
-    });
+        // Validate input
+        const parseResult = updateVehicleStatusSchema.safeParse({ id, status });
+        if (!parseResult.success) {
+            return { success: false, error: parseResult.error.issues[0]?.message || "Invalid input" };
+        }
 
-    await createAuditLog(
-        session.user.id,
-        "UPDATE_STATUS",
-        "FleetVehicle",
-        vehicle.id,
-        { name: vehicle.name, status }
-    );
+        const vehicle = await prisma.fleetVehicle.update({
+            where: { id },
+            data: { status },
+        });
 
-    revalidatePath("/fleet");
-    revalidatePath(`/fleet/${id}`);
-    return vehicle;
+        await createAuditLog(
+            session.user.id,
+            "UPDATE_STATUS",
+            "FleetVehicle",
+            vehicle.id,
+            { name: vehicle.name, status }
+        );
+
+        revalidatePath("/fleet");
+        revalidatePath(`/fleet/${id}`);
+        return { success: true, data: vehicle };
+    } catch (error) {
+        console.error("updateVehicleStatus error:", error);
+        return { success: false, error: "Failed to update vehicle status" };
+    }
 }
 
 export async function deleteVehicle(id: string) {
-    const session = await requireAdmin();
+    try {
+        const session = await requireAdmin();
 
-    // Get vehicle with all documents to delete files
-    const vehicle = await prisma.fleetVehicle.findUnique({
-        where: { id },
-        include: {
-            permits: true,
-            insurance: true,
-            registration: true,
-            documents: true,
-        },
-    });
-
-    if (!vehicle) {
-        throw new Error("Vehicle not found");
-    }
-
-    // Delete all associated files from storage
-    const filesToDelete: string[] = [];
-    vehicle.permits.forEach(p => p.fileUrl && filesToDelete.push(p.fileUrl));
-    vehicle.insurance.forEach(i => i.fileUrl && filesToDelete.push(i.fileUrl));
-    vehicle.registration.forEach(r => r.fileUrl && filesToDelete.push(r.fileUrl));
-    vehicle.documents.forEach(d => filesToDelete.push(d.fileUrl));
-
-    // Delete files (don't throw on failure, just log)
-    for (const fileUrl of filesToDelete) {
-        try {
-            await deleteFile(STORAGE_BUCKETS.FLEET_DOCUMENTS, fileUrl);
-        } catch (error) {
-            console.error(`Failed to delete file: ${fileUrl}`, error);
+        // Validate ID
+        const parseResult = idParamSchema.safeParse({ id });
+        if (!parseResult.success) {
+            return { success: false, error: "Invalid vehicle ID" };
         }
+
+        // Get vehicle with all documents to delete files
+        const vehicle = await prisma.fleetVehicle.findUnique({
+            where: { id },
+            include: {
+                permits: true,
+                insurance: true,
+                registration: true,
+                documents: true,
+            },
+        });
+
+        if (!vehicle) {
+            return { success: false, error: "Vehicle not found" };
+        }
+
+        // Delete all associated files from storage
+        const filesToDelete: string[] = [];
+        vehicle.permits.forEach(p => p.fileUrl && filesToDelete.push(p.fileUrl));
+        vehicle.insurance.forEach(i => i.fileUrl && filesToDelete.push(i.fileUrl));
+        vehicle.registration.forEach(r => r.fileUrl && filesToDelete.push(r.fileUrl));
+        vehicle.documents.forEach(d => filesToDelete.push(d.fileUrl));
+
+        // Delete files (don't throw on failure, just log)
+        for (const fileUrl of filesToDelete) {
+            try {
+                await deleteFile(STORAGE_BUCKETS.FLEET_DOCUMENTS, fileUrl);
+            } catch (error) {
+                console.error(`Failed to delete file: ${fileUrl}`, error);
+            }
+        }
+
+        // Delete vehicle (cascades to all related records)
+        await prisma.fleetVehicle.delete({
+            where: { id },
+        });
+
+        await createAuditLog(
+            session.user.id,
+            "DELETE",
+            "FleetVehicle",
+            id,
+            { name: vehicle.name, licensePlate: vehicle.licensePlate }
+        );
+
+        revalidatePath("/fleet");
+        return { success: true };
+    } catch (error) {
+        console.error("deleteVehicle error:", error);
+        return { success: false, error: "Failed to delete vehicle" };
     }
-
-    // Delete vehicle (cascades to all related records)
-    await prisma.fleetVehicle.delete({
-        where: { id },
-    });
-
-    await createAuditLog(
-        session.user.id,
-        "DELETE",
-        "FleetVehicle",
-        id,
-        { name: vehicle.name, licensePlate: vehicle.licensePlate }
-    );
-
-    revalidatePath("/fleet");
 }
 
 export async function getVehicles(filters?: {
@@ -199,73 +265,101 @@ export async function getVehicles(filters?: {
     type?: VehicleType;
     search?: string;
 }) {
-    await requireAuth();
+    try {
+        await requireAuth();
 
-    const where: Record<string, unknown> = {};
+        // Validate filters if provided
+        if (filters) {
+            const parseResult = getVehicleFiltersSchema.safeParse(filters);
+            if (!parseResult.success) {
+                return { success: false, error: "Invalid filters", data: [] };
+            }
+        }
 
-    if (filters?.status) {
-        where.status = filters.status;
-    }
-    if (filters?.type) {
-        where.type = filters.type;
-    }
-    if (filters?.search) {
-        where.OR = [
-            { name: { contains: filters.search, mode: "insensitive" } },
-            { licensePlate: { contains: filters.search, mode: "insensitive" } },
-            { make: { contains: filters.search, mode: "insensitive" } },
-            { model: { contains: filters.search, mode: "insensitive" } },
-        ];
-    }
+        const where: Record<string, unknown> = {};
 
-    return await prisma.fleetVehicle.findMany({
-        where,
-        include: {
-            permits: {
-                select: { id: true, permitType: true, expirationDate: true },
+        if (filters?.status) {
+            where.status = filters.status;
+        }
+        if (filters?.type) {
+            where.type = filters.type;
+        }
+        if (filters?.search) {
+            where.OR = [
+                { name: { contains: filters.search, mode: "insensitive" } },
+                { licensePlate: { contains: filters.search, mode: "insensitive" } },
+                { make: { contains: filters.search, mode: "insensitive" } },
+                { model: { contains: filters.search, mode: "insensitive" } },
+            ];
+        }
+
+        const vehicles = await prisma.fleetVehicle.findMany({
+            where,
+            include: {
+                permits: {
+                    select: { id: true, permitType: true, expirationDate: true },
+                },
+                insurance: {
+                    select: { id: true, insuranceType: true, expirationDate: true },
+                },
+                registration: {
+                    select: { id: true, state: true, expirationDate: true },
+                },
+                createdBy: {
+                    select: { id: true, name: true },
+                },
             },
-            insurance: {
-                select: { id: true, insuranceType: true, expirationDate: true },
-            },
-            registration: {
-                select: { id: true, state: true, expirationDate: true },
-            },
-            createdBy: {
-                select: { id: true, name: true },
-            },
-        },
-        orderBy: { createdAt: "desc" },
-    });
+            orderBy: { createdAt: "desc" },
+        });
+
+        return { success: true, data: vehicles };
+    } catch (error) {
+        console.error("getVehicles error:", error);
+        return { success: false, error: "Failed to get vehicles", data: [] };
+    }
 }
 
 export async function getVehicleById(id: string) {
-    await requireAuth();
+    try {
+        await requireAuth();
 
-    return await prisma.fleetVehicle.findUnique({
-        where: { id },
-        include: {
-            permits: {
-                orderBy: { expirationDate: "asc" },
-            },
-            insurance: {
-                orderBy: { expirationDate: "asc" },
-            },
-            registration: {
-                orderBy: { expirationDate: "asc" },
-            },
-            documents: {
-                include: {
-                    uploadedBy: {
-                        select: { id: true, name: true },
-                    },
+        // Validate ID
+        const parseResult = idParamSchema.safeParse({ id });
+        if (!parseResult.success) {
+            return { success: false, error: "Invalid vehicle ID", data: null };
+        }
+
+        const vehicle = await prisma.fleetVehicle.findUnique({
+            where: { id },
+            include: {
+                permits: {
+                    orderBy: { expirationDate: "asc" },
                 },
-                orderBy: { createdAt: "desc" },
+                insurance: {
+                    orderBy: { expirationDate: "asc" },
+                },
+                registration: {
+                    orderBy: { expirationDate: "asc" },
+                },
+                documents: {
+                    include: {
+                        uploadedBy: {
+                            select: { id: true, name: true },
+                        },
+                    },
+                    orderBy: { createdAt: "desc" },
+                },
+                createdBy: {
+                    select: { id: true, name: true },
+                },
             },
-            createdBy: {
-                select: { id: true, name: true },
-            },
-        },
-    });
+        });
+
+        return { success: true, data: vehicle };
+    } catch (error) {
+        console.error("getVehicleById error:", error);
+        return { success: false, error: "Failed to get vehicle", data: null };
+    }
 }
 
 // ============================================
@@ -273,77 +367,117 @@ export async function getVehicleById(id: string) {
 // ============================================
 
 export async function createPermit(data: CreatePermitData) {
-    const session = await requireAdmin();
+    try {
+        const session = await requireAdmin();
 
-    const permit = await prisma.vehiclePermit.create({
-        data,
-    });
+        // Validate input
+        const parseResult = createPermitSchema.safeParse(data);
+        if (!parseResult.success) {
+            return { success: false, error: parseResult.error.issues[0]?.message || "Invalid input" };
+        }
 
-    await createAuditLog(
-        session.user.id,
-        "CREATE",
-        "VehiclePermit",
-        permit.id,
-        { vehicleId: data.vehicleId, permitType: data.permitType }
-    );
+        const permit = await prisma.vehiclePermit.create({
+            data,
+        });
 
-    revalidatePath(`/fleet/${data.vehicleId}`);
-    return permit;
+        await createAuditLog(
+            session.user.id,
+            "CREATE",
+            "VehiclePermit",
+            permit.id,
+            { vehicleId: data.vehicleId, permitType: data.permitType }
+        );
+
+        revalidatePath(`/fleet/${data.vehicleId}`);
+        return { success: true, data: permit };
+    } catch (error) {
+        console.error("createPermit error:", error);
+        return { success: false, error: "Failed to create permit" };
+    }
 }
 
 export async function updatePermit(id: string, data: Partial<CreatePermitData>) {
-    const session = await requireAdmin();
+    try {
+        const session = await requireAdmin();
 
-    const permit = await prisma.vehiclePermit.update({
-        where: { id },
-        data,
-    });
+        // Validate ID
+        const idResult = idParamSchema.safeParse({ id });
+        if (!idResult.success) {
+            return { success: false, error: "Invalid permit ID" };
+        }
 
-    await createAuditLog(
-        session.user.id,
-        "UPDATE",
-        "VehiclePermit",
-        permit.id,
-        { permitType: permit.permitType }
-    );
+        // Validate input
+        const parseResult = updatePermitSchema.safeParse(data);
+        if (!parseResult.success) {
+            return { success: false, error: parseResult.error.issues[0]?.message || "Invalid input" };
+        }
 
-    revalidatePath(`/fleet/${permit.vehicleId}`);
-    return permit;
+        const permit = await prisma.vehiclePermit.update({
+            where: { id },
+            data,
+        });
+
+        await createAuditLog(
+            session.user.id,
+            "UPDATE",
+            "VehiclePermit",
+            permit.id,
+            { permitType: permit.permitType }
+        );
+
+        revalidatePath(`/fleet/${permit.vehicleId}`);
+        return { success: true, data: permit };
+    } catch (error) {
+        console.error("updatePermit error:", error);
+        return { success: false, error: "Failed to update permit" };
+    }
 }
 
 export async function deletePermit(id: string) {
-    const session = await requireAdmin();
+    try {
+        const session = await requireAdmin();
 
-    const permit = await prisma.vehiclePermit.findUnique({
-        where: { id },
-    });
-
-    if (!permit) {
-        throw new Error("Permit not found");
-    }
-
-    // Delete file if exists
-    if (permit.fileUrl) {
-        try {
-            await deleteFile(STORAGE_BUCKETS.FLEET_DOCUMENTS, permit.fileUrl);
-        } catch (error) {
-            console.error("Failed to delete permit file:", error);
+        // Validate ID
+        const parseResult = idParamSchema.safeParse({ id });
+        if (!parseResult.success) {
+            return { success: false, error: "Invalid permit ID" };
         }
+
+        const permit = await prisma.vehiclePermit.findUnique({
+            where: { id },
+        });
+
+        if (!permit) {
+            return { success: false, error: "Permit not found" };
+        }
+
+        // Delete file if exists
+        if (permit.fileUrl) {
+            try {
+                await deleteFile(STORAGE_BUCKETS.FLEET_DOCUMENTS, permit.fileUrl);
+            } catch (error) {
+                console.error("Failed to delete permit file:", error);
+            }
+        }
+
+        await prisma.vehiclePermit.delete({
+            where: { id },
+        });
+
+        await createAuditLog(
+            session.user.id,
+            "DELETE",
+            "VehiclePermit",
+            id,
+            { vehicleId: permit.vehicleId, permitType: permit.permitType }
+        );
+
+        revalidatePath(`/fleet/${permit.vehicleId}`);
+        return { success: true };
+    } catch (error) {
+        console.error("deletePermit error:", error);
+        return { success: false, error: "Failed to delete permit" };
     }
-
-    await prisma.vehiclePermit.delete({
-        where: { id },
-    });
-
-    await createAuditLog(
-        session.user.id,
-        "DELETE",
-        "VehiclePermit",
-        id,
-        { vehicleId: permit.vehicleId, permitType: permit.permitType }
-    );
-
-    revalidatePath(`/fleet/${permit.vehicleId}`);
 }
 
 // ============================================
@@ -351,77 +485,117 @@ export async function deletePermit(id: string) {
 // ============================================
 
 export async function createInsurance(data: CreateInsuranceData) {
-    const session = await requireAdmin();
+    try {
+        const session = await requireAdmin();
 
-    const insurance = await prisma.vehicleInsurance.create({
-        data,
-    });
+        // Validate input
+        const parseResult = createInsuranceSchema.safeParse(data);
+        if (!parseResult.success) {
+            return { success: false, error: parseResult.error.issues[0]?.message || "Invalid input" };
+        }
 
-    await createAuditLog(
-        session.user.id,
-        "CREATE",
-        "VehicleInsurance",
-        insurance.id,
-        { vehicleId: data.vehicleId, insuranceType: data.insuranceType, provider: data.provider }
-    );
+        const insurance = await prisma.vehicleInsurance.create({
+            data,
+        });
 
-    revalidatePath(`/fleet/${data.vehicleId}`);
-    return insurance;
+        await createAuditLog(
+            session.user.id,
+            "CREATE",
+            "VehicleInsurance",
+            insurance.id,
+            { vehicleId: data.vehicleId, insuranceType: data.insuranceType, provider: data.provider }
+        );
+
+        revalidatePath(`/fleet/${data.vehicleId}`);
+        return { success: true, data: insurance };
+    } catch (error) {
+        console.error("createInsurance error:", error);
+        return { success: false, error: "Failed to create insurance record" };
+    }
 }
 
 export async function updateInsurance(id: string, data: Partial<CreateInsuranceData>) {
-    const session = await requireAdmin();
+    try {
+        const session = await requireAdmin();
 
-    const insurance = await prisma.vehicleInsurance.update({
-        where: { id },
-        data,
-    });
+        // Validate ID
+        const idResult = idParamSchema.safeParse({ id });
+        if (!idResult.success) {
+            return { success: false, error: "Invalid insurance ID" };
+        }
 
-    await createAuditLog(
-        session.user.id,
-        "UPDATE",
-        "VehicleInsurance",
-        insurance.id,
-        { insuranceType: insurance.insuranceType }
-    );
+        // Validate input
+        const parseResult = updateInsuranceSchema.safeParse(data);
+        if (!parseResult.success) {
+            return { success: false, error: parseResult.error.issues[0]?.message || "Invalid input" };
+        }
 
-    revalidatePath(`/fleet/${insurance.vehicleId}`);
-    return insurance;
+        const insurance = await prisma.vehicleInsurance.update({
+            where: { id },
+            data,
+        });
+
+        await createAuditLog(
+            session.user.id,
+            "UPDATE",
+            "VehicleInsurance",
+            insurance.id,
+            { insuranceType: insurance.insuranceType }
+        );
+
+        revalidatePath(`/fleet/${insurance.vehicleId}`);
+        return { success: true, data: insurance };
+    } catch (error) {
+        console.error("updateInsurance error:", error);
+        return { success: false, error: "Failed to update insurance record" };
+    }
 }
 
 export async function deleteInsurance(id: string) {
-    const session = await requireAdmin();
+    try {
+        const session = await requireAdmin();
 
-    const insurance = await prisma.vehicleInsurance.findUnique({
-        where: { id },
-    });
-
-    if (!insurance) {
-        throw new Error("Insurance record not found");
-    }
-
-    // Delete file if exists
-    if (insurance.fileUrl) {
-        try {
-            await deleteFile(STORAGE_BUCKETS.FLEET_DOCUMENTS, insurance.fileUrl);
-        } catch (error) {
-            console.error("Failed to delete insurance file:", error);
+        // Validate ID
+        const parseResult = idParamSchema.safeParse({ id });
+        if (!parseResult.success) {
+            return { success: false, error: "Invalid insurance ID" };
         }
+
+        const insurance = await prisma.vehicleInsurance.findUnique({
+            where: { id },
+        });
+
+        if (!insurance) {
+            return { success: false, error: "Insurance record not found" };
+        }
+
+        // Delete file if exists
+        if (insurance.fileUrl) {
+            try {
+                await deleteFile(STORAGE_BUCKETS.FLEET_DOCUMENTS, insurance.fileUrl);
+            } catch (error) {
+                console.error("Failed to delete insurance file:", error);
+            }
+        }
+
+        await prisma.vehicleInsurance.delete({
+            where: { id },
+        });
+
+        await createAuditLog(
+            session.user.id,
+            "DELETE",
+            "VehicleInsurance",
+            id,
+            { vehicleId: insurance.vehicleId, insuranceType: insurance.insuranceType }
+        );
+
+        revalidatePath(`/fleet/${insurance.vehicleId}`);
+        return { success: true };
+    } catch (error) {
+        console.error("deleteInsurance error:", error);
+        return { success: false, error: "Failed to delete insurance record" };
     }
-
-    await prisma.vehicleInsurance.delete({
-        where: { id },
-    });
-
-    await createAuditLog(
-        session.user.id,
-        "DELETE",
-        "VehicleInsurance",
-        id,
-        { vehicleId: insurance.vehicleId, insuranceType: insurance.insuranceType }
-    );
-
-    revalidatePath(`/fleet/${insurance.vehicleId}`);
 }
 
 // ============================================
@@ -429,77 +603,117 @@ export async function deleteInsurance(id: string) {
 // ============================================
 
 export async function createRegistration(data: CreateRegistrationData) {
-    const session = await requireAdmin();
+    try {
+        const session = await requireAdmin();
 
-    const registration = await prisma.vehicleRegistration.create({
-        data,
-    });
+        // Validate input
+        const parseResult = createRegistrationSchema.safeParse(data);
+        if (!parseResult.success) {
+            return { success: false, error: parseResult.error.issues[0]?.message || "Invalid input" };
+        }
 
-    await createAuditLog(
-        session.user.id,
-        "CREATE",
-        "VehicleRegistration",
-        registration.id,
-        { vehicleId: data.vehicleId, state: data.state }
-    );
+        const registration = await prisma.vehicleRegistration.create({
+            data,
+        });
 
-    revalidatePath(`/fleet/${data.vehicleId}`);
-    return registration;
+        await createAuditLog(
+            session.user.id,
+            "CREATE",
+            "VehicleRegistration",
+            registration.id,
+            { vehicleId: data.vehicleId, state: data.state }
+        );
+
+        revalidatePath(`/fleet/${data.vehicleId}`);
+        return { success: true, data: registration };
+    } catch (error) {
+        console.error("createRegistration error:", error);
+        return { success: false, error: "Failed to create registration record" };
+    }
 }
 
 export async function updateRegistration(id: string, data: Partial<CreateRegistrationData>) {
-    const session = await requireAdmin();
+    try {
+        const session = await requireAdmin();
 
-    const registration = await prisma.vehicleRegistration.update({
-        where: { id },
-        data,
-    });
+        // Validate ID
+        const idResult = idParamSchema.safeParse({ id });
+        if (!idResult.success) {
+            return { success: false, error: "Invalid registration ID" };
+        }
 
-    await createAuditLog(
-        session.user.id,
-        "UPDATE",
-        "VehicleRegistration",
-        registration.id,
-        { state: registration.state }
-    );
+        // Validate input
+        const parseResult = updateRegistrationSchema.safeParse(data);
+        if (!parseResult.success) {
+            return { success: false, error: parseResult.error.issues[0]?.message || "Invalid input" };
+        }
 
-    revalidatePath(`/fleet/${registration.vehicleId}`);
-    return registration;
+        const registration = await prisma.vehicleRegistration.update({
+            where: { id },
+            data,
+        });
+
+        await createAuditLog(
+            session.user.id,
+            "UPDATE",
+            "VehicleRegistration",
+            registration.id,
+            { state: registration.state }
+        );
+
+        revalidatePath(`/fleet/${registration.vehicleId}`);
+        return { success: true, data: registration };
+    } catch (error) {
+        console.error("updateRegistration error:", error);
+        return { success: false, error: "Failed to update registration record" };
+    }
 }
 
 export async function deleteRegistration(id: string) {
-    const session = await requireAdmin();
+    try {
+        const session = await requireAdmin();
 
-    const registration = await prisma.vehicleRegistration.findUnique({
-        where: { id },
-    });
-
-    if (!registration) {
-        throw new Error("Registration record not found");
-    }
-
-    // Delete file if exists
-    if (registration.fileUrl) {
-        try {
-            await deleteFile(STORAGE_BUCKETS.FLEET_DOCUMENTS, registration.fileUrl);
-        } catch (error) {
-            console.error("Failed to delete registration file:", error);
+        // Validate ID
+        const parseResult = idParamSchema.safeParse({ id });
+        if (!parseResult.success) {
+            return { success: false, error: "Invalid registration ID" };
         }
+
+        const registration = await prisma.vehicleRegistration.findUnique({
+            where: { id },
+        });
+
+        if (!registration) {
+            return { success: false, error: "Registration record not found" };
+        }
+
+        // Delete file if exists
+        if (registration.fileUrl) {
+            try {
+                await deleteFile(STORAGE_BUCKETS.FLEET_DOCUMENTS, registration.fileUrl);
+            } catch (error) {
+                console.error("Failed to delete registration file:", error);
+            }
+        }
+
+        await prisma.vehicleRegistration.delete({
+            where: { id },
+        });
+
+        await createAuditLog(
+            session.user.id,
+            "DELETE",
+            "VehicleRegistration",
+            id,
+            { vehicleId: registration.vehicleId, state: registration.state }
+        );
+
+        revalidatePath(`/fleet/${registration.vehicleId}`);
+        return { success: true };
+    } catch (error) {
+        console.error("deleteRegistration error:", error);
+        return { success: false, error: "Failed to delete registration record" };
     }
-
-    await prisma.vehicleRegistration.delete({
-        where: { id },
-    });
-
-    await createAuditLog(
-        session.user.id,
-        "DELETE",
-        "VehicleRegistration",
-        id,
-        { vehicleId: registration.vehicleId, state: registration.state }
-    );
-
-    revalidatePath(`/fleet/${registration.vehicleId}`);
 }
 
 // ============================================
@@ -507,58 +721,81 @@ export async function deleteRegistration(id: string) {
 // ============================================
 
 export async function createVehicleDocument(data: CreateDocumentData) {
-    const session = await requireAdmin();
+    try {
+        const session = await requireAdmin();
 
-    const document = await prisma.vehicleDocument.create({
-        data: {
-            ...data,
-            uploadedById: session.user.id,
-        },
-    });
+        // Validate input
+        const parseResult = createVehicleDocumentSchema.safeParse(data);
+        if (!parseResult.success) {
+            return { success: false, error: parseResult.error.issues[0]?.message || "Invalid input" };
+        }
 
-    await createAuditLog(
-        session.user.id,
-        "CREATE",
-        "VehicleDocument",
-        document.id,
-        { vehicleId: data.vehicleId, title: data.title, documentType: data.documentType }
-    );
+        const document = await prisma.vehicleDocument.create({
+            data: {
+                ...data,
+                uploadedById: session.user.id,
+            },
+        });
 
-    revalidatePath(`/fleet/${data.vehicleId}`);
-    return document;
+        await createAuditLog(
+            session.user.id,
+            "CREATE",
+            "VehicleDocument",
+            document.id,
+            { vehicleId: data.vehicleId, title: data.title, documentType: data.documentType }
+        );
+
+        revalidatePath(`/fleet/${data.vehicleId}`);
+        return { success: true, data: document };
+    } catch (error) {
+        console.error("createVehicleDocument error:", error);
+        return { success: false, error: "Failed to create document" };
+    }
 }
 
 export async function deleteVehicleDocument(id: string) {
-    const session = await requireAdmin();
-
-    const document = await prisma.vehicleDocument.findUnique({
-        where: { id },
-    });
-
-    if (!document) {
-        throw new Error("Document not found");
-    }
-
-    // Delete file from storage
     try {
-        await deleteFile(STORAGE_BUCKETS.FLEET_DOCUMENTS, document.fileUrl);
+        const session = await requireAdmin();
+
+        // Validate ID
+        const parseResult = idParamSchema.safeParse({ id });
+        if (!parseResult.success) {
+            return { success: false, error: "Invalid document ID" };
+        }
+
+        const document = await prisma.vehicleDocument.findUnique({
+            where: { id },
+        });
+
+        if (!document) {
+            return { success: false, error: "Document not found" };
+        }
+
+        // Delete file from storage
+        try {
+            await deleteFile(STORAGE_BUCKETS.FLEET_DOCUMENTS, document.fileUrl);
+        } catch (error) {
+            console.error("Failed to delete document file:", error);
+        }
+
+        await prisma.vehicleDocument.delete({
+            where: { id },
+        });
+
+        await createAuditLog(
+            session.user.id,
+            "DELETE",
+            "VehicleDocument",
+            id,
+            { vehicleId: document.vehicleId, title: document.title }
+        );
+
+        revalidatePath(`/fleet/${document.vehicleId}`);
+        return { success: true };
     } catch (error) {
-        console.error("Failed to delete document file:", error);
+        console.error("deleteVehicleDocument error:", error);
+        return { success: false, error: "Failed to delete document" };
     }
-
-    await prisma.vehicleDocument.delete({
-        where: { id },
-    });
-
-    await createAuditLog(
-        session.user.id,
-        "DELETE",
-        "VehicleDocument",
-        id,
-        { vehicleId: document.vehicleId, title: document.title }
-    );
-
-    revalidatePath(`/fleet/${document.vehicleId}`);
 }
 
 // ============================================
@@ -566,147 +803,175 @@ export async function deleteVehicleDocument(id: string) {
 // ============================================
 
 export async function getExpiringDocuments(daysAhead: number = 30) {
-    await requireAuth();
+    try {
+        await requireAuth();
 
-    const futureDate = new Date();
-    futureDate.setDate(futureDate.getDate() + daysAhead);
-    const now = new Date();
+        // Validate input
+        const parseResult = daysAheadSchema.safeParse({ daysAhead });
+        if (!parseResult.success) {
+            return { success: false, error: "Invalid days ahead value", data: { permits: [], insurance: [], registrations: [] } };
+        }
 
-    const [permits, insurance, registrations] = await Promise.all([
-        prisma.vehiclePermit.findMany({
-            where: {
-                expirationDate: {
-                    gte: now,
-                    lte: futureDate,
-                },
-            },
-            include: {
-                vehicle: {
-                    select: { id: true, name: true, licensePlate: true },
-                },
-            },
-            orderBy: { expirationDate: "asc" },
-        }),
-        prisma.vehicleInsurance.findMany({
-            where: {
-                expirationDate: {
-                    gte: now,
-                    lte: futureDate,
-                },
-            },
-            include: {
-                vehicle: {
-                    select: { id: true, name: true, licensePlate: true },
-                },
-            },
-            orderBy: { expirationDate: "asc" },
-        }),
-        prisma.vehicleRegistration.findMany({
-            where: {
-                expirationDate: {
-                    gte: now,
-                    lte: futureDate,
-                },
-            },
-            include: {
-                vehicle: {
-                    select: { id: true, name: true, licensePlate: true },
-                },
-            },
-            orderBy: { expirationDate: "asc" },
-        }),
-    ]);
+        const futureDate = new Date();
+        futureDate.setDate(futureDate.getDate() + daysAhead);
+        const now = new Date();
 
-    return { permits, insurance, registrations };
+        const [permits, insurance, registrations] = await Promise.all([
+            prisma.vehiclePermit.findMany({
+                where: {
+                    expirationDate: {
+                        gte: now,
+                        lte: futureDate,
+                    },
+                },
+                include: {
+                    vehicle: {
+                        select: { id: true, name: true, licensePlate: true },
+                    },
+                },
+                orderBy: { expirationDate: "asc" },
+            }),
+            prisma.vehicleInsurance.findMany({
+                where: {
+                    expirationDate: {
+                        gte: now,
+                        lte: futureDate,
+                    },
+                },
+                include: {
+                    vehicle: {
+                        select: { id: true, name: true, licensePlate: true },
+                    },
+                },
+                orderBy: { expirationDate: "asc" },
+            }),
+            prisma.vehicleRegistration.findMany({
+                where: {
+                    expirationDate: {
+                        gte: now,
+                        lte: futureDate,
+                    },
+                },
+                include: {
+                    vehicle: {
+                        select: { id: true, name: true, licensePlate: true },
+                    },
+                },
+                orderBy: { expirationDate: "asc" },
+            }),
+        ]);
+
+        return { success: true, data: { permits, insurance, registrations } };
+    } catch (error) {
+        console.error("getExpiringDocuments error:", error);
+        return { success: false, error: "Failed to get expiring documents", data: { permits: [], insurance: [], registrations: [] } };
+    }
 }
 
 export async function getExpiredDocuments() {
-    await requireAuth();
+    try {
+        await requireAuth();
 
-    const now = new Date();
+        const now = new Date();
 
-    const [permits, insurance, registrations] = await Promise.all([
-        prisma.vehiclePermit.findMany({
-            where: {
-                expirationDate: { lt: now },
-            },
-            include: {
-                vehicle: {
-                    select: { id: true, name: true, licensePlate: true },
+        const [permits, insurance, registrations] = await Promise.all([
+            prisma.vehiclePermit.findMany({
+                where: {
+                    expirationDate: { lt: now },
                 },
-            },
-            orderBy: { expirationDate: "desc" },
-        }),
-        prisma.vehicleInsurance.findMany({
-            where: {
-                expirationDate: { lt: now },
-            },
-            include: {
-                vehicle: {
-                    select: { id: true, name: true, licensePlate: true },
+                include: {
+                    vehicle: {
+                        select: { id: true, name: true, licensePlate: true },
+                    },
                 },
-            },
-            orderBy: { expirationDate: "desc" },
-        }),
-        prisma.vehicleRegistration.findMany({
-            where: {
-                expirationDate: { lt: now },
-            },
-            include: {
-                vehicle: {
-                    select: { id: true, name: true, licensePlate: true },
+                orderBy: { expirationDate: "desc" },
+            }),
+            prisma.vehicleInsurance.findMany({
+                where: {
+                    expirationDate: { lt: now },
                 },
-            },
-            orderBy: { expirationDate: "desc" },
-        }),
-    ]);
+                include: {
+                    vehicle: {
+                        select: { id: true, name: true, licensePlate: true },
+                    },
+                },
+                orderBy: { expirationDate: "desc" },
+            }),
+            prisma.vehicleRegistration.findMany({
+                where: {
+                    expirationDate: { lt: now },
+                },
+                include: {
+                    vehicle: {
+                        select: { id: true, name: true, licensePlate: true },
+                    },
+                },
+                orderBy: { expirationDate: "desc" },
+            }),
+        ]);
 
-    return { permits, insurance, registrations };
+        return { success: true, data: { permits, insurance, registrations } };
+    } catch (error) {
+        console.error("getExpiredDocuments error:", error);
+        return { success: false, error: "Failed to get expired documents", data: { permits: [], insurance: [], registrations: [] } };
+    }
 }
 
 export async function getFleetStats() {
-    await requireAuth();
+    try {
+        await requireAuth();
 
-    const now = new Date();
-    const thirtyDaysFromNow = new Date();
-    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+        const now = new Date();
+        const thirtyDaysFromNow = new Date();
+        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
 
-    const [
-        totalVehicles,
-        activeVehicles,
-        expiringPermits,
-        expiringInsurance,
-        expiringRegistration,
-        expiredPermits,
-        expiredInsurance,
-        expiredRegistration,
-    ] = await Promise.all([
-        prisma.fleetVehicle.count(),
-        prisma.fleetVehicle.count({ where: { status: "ACTIVE" } }),
-        prisma.vehiclePermit.count({
-            where: { expirationDate: { gte: now, lte: thirtyDaysFromNow } },
-        }),
-        prisma.vehicleInsurance.count({
-            where: { expirationDate: { gte: now, lte: thirtyDaysFromNow } },
-        }),
-        prisma.vehicleRegistration.count({
-            where: { expirationDate: { gte: now, lte: thirtyDaysFromNow } },
-        }),
-        prisma.vehiclePermit.count({
-            where: { expirationDate: { lt: now } },
-        }),
-        prisma.vehicleInsurance.count({
-            where: { expirationDate: { lt: now } },
-        }),
-        prisma.vehicleRegistration.count({
-            where: { expirationDate: { lt: now } },
-        }),
-    ]);
+        const [
+            totalVehicles,
+            activeVehicles,
+            expiringPermits,
+            expiringInsurance,
+            expiringRegistration,
+            expiredPermits,
+            expiredInsurance,
+            expiredRegistration,
+        ] = await Promise.all([
+            prisma.fleetVehicle.count(),
+            prisma.fleetVehicle.count({ where: { status: "ACTIVE" } }),
+            prisma.vehiclePermit.count({
+                where: { expirationDate: { gte: now, lte: thirtyDaysFromNow } },
+            }),
+            prisma.vehicleInsurance.count({
+                where: { expirationDate: { gte: now, lte: thirtyDaysFromNow } },
+            }),
+            prisma.vehicleRegistration.count({
+                where: { expirationDate: { gte: now, lte: thirtyDaysFromNow } },
+            }),
+            prisma.vehiclePermit.count({
+                where: { expirationDate: { lt: now } },
+            }),
+            prisma.vehicleInsurance.count({
+                where: { expirationDate: { lt: now } },
+            }),
+            prisma.vehicleRegistration.count({
+                where: { expirationDate: { lt: now } },
+            }),
+        ]);
 
-    return {
-        totalVehicles,
-        activeVehicles,
-        expiringDocuments: expiringPermits + expiringInsurance + expiringRegistration,
-        expiredDocuments: expiredPermits + expiredInsurance + expiredRegistration,
-    };
+        return {
+            success: true,
+            data: {
+                totalVehicles,
+                activeVehicles,
+                expiringDocuments: expiringPermits + expiringInsurance + expiringRegistration,
+                expiredDocuments: expiredPermits + expiredInsurance + expiredRegistration,
+            },
+        };
+    } catch (error) {
+        console.error("getFleetStats error:", error);
+        return {
+            success: false,
+            error: "Failed to get fleet stats",
+            data: { totalVehicles: 0, activeVehicles: 0, expiringDocuments: 0, expiredDocuments: 0 },
+        };
+    }
 }

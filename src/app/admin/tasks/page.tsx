@@ -32,7 +32,7 @@ export default async function AdminTasksPage() {
 
     return (
         <TasksClient
-            initialTasks={tasks}
+            initialTasks={tasks.success ? tasks.data : []}
             dispatchers={dispatchers}
         />
     );

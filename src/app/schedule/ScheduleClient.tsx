@@ -179,7 +179,7 @@ export default function ScheduleClient({
 
         setLoading(true);
         try {
-            const newRequest = await createDetailedRequest({
+            const result = await createDetailedRequest({
                 userId: session.user.id,
                 type: requestType,
                 reason: reason.trim(),
@@ -188,8 +188,8 @@ export default function ScheduleClient({
                 requestedEnd: requestedEnd ? new Date(requestedEnd) : undefined,
             });
 
-            if (newRequest) {
-                setRequests((prev) => [newRequest as Request, ...prev]);
+            if (result.success && result.data) {
+                setRequests((prev) => [result.data as Request, ...prev]);
                 setShowRequestForm(false);
                 setReason("");
                 setSelectedScheduleId("");
