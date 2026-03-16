@@ -1,0 +1,11 @@
+# Auth & Role Rules
+- Auth is NextAuth.js v4 with credentials provider and JWT strategy
+- Config lives in src/lib/auth.ts, middleware in src/middleware.ts
+- Four roles: SUPER_ADMIN, ADMIN, ACCOUNTING, DISPATCHER
+- Always check auth in server actions — don't rely only on middleware
+- SUPER_ADMIN: full access including user management and system settings
+- ADMIN: scheduling, dispatchers, approvals, reports, fleet, pricing, confirmations, TBR
+- ACCOUNTING: accounting flags, billing review, pricing, affiliate audit
+- DISPATCHER: dashboard, clock, shift reports, quotes, SMS, schedule view, fleet, SOPs, contacts
+- New features must specify which roles can access them in both page.tsx and server actions
+- New signups get ApprovalStatus.PENDING — admin must approve before access

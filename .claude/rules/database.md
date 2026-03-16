@@ -1,0 +1,11 @@
+# Database Rules
+- Schema at prisma/schema.prisma is the single source of truth
+- Use `npx prisma db push` — NEVER `npx prisma migrate`. No migration files.
+- Always run `npx prisma generate` after any schema change
+- All models should have createdAt DateTime @default(now()) and updatedAt DateTime @updatedAt
+- Use enums for fixed value sets — define them in the schema, not as TypeScript string unions
+- Use @id @default(cuid()) for primary keys
+- Add @@index on fields used in WHERE clauses and frequently queried columns
+- Relations must have explicit onDelete behavior (Cascade, SetNull, or Restrict)
+- When adding a new model, also add corresponding TypeScript types in src/types/
+- Route pricing table has ~158K rows — always paginate queries, never SELECT *

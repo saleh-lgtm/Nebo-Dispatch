@@ -1,0 +1,11 @@
+# Server Action Rules
+- All server action files live in src/lib/ with naming pattern *Actions.ts
+- Every file starts with "use server" directive
+- Every exported function must check auth via getServerSession(authOptions)
+- Every exported function must validate input with Zod before database access
+- Every exported function must wrap DB operations in try/catch
+- Return shape is always: { success: boolean, data?: T, error?: string }
+- Sensitive operations must call createAuditLog() from src/lib/auditActions.ts
+- Do NOT create API routes for CRUD — use server actions instead
+- API routes (src/app/api/) are ONLY for: webhooks, external integrations, cron jobs
+- Use Prisma client from src/lib/prisma.ts — never instantiate a new PrismaClient
