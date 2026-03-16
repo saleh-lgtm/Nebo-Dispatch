@@ -4,6 +4,30 @@ Permanent session history. Newest entries at top.
 
 ---
 
+### Session — 2026-03-16 Night
+**Focus:** Sidebar navigation reorganization — data-driven config, role-based groups, badge counts
+**Changes:**
+- Created: src/config/navigation.ts — centralized navigation config with TypeScript types
+- Created: src/lib/navCountsActions.ts — server action for admin badge counts
+- Modified: src/components/Sidebar.tsx — complete rewrite with dynamic nav rendering
+- Modified: src/components/Sidebar.module.css — added badge, collapsible group styles
+- Modified: src/components/AppLayout.tsx — removed Navbar import
+- Modified: src/middleware.ts — added ACCOUNTING role access to /admin/pricing, /admin/affiliate-audit
+- Modified: src/components/dashboard/index.ts — removed Navbar export
+- Deleted: src/components/Navbar.tsx, src/components/Navbar.module.css
+- Commits:
+  - b554728 feat: reorganize sidebar navigation — data-driven config, role-based groups, badge counts
+**Decisions:**
+- Navigation is data-driven from src/config/navigation.ts
+- Badge counts poll every 60s for ADMIN/SUPER_ADMIN (confirmations, SMS, requests, tasks, TBR)
+- System group collapsed by default
+- ACCOUNTING role can access /admin/pricing and /admin/affiliate-audit
+**Issues Found:**
+- SMSLog has no isRead field — using inbound SMS count from last 24h instead
+- Dispatcher /confirmations page needs to be created (nav item added, page TODO)
+
+---
+
 ### Session — 2026-03-16 Late Evening
 **Focus:** Set up persistent session logging with SESSION-LOG.md
 **Changes:**
