@@ -16,25 +16,11 @@ Staff-only tool for dispatchers, admins, and accounting.
 - Accounting flags, billing review
 - 45 server action files, 71 Prisma models, 26 enums
 
-## This Session
+## Recent Sessions (last 3)
 
-Created comprehensive documentation suite in `docs/`.
-
-**Files Created:**
-- `docs/ARCHITECTURE.md` — system overview, data flow diagrams, deployment architecture
-- `docs/DATABASE.md` — 71 models, 26 enums, relationships, performance notes
-- `docs/API.md` — 13 API routes, auth methods, webhooks, cron endpoints
-- `docs/INTEGRATIONS.md` — 6 external services, setup checklist, environment config
-
-**Commits:**
-- c3669b9 — docs: add ARCHITECTURE.md
-- 9ef7794 — docs: add DATABASE.md
-- e4564ce — docs: add API.md
-- f7cd301 — docs: add INTEGRATIONS.md
-
-**Pending Changes:**
-- CLEANUP-CHECKLIST.md deleted (staged)
-- .claude/settings.json untracked
+- **2026-03-16 Evening:** Server action hardening — added Zod validation, try/catch, standard return shape to 10 server action files (56 functions total)
+- **2026-03-16 Afternoon:** Created docs/ suite — ARCHITECTURE.md, DATABASE.md, API.md, INTEGRATIONS.md
+- **2026-03-16 Morning:** Set up Claude Code project rules and slash commands
 
 ## In Progress
 
@@ -44,20 +30,24 @@ Created comprehensive documentation suite in `docs/`.
 - Production: remove TWILIO_SKIP_SIGNATURE_VALIDATION
 - A2P 10DLC registration for US compliance
 
+**Server Action Hardening:**
+- 10 of 45 server action files hardened — remaining 35 need review
+
 ## Known Issues
 
 1. SMS real-time not working until Supabase replication enabled
 2. Route Pricing ~158K rows — always paginate, no SELECT *
 3. ShiftReportForm.tsx ~100KB — edit subcomponents in src/components/shift-report/
 4. TripConfirmation queries need status + dueAt index
+5. ESLint error in useClockTimer.ts (pre-existing, not blocking)
 
 ## Next Session
 
-1. Complete Twilio production setup per TODO-TWILIO-SETUP.md
-2. Add database indexes for TripConfirmation (status, dueAt)
-3. Review/optimize slow queries on RoutePricing table
-4. Consider adding docs/FEATURES.md for feature-by-feature guide
-5. Stage and commit pending .claude/settings.json if needed
+1. Continue server action hardening — remaining 35 files
+2. Complete Twilio production setup per TODO-TWILIO-SETUP.md
+3. Add database indexes for TripConfirmation (status, dueAt)
+4. Review/optimize slow queries on RoutePricing table
+5. Consider adding docs/FEATURES.md for feature-by-feature guide
 
 ## Key Decisions
 
@@ -65,5 +55,7 @@ Created comprehensive documentation suite in `docs/`.
 - Server actions for CRUD — API routes only for webhooks/external
 - `npm run db:push` — no migrations
 - Client components use *Client.tsx suffix
+- All server actions return `{ success: boolean, data?: T, error?: string }`
+- ZodError uses `.issues` not `.errors` for validation messages
 - Documentation lives in docs/ — ARCHITECTURE, DATABASE, API, INTEGRATIONS
-- Run /session-end at end of each session to update this file
+- Run /session-end at end of each session to update PRIMER.md and SESSION-LOG.md

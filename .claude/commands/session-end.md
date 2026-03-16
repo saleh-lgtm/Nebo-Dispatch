@@ -1,30 +1,45 @@
 ---
-description: End-of-session — rewrite PRIMER.md with current project state
+description: End-of-session — update PRIMER.md and append to SESSION-LOG.md
 ---
-Rewrite PRIMER.md at the project root with a fresh snapshot.
-Include these sections and keep the entire file under 100 lines:
+
+Do TWO things at end of session:
+
+FIRST — Append to SESSION-LOG.md at the project root.
+Add a new entry at the TOP of the file (newest first) with:
+
+### Session — [today's date] [approximate time]
+**Focus:** One-line summary of what this session was about
+**Changes:**
+- List every file created/modified/deleted
+- List every commit made
+**Decisions:** Any architecture or approach decisions made
+**Issues Found:** Bugs or problems discovered
+---
+
+Do NOT delete existing entries. Always append to the top.
+This file is a permanent log.
+
+SECOND — Rewrite PRIMER.md as a fresh snapshot. Include:
 
 ## Current State
-What's working, what's deployed, what's the overall status.
+What's working, deployed, overall status.
 
-## This Session
-What was built, changed, or fixed this session. Be specific —
-list files created/modified and decisions made.
+## Recent Sessions (last 3)
+Summary of the last 3 sessions from SESSION-LOG.md —
+one bullet per session with date and focus area.
 
 ## In Progress
-Anything started but not finished. Include branch names if relevant.
+Anything started but not finished across recent sessions.
 
 ## Known Issues
-Bugs, broken things, or tech debt discovered this session.
+All current bugs, broken things, tech debt.
 
 ## Next Session
-What should be tackled next, in priority order. Be specific
-enough that a fresh Claude Code session can pick this up
-without asking questions.
+What to tackle next, in priority order. Be specific enough
+that a fresh Claude Code session can pick this up cold.
 
 ## Key Decisions
-Any architecture or approach decisions made this session
-that future sessions need to know about.
+Running list of important decisions that affect how code
+should be written. Pull from SESSION-LOG.md entries.
 
-Write it as a factual snapshot — no filler, no commentary.
-Every line should be information a fresh session needs.
+Keep PRIMER.md under 100 lines. Keep it factual, no filler.
