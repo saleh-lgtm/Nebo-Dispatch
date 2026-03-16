@@ -2,6 +2,7 @@
 
 import prisma from "@/lib/prisma";
 import { requireAuth } from "./auth-helpers";
+import { calendarUserIdSchema, calendarTokenSchema } from "./schemas";
 import crypto from "crypto";
 
 // Company timezone for display
@@ -47,147 +48,187 @@ function createDateWithHour(date: Date, hour: number): Date {
  * Generate a unique calendar subscription token for a user
  * This token is used to authenticate calendar subscriptions without requiring login
  */
-export async function generateCalendarToken(userId: string): Promise<string> {
-    await requireAuth();
+export async function generateCalendarToken(userId: string): Promise<{ success: boolean; data?: string; error?: string }> {
+    try {
+        await requireAuth();
 
-    // Generate a secure random token
-    const token = crypto.randomBytes(32).toString("hex");
+        const parseResult = calendarUserIdSchema.safeParse({ userId });
+        if (!parseResult.success) {
+            return { success: false, error: "Invalid user ID" };
+        }
 
-    // Store token in user record (you may need to add this field to the schema)
-    // For now, we'll use a deterministic hash of userId + a secret
-    // In production, store this in the database
-    const hash = crypto
-        .createHmac("sha256", process.env.NEXTAUTH_SECRET || "calendar-secret")
-        .update(userId)
-        .digest("hex");
+        const hash = crypto
+            .createHmac("sha256", process.env.NEXTAUTH_SECRET || "calendar-secret")
+            .update(userId)
+            .digest("hex");
 
-    return hash.substring(0, 32);
+        return { success: true, data: hash.substring(0, 32) };
+    } catch (error) {
+        console.error("generateCalendarToken error:", error);
+        return { success: false, error: "Failed to generate calendar token" };
+    }
 }
 
 /**
  * Verify a calendar token and return the associated userId
  */
-export async function verifyCalendarToken(token: string, userId: string): Promise<boolean> {
-    const expectedToken = crypto
-        .createHmac("sha256", process.env.NEXTAUTH_SECRET || "calendar-secret")
-        .update(userId)
-        .digest("hex")
-        .substring(0, 32);
+export async function verifyCalendarToken(token: string, userId: string): Promise<{ success: boolean; data?: boolean; error?: string }> {
+    try {
+        const parseResult = calendarTokenSchema.safeParse({ token, userId });
+        if (!parseResult.success) {
+            return { success: false, error: "Invalid token or user ID" };
+        }
 
-    return token === expectedToken;
+        const expectedToken = crypto
+            .createHmac("sha256", process.env.NEXTAUTH_SECRET || "calendar-secret")
+            .update(userId)
+            .digest("hex")
+            .substring(0, 32);
+
+        return { success: true, data: token === expectedToken };
+    } catch (error) {
+        console.error("verifyCalendarToken error:", error);
+        return { success: false, error: "Failed to verify calendar token" };
+    }
 }
 
 /**
  * Generate an iCal feed for a user's published schedules
  */
-export async function generateICalFeed(userId: string): Promise<string> {
-    // Get user info
-    const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true, name: true, email: true },
-    });
+export async function generateICalFeed(userId: string): Promise<{ success: boolean; data?: string; error?: string }> {
+    try {
+        const parseResult = calendarUserIdSchema.safeParse({ userId });
+        if (!parseResult.success) {
+            return { success: false, error: "Invalid user ID" };
+        }
 
-    if (!user) {
-        throw new Error("User not found");
+        // Get user info
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { id: true, name: true, email: true },
+        });
+
+        if (!user) {
+            return { success: false, error: "User not found" };
+        }
+
+        // Get all future published schedules for this user
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const schedules = await prisma.schedule.findMany({
+            where: {
+                userId,
+                isPublished: true,
+                date: { gte: today }, // Include today and future shifts
+            },
+            orderBy: [{ date: "asc" }, { startHour: "asc" }],
+        });
+
+        // Build iCal content
+        const lines: string[] = [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "PRODID:-//Nebo Dispatch//Schedule//EN",
+            "CALSCALE:GREGORIAN",
+            "METHOD:PUBLISH",
+            `X-WR-CALNAME:${escapeICalText(user.name || "Dispatch")} Schedule`,
+            "X-WR-TIMEZONE:America/Chicago",
+            // Timezone definition for America/Chicago
+            "BEGIN:VTIMEZONE",
+            "TZID:America/Chicago",
+            "BEGIN:STANDARD",
+            "DTSTART:20071104T020000",
+            "RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU",
+            "TZOFFSETFROM:-0500",
+            "TZOFFSETTO:-0600",
+            "TZNAME:CST",
+            "END:STANDARD",
+            "BEGIN:DAYLIGHT",
+            "DTSTART:20070311T020000",
+            "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU",
+            "TZOFFSETFROM:-0600",
+            "TZOFFSETTO:-0500",
+            "TZNAME:CDT",
+            "END:DAYLIGHT",
+            "END:VTIMEZONE",
+        ];
+
+        // Add each schedule as an event
+        for (const schedule of schedules) {
+            const startDate = createDateWithHour(schedule.date, schedule.startHour);
+            // For overnight shifts, end date is next day
+            const isOvernight = schedule.endHour <= schedule.startHour && schedule.endHour !== schedule.startHour;
+            const endDate = isOvernight
+                ? createDateWithHour(new Date(schedule.date.getTime() + 24 * 60 * 60 * 1000), schedule.endHour)
+                : createDateWithHour(schedule.date, schedule.endHour);
+            const duration = getShiftDuration(schedule.startHour, schedule.endHour);
+
+            // Format dates for local timezone display
+            const startStr = startDate.toLocaleString("en-US", { timeZone: COMPANY_TIMEZONE });
+
+            lines.push(
+                "BEGIN:VEVENT",
+                `UID:${schedule.id}@nebodispatch.com`,
+                `DTSTAMP:${formatICalDateTime(new Date())}`,
+                `DTSTART:${formatICalDateTime(startDate)}`,
+                `DTEND:${formatICalDateTime(endDate)}`,
+                `SUMMARY:Dispatch Shift (${duration}h)`,
+                `DESCRIPTION:${escapeICalText(`Nebo Dispatch shift starting at ${startStr}`)}`,
+                "CATEGORIES:WORK,DISPATCH",
+                "STATUS:CONFIRMED",
+                "END:VEVENT"
+            );
+        }
+
+        lines.push("END:VCALENDAR");
+
+        return { success: true, data: lines.join("\r\n") };
+    } catch (error) {
+        console.error("generateICalFeed error:", error);
+        return { success: false, error: "Failed to generate calendar feed" };
     }
-
-    // Get all future published schedules for this user
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const schedules = await prisma.schedule.findMany({
-        where: {
-            userId,
-            isPublished: true,
-            date: { gte: today }, // Include today and future shifts
-        },
-        orderBy: [{ date: "asc" }, { startHour: "asc" }],
-    });
-
-    // Build iCal content
-    const lines: string[] = [
-        "BEGIN:VCALENDAR",
-        "VERSION:2.0",
-        "PRODID:-//Nebo Dispatch//Schedule//EN",
-        "CALSCALE:GREGORIAN",
-        "METHOD:PUBLISH",
-        `X-WR-CALNAME:${escapeICalText(user.name || "Dispatch")} Schedule`,
-        "X-WR-TIMEZONE:America/Chicago",
-        // Timezone definition for America/Chicago
-        "BEGIN:VTIMEZONE",
-        "TZID:America/Chicago",
-        "BEGIN:STANDARD",
-        "DTSTART:20071104T020000",
-        "RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU",
-        "TZOFFSETFROM:-0500",
-        "TZOFFSETTO:-0600",
-        "TZNAME:CST",
-        "END:STANDARD",
-        "BEGIN:DAYLIGHT",
-        "DTSTART:20070311T020000",
-        "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU",
-        "TZOFFSETFROM:-0600",
-        "TZOFFSETTO:-0500",
-        "TZNAME:CDT",
-        "END:DAYLIGHT",
-        "END:VTIMEZONE",
-    ];
-
-    // Add each schedule as an event
-    for (const schedule of schedules) {
-        const startDate = createDateWithHour(schedule.date, schedule.startHour);
-        // For overnight shifts, end date is next day
-        const isOvernight = schedule.endHour <= schedule.startHour && schedule.endHour !== schedule.startHour;
-        const endDate = isOvernight
-            ? createDateWithHour(new Date(schedule.date.getTime() + 24 * 60 * 60 * 1000), schedule.endHour)
-            : createDateWithHour(schedule.date, schedule.endHour);
-        const duration = getShiftDuration(schedule.startHour, schedule.endHour);
-
-        // Format dates for local timezone display
-        const startStr = startDate.toLocaleString("en-US", { timeZone: COMPANY_TIMEZONE });
-
-        lines.push(
-            "BEGIN:VEVENT",
-            `UID:${schedule.id}@nebodispatch.com`,
-            `DTSTAMP:${formatICalDateTime(new Date())}`,
-            `DTSTART:${formatICalDateTime(startDate)}`,
-            `DTEND:${formatICalDateTime(endDate)}`,
-            `SUMMARY:Dispatch Shift (${duration}h)`,
-            `DESCRIPTION:${escapeICalText(`Nebo Dispatch shift starting at ${startStr}`)}`,
-            "CATEGORIES:WORK,DISPATCH",
-            "STATUS:CONFIRMED",
-            "END:VEVENT"
-        );
-    }
-
-    lines.push("END:VCALENDAR");
-
-    return lines.join("\r\n");
 }
 
 /**
  * Get the calendar subscription URL for a user
  */
-export async function getCalendarSubscriptionUrl(userId: string): Promise<string> {
-    const token = await generateCalendarToken(userId);
+export async function getCalendarSubscriptionUrl(userId: string): Promise<{ success: boolean; data?: string; error?: string }> {
+    try {
+        const tokenResult = await generateCalendarToken(userId);
+        if (!tokenResult.success || !tokenResult.data) {
+            return { success: false, error: tokenResult.error || "Failed to generate token" };
+        }
 
-    // Build the webcal URL (webcal:// opens in calendar apps)
-    const baseUrl = process.env.NEXTAUTH_URL || "https://nebo-dispatch.vercel.app";
-    const url = new URL(`/api/calendar/${userId}`, baseUrl);
-    url.searchParams.set("token", token);
+        // Build the webcal URL (webcal:// opens in calendar apps)
+        const baseUrl = process.env.NEXTAUTH_URL || "https://nebo-dispatch.vercel.app";
+        const url = new URL(`/api/calendar/${userId}`, baseUrl);
+        url.searchParams.set("token", tokenResult.data);
 
-    return url.toString().replace(/^https?:\/\//, "webcal://");
+        return { success: true, data: url.toString().replace(/^https?:\/\//, "webcal://") };
+    } catch (error) {
+        console.error("getCalendarSubscriptionUrl error:", error);
+        return { success: false, error: "Failed to get calendar URL" };
+    }
 }
 
 /**
  * Get the calendar download URL (for one-time .ics download)
  */
-export async function getCalendarDownloadUrl(userId: string): Promise<string> {
-    const token = await generateCalendarToken(userId);
+export async function getCalendarDownloadUrl(userId: string): Promise<{ success: boolean; data?: string; error?: string }> {
+    try {
+        const tokenResult = await generateCalendarToken(userId);
+        if (!tokenResult.success || !tokenResult.data) {
+            return { success: false, error: tokenResult.error || "Failed to generate token" };
+        }
 
-    const baseUrl = process.env.NEXTAUTH_URL || "https://nebo-dispatch.vercel.app";
-    const url = new URL(`/api/calendar/${userId}`, baseUrl);
-    url.searchParams.set("token", token);
-    url.searchParams.set("download", "true");
+        const baseUrl = process.env.NEXTAUTH_URL || "https://nebo-dispatch.vercel.app";
+        const url = new URL(`/api/calendar/${userId}`, baseUrl);
+        url.searchParams.set("token", tokenResult.data);
+        url.searchParams.set("download", "true");
 
-    return url.toString();
+        return { success: true, data: url.toString() };
+    } catch (error) {
+        console.error("getCalendarDownloadUrl error:", error);
+        return { success: false, error: "Failed to get calendar download URL" };
+    }
 }

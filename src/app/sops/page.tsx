@@ -22,17 +22,21 @@ export default async function SOPsPage() {
         redirect("/login");
     }
 
-    const [sopsByCategory, favoriteSOPs, unacknowledgedSOPs] = await Promise.all([
+    const [sopsByCategoryResult, favoriteSOPsResult, unacknowledgedSOPsResult] = await Promise.all([
         getSOPsByCategory(),
         getFavoriteSOPs(),
         getUnacknowledgedSOPs(session.user.id),
     ]);
 
+    const sopsByCategory = sopsByCategoryResult.success && sopsByCategoryResult.data ? sopsByCategoryResult.data : {};
+    const favoriteSOPs = favoriteSOPsResult.success && favoriteSOPsResult.data ? favoriteSOPsResult.data : [];
+    const unacknowledgedSOPs = unacknowledgedSOPsResult.success && unacknowledgedSOPsResult.data ? unacknowledgedSOPsResult.data : [];
+
     return (
         <SOPsClient
-            sopsByCategory={sopsByCategory}
-            favoriteSOPs={favoriteSOPs}
-            unacknowledgedSOPs={unacknowledgedSOPs}
+            sopsByCategory={sopsByCategory as Record<string, never[]>}
+            favoriteSOPs={favoriteSOPs as never}
+            unacknowledgedSOPs={unacknowledgedSOPs as never}
         />
     );
 }

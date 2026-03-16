@@ -133,7 +133,7 @@ export default async function DashboardPage() {
 
         // Dashboard notes (announcements + shift notes)
         safePromise(
-            getDashboardNotes(session.user.id),
+            getDashboardNotes(session.user.id).then(r => r.success && r.data ? r.data : { announcements: [], shiftNotes: [], unacknowledgedCount: 0 }),
             { announcements: [], shiftNotes: [], unacknowledgedCount: 0 }
         ),
 

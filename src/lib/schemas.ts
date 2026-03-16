@@ -597,6 +597,90 @@ export const shiftsFilterSchema = z.object({
     offset: z.number().min(0).optional(),
 });
 
+// ===== SOP SCHEMAS =====
+
+export const createSOPSchema = z.object({
+    title: z.string().min(2, "Title must be at least 2 characters").max(200),
+    description: z.string().max(2000).optional(),
+    content: z.string().min(10, "Content must be at least 10 characters"),
+    category: z.string().max(100).optional(),
+    isPublished: z.boolean().optional(),
+    order: z.number().min(0).optional(),
+    quickReference: z.string().max(5000).optional(),
+    requiresAcknowledgment: z.boolean().optional(),
+    relatedSopIds: z.array(z.string()).optional(),
+});
+
+export const updateSOPSchema = z.object({
+    title: z.string().min(2).max(200).optional(),
+    description: z.string().max(2000).optional(),
+    content: z.string().min(10).optional(),
+    category: z.string().max(100).optional(),
+    isPublished: z.boolean().optional(),
+    order: z.number().min(0).optional(),
+    quickReference: z.string().max(5000).optional(),
+    requiresAcknowledgment: z.boolean().optional(),
+    relatedSopIds: z.array(z.string()).optional(),
+    changeNote: z.string().max(500).optional(),
+});
+
+export const quizQuestionDataSchema = z.object({
+    question: z.string().min(1).max(500),
+    options: z.array(z.string().min(1)).min(2),
+    correctAnswer: z.number().min(0),
+    explanation: z.string().max(1000).optional(),
+});
+
+export const createSOPQuizSchema = z.object({
+    sopId: z.string().min(1, "SOP ID is required"),
+    questions: z.array(quizQuestionDataSchema).min(1, "At least one question required"),
+    title: z.string().max(200).optional(),
+    passingScore: z.number().min(0).max(100).optional(),
+});
+
+export const submitQuizAttemptSchema = z.object({
+    quizId: z.string().min(1, "Quiz ID is required"),
+    answers: z.array(z.number()),
+});
+
+export const sopSearchSchema = z.object({
+    query: z.string().min(1).max(200),
+});
+
+// ===== ANNOUNCEMENT SCHEMAS =====
+
+export const createAnnouncementSchema = z.object({
+    title: z.string().min(3, "Title must be at least 3 characters").max(100, "Title too long"),
+    content: z.string().min(10, "Content must be at least 10 characters"),
+    isPinned: z.boolean().optional(),
+    expiresAt: z.coerce.date().nullable().optional(),
+});
+
+export const updateAnnouncementSchema = z.object({
+    title: z.string().min(3).max(100).optional(),
+    content: z.string().min(10).optional(),
+    isPinned: z.boolean().optional(),
+    expiresAt: z.coerce.date().nullable().optional(),
+});
+
+export const getAllShiftNotesSchema = z.object({
+    limit: z.number().min(1).max(500).optional(),
+    offset: z.number().min(0).optional(),
+    startDate: z.coerce.date().optional(),
+    endDate: z.coerce.date().optional(),
+});
+
+// ===== CALENDAR SCHEMAS =====
+
+export const calendarUserIdSchema = z.object({
+    userId: z.string().min(1, "User ID is required"),
+});
+
+export const calendarTokenSchema = z.object({
+    token: z.string().min(1, "Token is required"),
+    userId: z.string().min(1, "User ID is required"),
+});
+
 // ===== STORAGE SCHEMAS =====
 
 export const uploadFileSchema = z.object({

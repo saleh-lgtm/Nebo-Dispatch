@@ -26,19 +26,23 @@ export default function ShiftNotesCard({ notes, hasActiveShift }: Props) {
         setSubmitting(true);
         setError(null);
         try {
-            const newNote = await createShiftNote({ title, content });
-            setLocalNotes((prev) => [
-                {
-                    ...newNote,
-                    isFromCurrentShift: true,
-                    isFromPreviousShift: false,
-                    shiftAuthor: newNote.author,
-                } as ShiftHandoffNote,
-                ...prev,
-            ]);
-            setTitle("");
-            setContent("");
-            setShowForm(false);
+            const result = await createShiftNote({ title, content });
+            if (result.success && result.data) {
+                setLocalNotes((prev) => [
+                    {
+                        ...result.data,
+                        isFromCurrentShift: true,
+                        isFromPreviousShift: false,
+                        shiftAuthor: (result.data as { author: { id: string; name: string | null } }).author,
+                    } as ShiftHandoffNote,
+                    ...prev,
+                ]);
+                setTitle("");
+                setContent("");
+                setShowForm(false);
+            } else {
+                setError(result.error || "Failed to create note");
+            }
         } catch (err) {
             setError(
                 err instanceof Error ? err.message : "Failed to create note"

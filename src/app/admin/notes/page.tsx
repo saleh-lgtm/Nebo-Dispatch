@@ -24,7 +24,8 @@ export default async function NotesPage() {
         redirect("/dashboard");
     }
 
-    const announcements = await getAllAnnouncementsWithStats();
+    const result = await getAllAnnouncementsWithStats();
+    const announcements = result.success && result.data ? result.data : [];
 
     return (
         <NotesClient

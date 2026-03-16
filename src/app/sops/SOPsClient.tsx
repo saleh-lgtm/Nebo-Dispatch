@@ -56,8 +56,8 @@ export default function SOPsClient({
         const timer = setTimeout(async () => {
             setIsSearching(true);
             try {
-                const results = await searchSOPs(searchQuery);
-                setSearchResults(results);
+                const result = await searchSOPs(searchQuery);
+                setSearchResults(result.success && result.data ? result.data : []);
             } catch (error) {
                 console.error("Search failed:", error);
             } finally {
@@ -75,15 +75,17 @@ export default function SOPsClient({
         startTransition(async () => {
             try {
                 const result = await toggleSOPFavorite(sopId);
-                setFavorites((prev) => {
-                    const next = new Set(prev);
-                    if (result.favorited) {
-                        next.add(sopId);
-                    } else {
-                        next.delete(sopId);
-                    }
-                    return next;
-                });
+                if (result.success && result.data) {
+                    setFavorites((prev) => {
+                        const next = new Set(prev);
+                        if (result.data!.favorited) {
+                            next.add(sopId);
+                        } else {
+                            next.delete(sopId);
+                        }
+                        return next;
+                    });
+                }
             } catch (error) {
                 console.error("Failed to toggle favorite:", error);
             }

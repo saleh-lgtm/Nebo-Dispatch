@@ -21,8 +21,8 @@ export async function GET(
         }
 
         // Verify the token
-        const isValid = await verifyCalendarToken(token, userId);
-        if (!isValid) {
+        const verifyResult = await verifyCalendarToken(token, userId);
+        if (!verifyResult.success || !verifyResult.data) {
             return NextResponse.json(
                 { error: "Invalid token" },
                 { status: 401 }
@@ -30,7 +30,13 @@ export async function GET(
         }
 
         // Generate the iCal feed
-        const icalContent = await generateICalFeed(userId);
+        const feedResult = await generateICalFeed(userId);
+        if (!feedResult.success || !feedResult.data) {
+            return NextResponse.json(
+                { error: feedResult.error || "Failed to generate calendar" },
+                { status: 500 }
+            );
+        }
 
         // Return as iCal file
         const headers: HeadersInit = {
@@ -42,7 +48,7 @@ export async function GET(
             headers["Content-Disposition"] = `attachment; filename="nebo-schedule.ics"`;
         }
 
-        return new NextResponse(icalContent, { headers });
+        return new NextResponse(feedResult.data, { headers });
     } catch (error) {
         console.error("Calendar generation error:", error);
         return NextResponse.json(

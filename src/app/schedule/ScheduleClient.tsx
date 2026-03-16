@@ -147,12 +147,12 @@ export default function ScheduleClient({
         if (!calendarUrl) {
             setLoadingCalendar(true);
             try {
-                const [subUrl, dlUrl] = await Promise.all([
+                const [subResult, dlResult] = await Promise.all([
                     getCalendarSubscriptionUrl(userId),
                     getCalendarDownloadUrl(userId),
                 ]);
-                setCalendarUrl(subUrl);
-                setDownloadUrl(dlUrl);
+                if (subResult.success && subResult.data) setCalendarUrl(subResult.data);
+                if (dlResult.success && dlResult.data) setDownloadUrl(dlResult.data);
             } catch (error) {
                 console.error("Failed to get calendar URL:", error);
             } finally {

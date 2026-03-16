@@ -25,11 +25,11 @@ export default async function SOPDetailPage({ params }: Props) {
     }
 
     const { slug } = await params;
-    const sop = await getSOPWithDetails(slug);
+    const result = await getSOPWithDetails(slug);
 
-    if (!sop || !sop.isPublished) {
+    if (!result.success || !result.data || !result.data.isPublished) {
         notFound();
     }
 
-    return <SOPDetailClient sop={sop} />;
+    return <SOPDetailClient sop={result.data} />;
 }

@@ -89,7 +89,7 @@ export default function SOPsAdminClient({ initialSOPs }: Props) {
 
         try {
             if (editingSOP) {
-                const updated = await updateSOP(editingSOP.id, {
+                const result = await updateSOP(editingSOP.id, {
                     title: formData.title,
                     description: formData.description || undefined,
                     content: formData.content,
@@ -98,13 +98,15 @@ export default function SOPsAdminClient({ initialSOPs }: Props) {
                     requiresAcknowledgment: formData.requiresAcknowledgment,
                     isPublished: formData.isPublished,
                 });
-                setSOPs((prev) =>
-                    prev.map((s) =>
-                        s.id === editingSOP.id ? { ...s, ...updated } : s
-                    )
-                );
+                if (result.success && result.data) {
+                    setSOPs((prev) =>
+                        prev.map((s) =>
+                            s.id === editingSOP.id ? { ...s, ...result.data } : s
+                        )
+                    );
+                }
             } else {
-                const newSOP = await createSOP({
+                const result = await createSOP({
                     title: formData.title,
                     description: formData.description || undefined,
                     content: formData.content,
@@ -113,10 +115,12 @@ export default function SOPsAdminClient({ initialSOPs }: Props) {
                     requiresAcknowledgment: formData.requiresAcknowledgment,
                     isPublished: formData.isPublished,
                 });
-                setSOPs((prev) => [
-                    { ...newSOP, createdBy: { id: "", name: "You" } } as SOP,
-                    ...prev,
-                ]);
+                if (result.success && result.data) {
+                    setSOPs((prev) => [
+                        { ...result.data, createdBy: { id: "", name: "You" } } as SOP,
+                        ...prev,
+                    ]);
+                }
             }
             resetForm();
         } catch (error) {
@@ -143,8 +147,10 @@ export default function SOPsAdminClient({ initialSOPs }: Props) {
     const handleDelete = async (id: string) => {
         setLoading(true);
         try {
-            await deleteSOP(id);
-            setSOPs((prev) => prev.filter((s) => s.id !== id));
+            const result = await deleteSOP(id);
+            if (result.success) {
+                setSOPs((prev) => prev.filter((s) => s.id !== id));
+            }
             setDeleteConfirm(null);
         } catch (error) {
             console.error("Failed to delete SOP:", error);
@@ -155,12 +161,14 @@ export default function SOPsAdminClient({ initialSOPs }: Props) {
 
     const handleTogglePublished = async (sop: SOP) => {
         try {
-            const updated = await toggleSOPPublished(sop.id);
-            setSOPs((prev) =>
-                prev.map((s) =>
-                    s.id === sop.id ? { ...s, isPublished: updated.isPublished } : s
-                )
-            );
+            const result = await toggleSOPPublished(sop.id);
+            if (result.success && result.data) {
+                setSOPs((prev) =>
+                    prev.map((s) =>
+                        s.id === sop.id ? { ...s, isPublished: result.data!.isPublished } : s
+                    )
+                );
+            }
         } catch (error) {
             console.error("Failed to toggle publish status:", error);
         }

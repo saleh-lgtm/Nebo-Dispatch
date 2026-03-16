@@ -74,28 +74,32 @@ export default function NotesClient({ initialNotes, currentUserId }: Props) {
                 : null;
 
             if (editingNote) {
-                const updated = await updateAnnouncement(editingNote.id, {
+                const result = await updateAnnouncement(editingNote.id, {
                     title: formData.title,
                     content: formData.content,
                     isPinned: formData.isPinned,
                     expiresAt,
                 });
-                setAnnouncements((prev) =>
-                    prev.map((n) =>
-                        n.id === editingNote.id ? (updated as Announcement) : n
-                    )
-                );
+                if (result.success && result.data) {
+                    setAnnouncements((prev) =>
+                        prev.map((n) =>
+                            n.id === editingNote.id ? (result.data as Announcement) : n
+                        )
+                    );
+                }
             } else {
-                const newAnnouncement = await createAnnouncement({
+                const result = await createAnnouncement({
                     title: formData.title,
                     content: formData.content,
                     isPinned: formData.isPinned,
                     expiresAt,
                 });
-                setAnnouncements((prev) => [
-                    newAnnouncement as Announcement,
-                    ...prev,
-                ]);
+                if (result.success && result.data) {
+                    setAnnouncements((prev) => [
+                        result.data as Announcement,
+                        ...prev,
+                    ]);
+                }
             }
             resetForm();
         } catch (error) {
@@ -121,8 +125,10 @@ export default function NotesClient({ initialNotes, currentUserId }: Props) {
     const handleDelete = async (id: string) => {
         setLoading(true);
         try {
-            await deleteAnnouncement(id);
-            setAnnouncements((prev) => prev.filter((n) => n.id !== id));
+            const result = await deleteAnnouncement(id);
+            if (result.success) {
+                setAnnouncements((prev) => prev.filter((n) => n.id !== id));
+            }
             setDeleteConfirm(null);
         } catch (error) {
             console.error("Failed to delete announcement:", error);
@@ -134,12 +140,14 @@ export default function NotesClient({ initialNotes, currentUserId }: Props) {
     const handleTogglePin = async (id: string) => {
         setPinningId(id);
         try {
-            const updated = await toggleAnnouncementPin(id);
-            setAnnouncements((prev) =>
-                prev.map((n) =>
-                    n.id === id ? { ...n, isPinned: updated.isPinned } : n
-                )
-            );
+            const result = await toggleAnnouncementPin(id);
+            if (result.success && result.data) {
+                setAnnouncements((prev) =>
+                    prev.map((n) =>
+                        n.id === id ? { ...n, isPinned: result.data!.isPinned } : n
+                    )
+                );
+            }
         } catch (error) {
             console.error("Failed to toggle pin:", error);
         } finally {

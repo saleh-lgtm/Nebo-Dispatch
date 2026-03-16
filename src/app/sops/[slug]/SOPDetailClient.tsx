@@ -88,7 +88,9 @@ export default function SOPDetailClient({ sop }: Props) {
         startTransition(async () => {
             try {
                 const result = await toggleSOPFavorite(sop.id);
-                setIsFavorited(result.favorited);
+                if (result.success && result.data) {
+                    setIsFavorited(result.data.favorited);
+                }
             } catch (error) {
                 console.error("Failed to toggle favorite:", error);
             }

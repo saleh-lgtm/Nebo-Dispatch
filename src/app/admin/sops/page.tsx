@@ -24,7 +24,8 @@ export default async function SOPsAdminPage() {
         redirect("/dashboard");
     }
 
-    const sops = await getAllSOPs({ includeUnpublished: true });
+    const result = await getAllSOPs({ includeUnpublished: true });
+    const sops = result.success && result.data ? result.data : [];
 
-    return <SOPsAdminClient initialSOPs={sops} />;
+    return <SOPsAdminClient initialSOPs={sops as never} />;
 }
