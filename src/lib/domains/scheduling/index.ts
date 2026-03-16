@@ -15,18 +15,21 @@ export {
   // Schedule queries
   getDispatchers,
   getWeekSchedules,
-  isWeekPublished,
   getUserNextShift,
+  getUserUpcomingSchedules,
+  getSchedule,
 
   // Schedule mutations
-  createScheduleBlock,
-  updateScheduleBlock,
-  deleteScheduleBlock,
+  createSchedule,
+  updateSchedule,
+  deleteSchedule,
 
-  // Week publishing
-  publishWeekSchedules,
-  unpublishWeekSchedules,
-  copyPreviousWeekSchedules,
+  // Week operations
+  publishWeek,
+  unpublishWeek,
+  copyPreviousWeek,
+  clearWeekSchedules,
+  previewCopyPreviousWeek,
 } from "../../schedulerActions";
 
 // ============================================

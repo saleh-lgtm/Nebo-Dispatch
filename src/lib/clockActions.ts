@@ -5,6 +5,15 @@ import { revalidatePath } from "next/cache";
 import { requireAuth } from "./auth-helpers";
 import { createAuditLog } from "./auditActions";
 
+/**
+ * Convert a date and hour integer to a full DateTime
+ */
+function createDateWithHour(date: Date, hour: number): Date {
+    const d = new Date(date);
+    d.setHours(hour, 0, 0, 0);
+    return d;
+}
+
 export interface ShiftStatus {
     isClocked: boolean;
     shift: {
@@ -17,8 +26,9 @@ export interface ShiftStatus {
     } | null;
     scheduledShift: {
         id: string;
-        shiftStart: Date;
-        shiftEnd: Date;
+        date: Date;
+        startHour: number;
+        endHour: number;
     } | null;
     hasSubmittedReport: boolean;
 }
@@ -54,11 +64,9 @@ export async function getShiftStatus(): Promise<ShiftStatus> {
         where: {
             userId,
             isPublished: true,
-            shiftStart: {
-                gte: today,
-                lt: tomorrow,
-            },
+            date: today,
         },
+        orderBy: { startHour: "asc" },
     });
 
     return {
@@ -76,8 +84,9 @@ export async function getShiftStatus(): Promise<ShiftStatus> {
         scheduledShift: scheduledShift
             ? {
                   id: scheduledShift.id,
-                  shiftStart: scheduledShift.shiftStart,
-                  shiftEnd: scheduledShift.shiftEnd,
+                  date: scheduledShift.date,
+                  startHour: scheduledShift.startHour,
+                  endHour: scheduledShift.endHour,
               }
             : null,
         hasSubmittedReport: activeShift ? activeShift.reports.length > 0 : false,
@@ -102,30 +111,33 @@ export async function clockIn(): Promise<{ success: boolean; shiftId?: string; e
 
     // Get today's scheduled shift for comparison
     const today = new Date();
-    const todayStart = new Date(today);
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(todayStart);
-    todayEnd.setDate(todayEnd.getDate() + 1);
+    today.setHours(0, 0, 0, 0);
 
     const scheduledShift = await prisma.schedule.findFirst({
         where: {
             userId,
             isPublished: true,
-            shiftStart: {
-                gte: todayStart,
-                lt: todayEnd,
-            },
+            date: today,
         },
+        orderBy: { startHour: "asc" },
     });
 
     const clockInTime = new Date();
     let earlyClockIn: number | null = null;
+    let scheduledStart: Date | null = null;
+    let scheduledEnd: Date | null = null;
 
     if (scheduledShift) {
+        // Convert integer hours to DateTime for Shift model
+        scheduledStart = createDateWithHour(scheduledShift.date, scheduledShift.startHour);
+        // For overnight shifts, end date is next day
+        const isOvernight = scheduledShift.endHour <= scheduledShift.startHour && scheduledShift.endHour !== scheduledShift.startHour;
+        scheduledEnd = isOvernight
+            ? createDateWithHour(new Date(scheduledShift.date.getTime() + 24 * 60 * 60 * 1000), scheduledShift.endHour)
+            : createDateWithHour(scheduledShift.date, scheduledShift.endHour);
+
         // Calculate minutes early (positive) or late (negative)
-        const scheduledMs = scheduledShift.shiftStart.getTime();
-        const actualMs = clockInTime.getTime();
-        earlyClockIn = Math.round((scheduledMs - actualMs) / (1000 * 60));
+        earlyClockIn = Math.round((scheduledStart.getTime() - clockInTime.getTime()) / (1000 * 60));
     }
 
     // Create the shift
@@ -133,15 +145,15 @@ export async function clockIn(): Promise<{ success: boolean; shiftId?: string; e
         data: {
             userId,
             clockIn: clockInTime,
-            scheduledStart: scheduledShift?.shiftStart || null,
-            scheduledEnd: scheduledShift?.shiftEnd || null,
+            scheduledStart,
+            scheduledEnd,
             earlyClockIn,
         },
     });
 
     await createAuditLog(session.user.id, "CLOCK_IN", "Shift", shift.id, {
         earlyClockIn,
-        scheduledStart: scheduledShift?.shiftStart,
+        scheduledStart,
     });
 
     // Create standard tasks for the new shift

@@ -39,7 +39,7 @@ export function formatDate(date: Date): string {
 }
 
 /**
- * Format time only
+ * Format time only (from Date)
  */
 export function formatTime(date: Date): string {
   return new Date(date).toLocaleTimeString(undefined, {
@@ -49,11 +49,30 @@ export function formatTime(date: Date): string {
 }
 
 /**
- * Get shift duration in hours
+ * Format hour integer (0-23) to display string
  */
-export function getShiftDuration(start: Date, end: Date): number {
-  const diff = new Date(end).getTime() - new Date(start).getTime();
-  return Math.round((diff / (1000 * 60 * 60)) * 10) / 10;
+export function formatHour(hour: number): string {
+  const period = hour >= 12 ? "PM" : "AM";
+  const h = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  return `${h}${period}`;
+}
+
+/**
+ * Format shift time range
+ */
+export function formatShiftTime(startHour: number, endHour: number): string {
+  return `${formatHour(startHour)} - ${formatHour(endHour)}`;
+}
+
+/**
+ * Get shift duration in hours (from integer hours)
+ */
+export function getShiftDuration(startHour: number, endHour: number): number {
+  if (endHour > startHour) {
+    return endHour - startHour;
+  }
+  // Overnight shift
+  return 24 - startHour + endHour;
 }
 
 /**

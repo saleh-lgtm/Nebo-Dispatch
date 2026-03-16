@@ -515,6 +515,6 @@ export async function getDispatcherSchedule(userId: string) {
 
     return await prisma.schedule.findMany({
         where: { userId, isPublished: true },
-        orderBy: { shiftStart: "asc" },
+        orderBy: [{ date: "asc" }, { startHour: "asc" }],
     });
 }

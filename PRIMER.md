@@ -18,20 +18,20 @@ Staff-only tool for dispatchers, admins, and accounting.
 
 ## Recent Sessions (last 3)
 
-- **2026-03-16 Evening:** Server action hardening — added Zod validation, try/catch, standard return shape to 10 server action files (56 functions total)
+- **2026-03-16 Late Evening:** Set up persistent session logging — created SESSION-LOG.md, updated /session-end flow
+- **2026-03-16 Evening:** Server action hardening — Zod validation, try/catch, standard return shape for 10 files (56 functions)
 - **2026-03-16 Afternoon:** Created docs/ suite — ARCHITECTURE.md, DATABASE.md, API.md, INTEGRATIONS.md
-- **2026-03-16 Morning:** Set up Claude Code project rules and slash commands
 
 ## In Progress
+
+**Server Action Hardening:**
+- 10 of 45 server action files hardened — remaining 35 need review
 
 **Twilio SMS Real-time (TODO-TWILIO-SETUP.md):**
 - Enable Supabase replication for SMSLog table
 - Add NEXT_PUBLIC_SUPABASE_ANON_KEY to .env
 - Production: remove TWILIO_SKIP_SIGNATURE_VALIDATION
 - A2P 10DLC registration for US compliance
-
-**Server Action Hardening:**
-- 10 of 45 server action files hardened — remaining 35 need review
 
 ## Known Issues
 
@@ -47,7 +47,6 @@ Staff-only tool for dispatchers, admins, and accounting.
 2. Complete Twilio production setup per TODO-TWILIO-SETUP.md
 3. Add database indexes for TripConfirmation (status, dueAt)
 4. Review/optimize slow queries on RoutePricing table
-5. Consider adding docs/FEATURES.md for feature-by-feature guide
 
 ## Key Decisions
 
@@ -58,4 +57,5 @@ Staff-only tool for dispatchers, admins, and accounting.
 - All server actions return `{ success: boolean, data?: T, error?: string }`
 - ZodError uses `.issues` not `.errors` for validation messages
 - Documentation lives in docs/ — ARCHITECTURE, DATABASE, API, INTEGRATIONS
-- Run /session-end at end of each session to update PRIMER.md and SESSION-LOG.md
+- SESSION-LOG.md is append-only (newest at top), PRIMER.md summarizes last 3
+- Run /session-end at end of each session

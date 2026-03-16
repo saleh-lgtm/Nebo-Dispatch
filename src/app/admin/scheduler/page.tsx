@@ -2,16 +2,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getDispatchers, getWeekSchedules } from "@/lib/schedulerActions";
+import { getWeekStart } from "@/types/schedule";
 import SchedulerWrapper from "./SchedulerWrapper";
-
-// Helper to get start of week (Sunday 00:00:00 UTC)
-function getWeekStart(date: Date): Date {
-    const d = new Date(date);
-    const day = d.getUTCDay();
-    d.setUTCDate(d.getUTCDate() - day);
-    d.setUTCHours(0, 0, 0, 0);
-    return d;
-}
 
 export default async function SchedulerPage() {
     const session = await getServerSession(authOptions);
@@ -26,12 +18,12 @@ export default async function SchedulerPage() {
 
     const dispatchers = await getDispatchers();
     const currentWeekStart = getWeekStart(new Date());
-    const schedules = await getWeekSchedules(currentWeekStart);
+    const weekData = await getWeekSchedules(currentWeekStart);
 
     return (
         <SchedulerWrapper
             dispatchers={dispatchers}
-            initialSchedules={schedules}
+            initialSchedules={weekData.schedules}
             initialWeekStart={currentWeekStart.toISOString()}
         />
     );

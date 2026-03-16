@@ -21,8 +21,9 @@ import { adminApproveSwap } from "@/lib/shiftSwapActions";
 
 interface ScheduleData {
     id: string;
-    shiftStart: Date;
-    shiftEnd: Date;
+    date: Date;
+    startHour: number;
+    endHour: number;
     isPublished: boolean;
 }
 
@@ -100,7 +101,20 @@ export default function RequestsClient({ pendingRequests, allRequests, counts }:
         });
     };
 
-    const formatShiftTime = (start: Date, end: Date) => {
+    // Format hour integer to display time
+    const formatHour = (hour: number) => {
+        if (hour === 0) return "12:00 AM";
+        if (hour < 12) return `${hour}:00 AM`;
+        if (hour === 12) return "12:00 PM";
+        return `${hour - 12}:00 PM`;
+    };
+
+    const formatShiftTime = (schedule: ScheduleData) => {
+        const d = new Date(schedule.date);
+        return `${d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} ${formatHour(schedule.startHour)} - ${formatHour(schedule.endHour)}`;
+    };
+
+    const formatDateRange = (start: Date, end: Date) => {
         const s = new Date(start);
         const e = new Date(end);
         return `${s.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} ${s.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} - ${e.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
@@ -326,7 +340,7 @@ export default function RequestsClient({ pendingRequests, allRequests, counts }:
                                         <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: 4 }}>
                                             Current Shift
                                         </p>
-                                        <p>{formatShiftTime(request.schedule.shiftStart, request.schedule.shiftEnd)}</p>
+                                        <p>{formatShiftTime(request.schedule)}</p>
                                     </div>
                                 </div>
                             )}
@@ -339,7 +353,7 @@ export default function RequestsClient({ pendingRequests, allRequests, counts }:
                                             {request.type === "TIME_OFF" ? "Time Off Period" : "Requested Change"}
                                         </p>
                                         <p style={{ color: "var(--accent)" }}>
-                                            {formatShiftTime(request.requestedStart, request.requestedEnd)}
+                                            {formatDateRange(request.requestedStart, request.requestedEnd)}
                                         </p>
                                     </div>
                                 </div>
@@ -397,7 +411,7 @@ export default function RequestsClient({ pendingRequests, allRequests, counts }:
                                         <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: 4 }}>
                                             Target&apos;s Shift
                                         </p>
-                                        <p>{formatShiftTime(request.targetSchedule.shiftStart, request.targetSchedule.shiftEnd)}</p>
+                                        <p>{formatShiftTime(request.targetSchedule)}</p>
                                     </div>
                                 </div>
                             )}

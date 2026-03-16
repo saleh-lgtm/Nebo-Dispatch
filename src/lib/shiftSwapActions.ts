@@ -418,7 +418,7 @@ export async function getSwapableShifts(startDate: Date, endDate: Date) {
         where: {
             isPublished: true,
             userId: { not: session.user.id },
-            shiftStart: {
+            date: {
                 gte: start,
                 lte: end,
             },
@@ -426,7 +426,7 @@ export async function getSwapableShifts(startDate: Date, endDate: Date) {
         include: {
             user: { select: { id: true, name: true } },
         },
-        orderBy: { shiftStart: "asc" },
+        orderBy: [{ date: "asc" }, { startHour: "asc" }],
     });
 
     // Get current user's schedules in the date range
@@ -434,12 +434,12 @@ export async function getSwapableShifts(startDate: Date, endDate: Date) {
         where: {
             isPublished: true,
             userId: session.user.id,
-            shiftStart: {
+            date: {
                 gte: start,
                 lte: end,
             },
         },
-        orderBy: { shiftStart: "asc" },
+        orderBy: [{ date: "asc" }, { startHour: "asc" }],
     });
 
     return { availableShifts: schedules, myShifts: mySchedules };

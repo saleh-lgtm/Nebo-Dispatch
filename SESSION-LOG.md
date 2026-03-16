@@ -4,6 +4,19 @@ Permanent session history. Newest entries at top.
 
 ---
 
+### Session — 2026-03-16 Late Evening
+**Focus:** Set up persistent session logging with SESSION-LOG.md
+**Changes:**
+- Created: SESSION-LOG.md — permanent session history file
+- Modified: .claude/commands/session-end.md — now appends to SESSION-LOG.md + rewrites PRIMER.md
+- Modified: PRIMER.md — new format with "Recent Sessions (last 3)" section
+- Commits:
+  - ad0a069 chore: add SESSION-LOG.md for persistent history, update session-end flow
+**Decisions:** SESSION-LOG.md is append-only (newest at top). PRIMER.md summarizes last 3 sessions.
+**Issues Found:** None
+
+---
+
 ### Session — 2026-03-16 Evening
 **Focus:** Server action hardening — Zod validation, try/catch, standard return shape
 **Changes:**

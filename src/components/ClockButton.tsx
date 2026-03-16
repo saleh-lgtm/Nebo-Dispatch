@@ -9,6 +9,12 @@ function formatTime(date: Date): string {
     return new Date(date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function formatHour(hour: number): string {
+    const period = hour >= 12 ? "PM" : "AM";
+    const h = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    return `${h}:00 ${period}`;
+}
+
 function formatDuration(ms: number): string {
     const hours = Math.floor(ms / (1000 * 60 * 60));
     const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
@@ -222,7 +228,7 @@ export default function ClockButton() {
                                         <div className="info-row">
                                             <span className="info-label">Scheduled</span>
                                             <span className="info-value">
-                                                {formatTime(scheduled.shiftStart)} - {formatTime(scheduled.shiftEnd)}
+                                                {formatHour(scheduled.startHour)} - {formatHour(scheduled.endHour)}
                                             </span>
                                         </div>
                                     </div>

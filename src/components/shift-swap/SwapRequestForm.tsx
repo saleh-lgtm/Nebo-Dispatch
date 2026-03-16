@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { ArrowLeftRight, Clock, Send } from "lucide-react";
 import { getSwapableShifts } from "@/lib/shiftSwapActions";
 import type { Schedule, SwapFormData } from "./types";
-import { formatDateTime, formatShortDateTime } from "./utils";
+import { formatDate, formatShiftTime } from "./utils";
 import styles from "./SwapRequestForm.module.css";
 
 interface Props {
@@ -93,7 +93,7 @@ export default function SwapRequestForm({
               <option value="">Select your shift...</option>
               {myShifts.map((shift) => (
                 <option key={shift.id} value={shift.id}>
-                  {formatDateTime(shift.shiftStart)} - {formatShortDateTime(shift.shiftEnd)}
+                  {formatDate(shift.date)} {formatShiftTime(shift.startHour, shift.endHour)}
                 </option>
               ))}
             </select>
@@ -113,7 +113,7 @@ export default function SwapRequestForm({
                 <option value="">Select a shift to swap with...</option>
                 {availableShifts.map((shift) => (
                   <option key={shift.id} value={shift.id}>
-                    {shift.user?.name || "Unknown"} - {formatDateTime(shift.shiftStart)}
+                    {shift.user?.name || "Unknown"} - {formatDate(shift.date)} {formatShiftTime(shift.startHour, shift.endHour)}
                   </option>
                 ))}
               </select>

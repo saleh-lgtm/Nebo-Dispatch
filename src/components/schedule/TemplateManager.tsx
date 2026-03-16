@@ -16,14 +16,20 @@ interface TemplateManagerProps {
     onCreateNew?: () => void;
 }
 
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function formatHour(hour: number): string {
-    const h = Math.floor(hour);
-    const m = Math.round((hour - h) * 60);
-    const period = h >= 12 ? "PM" : "AM";
-    const displayHour = h > 12 ? h - 12 : h === 0 ? 12 : h;
-    return m === 0 ? `${displayHour}${period}` : `${displayHour}:${m.toString().padStart(2, "0")}${period}`;
+    const period = hour >= 12 ? "PM" : "AM";
+    const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+    return `${displayHour}${period}`;
+}
+
+function getShiftDuration(startHour: number, endHour: number): number {
+    if (endHour > startHour) {
+        return endHour - startHour;
+    }
+    // Overnight shift
+    return 24 - startHour + endHour;
 }
 
 export function TemplateManager({
@@ -183,7 +189,7 @@ export function TemplateManager({
                                     <div key={shift.id} className={styles.shiftItem}>
                                         <span className={styles.shiftDay}>{DAY_NAMES[shift.dayOfWeek]}</span>
                                         <span className={styles.shiftTime}>
-                                            {formatHour(shift.startHour)} ({shift.durationHours}h)
+                                            {formatHour(shift.startHour)} ({getShiftDuration(shift.startHour, shift.endHour)}h)
                                         </span>
                                     </div>
                                 ))}

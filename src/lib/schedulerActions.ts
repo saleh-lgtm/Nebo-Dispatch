@@ -1,696 +1,702 @@
 "use server";
 
 import prisma from "@/lib/prisma";
-import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { requireAdmin, requireAuth } from "./auth-helpers";
 import { createAuditLog } from "./auditActions";
 import { notifySchedulePublished } from "./notificationActions";
-import { detectScheduleConflicts, type ScheduleConflict } from "./scheduleConflicts";
-
-// Helper to get start of week (Sunday 00:00:00 UTC) - internal use only
-function getWeekStartInternal(date: Date): Date {
-    const d = new Date(date);
-    const day = d.getUTCDay();
-    d.setUTCDate(d.getUTCDate() - day);
-    d.setUTCHours(0, 0, 0, 0);
-    return d;
-}
-
-// Get all dispatchers (ADMIN/SUPER_ADMIN only)
-export async function getDispatchers() {
-    await requireAdmin();
-
-    return await prisma.user.findMany({
-        where: { role: "DISPATCHER", isActive: true },
-        select: { id: true, name: true, email: true },
-        orderBy: { name: "asc" },
-    });
-}
-
-// Cached version of getDispatchers - 5 minute cache
-const getCachedDispatchersInternal = unstable_cache(
-    async () => {
-        return await prisma.user.findMany({
-            where: { role: "DISPATCHER", isActive: true },
-            select: { id: true, name: true, email: true },
-            orderBy: { name: "asc" },
-        });
-    },
-    ["dispatchers-list"],
-    { revalidate: 300, tags: ["dispatchers"] }
-);
-
-export async function getCachedDispatchers() {
-    await requireAdmin();
-    return getCachedDispatchersInternal();
-}
-
-// Get schedules for a specific week (ADMIN/SUPER_ADMIN only)
-export async function getWeekSchedules(weekStart: Date) {
-    await requireAdmin();
-
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 7);
-
-    return await prisma.schedule.findMany({
-        where: {
-            shiftStart: {
-                gte: weekStart,
-                lt: weekEnd,
-            },
-        },
-        include: { user: { select: { id: true, name: true } } },
-        orderBy: { shiftStart: "asc" },
-    });
-}
-
-// Cached version of getWeekSchedules - 60 second cache
-const getCachedWeekSchedulesInternal = unstable_cache(
-    async (weekStartISO: string) => {
-        const weekStart = new Date(weekStartISO);
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekEnd.getDate() + 7);
-
-        return await prisma.schedule.findMany({
-            where: {
-                shiftStart: {
-                    gte: weekStart,
-                    lt: weekEnd,
-                },
-            },
-            include: { user: { select: { id: true, name: true } } },
-            orderBy: { shiftStart: "asc" },
-        });
-    },
-    ["week-schedules"],
-    { revalidate: 60, tags: ["schedules"] }
-);
-
-export async function getCachedWeekSchedules(weekStart: Date) {
-    await requireAdmin();
-    return getCachedWeekSchedulesInternal(weekStart.toISOString());
-}
-
-// Schedule with user relation type
-type ScheduleWithUser = {
-    id: string;
-    userId: string;
-    shiftStart: Date;
-    shiftEnd: Date;
-    isPublished: boolean;
-    weekStart: Date | null;
-    user: { id: string; name: string | null };
-};
-
-// Create a new schedule block (ADMIN/SUPER_ADMIN only)
-// Set checkConflicts to true to check for conflicts before creating
-// If skipBlockingConflicts is false and there are error-level conflicts, creation will be blocked
-export async function createScheduleBlock(data: {
-    userId: string;
-    shiftStart: Date;
-    shiftEnd: Date;
-    checkConflicts?: boolean;
-    skipBlockingConflicts?: boolean; // Force create even with error-level conflicts
-}): Promise<{
-    success: boolean;
-    schedule?: ScheduleWithUser;
-    error?: string;
-    conflicts?: ScheduleConflict[];
-}> {
-    try {
-        const session = await requireAdmin();
-        const weekStart = getWeekStartInternal(data.shiftStart);
-
-        // Check for conflicts if requested
-        if (data.checkConflicts) {
-            const conflicts = await detectScheduleConflicts({
-                userId: data.userId,
-                shiftStart: data.shiftStart,
-                shiftEnd: data.shiftEnd,
-            });
-
-            // If there are blocking conflicts and we shouldn't skip them, return them
-            const hasBlocking = conflicts.some((c) => c.severity === "error");
-            if (hasBlocking && !data.skipBlockingConflicts) {
-                return {
-                    success: false,
-                    error: "Schedule has conflicts that need to be resolved",
-                    conflicts,
-                };
-            }
-
-            // If there are warnings, still create but return the conflicts
-            if (conflicts.length > 0) {
-                const schedule = await prisma.schedule.create({
-                    data: {
-                        userId: data.userId,
-                        shiftStart: data.shiftStart,
-                        shiftEnd: data.shiftEnd,
-                        weekStart: weekStart,
-                        isPublished: false,
-                    },
-                    include: { user: { select: { id: true, name: true } } },
-                });
-
-                await createAuditLog(
-                    session.user.id,
-                    "CREATE",
-                    "Schedule",
-                    schedule.id,
-                    { userId: data.userId, shiftStart: data.shiftStart, shiftEnd: data.shiftEnd, conflicts: conflicts.length }
-                );
-
-                revalidatePath("/admin/scheduler");
-                revalidateTag("schedules", "max");
-                return { success: true, schedule, conflicts };
-            }
-        }
-
-        const schedule = await prisma.schedule.create({
-            data: {
-                userId: data.userId,
-                shiftStart: data.shiftStart,
-                shiftEnd: data.shiftEnd,
-                weekStart: weekStart,
-                isPublished: false,
-            },
-            include: { user: { select: { id: true, name: true } } },
-        });
-
-        await createAuditLog(
-            session.user.id,
-            "CREATE",
-            "Schedule",
-            schedule.id,
-            { userId: data.userId, shiftStart: data.shiftStart, shiftEnd: data.shiftEnd }
-        );
-
-        revalidatePath("/admin/scheduler");
-        revalidateTag("schedules", "max");
-        return { success: true, schedule };
-    } catch (error) {
-        console.error("Failed to create schedule:", error);
-        return { success: false, error: "Failed to create shift. Please try again." };
-    }
-}
-
-// Update schedule block position/duration (ADMIN/SUPER_ADMIN only)
-export async function updateScheduleBlock(
-    id: string,
-    data: {
-        shiftStart?: Date;
-        shiftEnd?: Date;
-        checkConflicts?: boolean;
-        skipBlockingConflicts?: boolean;
-    }
-): Promise<{
-    success: boolean;
-    schedule?: ScheduleWithUser;
-    error?: string;
-    conflicts?: ScheduleConflict[];
-}> {
-    try {
-        const session = await requireAdmin();
-
-        // Get current schedule to know the user
-        const currentSchedule = await prisma.schedule.findUnique({
-            where: { id },
-            select: { userId: true, shiftStart: true, shiftEnd: true },
-        });
-
-        if (!currentSchedule) {
-            return { success: false, error: "Schedule not found" };
-        }
-
-        const newShiftStart = data.shiftStart || currentSchedule.shiftStart;
-        const newShiftEnd = data.shiftEnd || currentSchedule.shiftEnd;
-
-        // Check for conflicts if requested
-        if (data.checkConflicts) {
-            const conflicts = await detectScheduleConflicts({
-                userId: currentSchedule.userId,
-                shiftStart: newShiftStart,
-                shiftEnd: newShiftEnd,
-                excludeScheduleId: id, // Exclude current schedule from overlap check
-            });
-
-            const hasBlocking = conflicts.some((c) => c.severity === "error");
-            if (hasBlocking && !data.skipBlockingConflicts) {
-                return {
-                    success: false,
-                    error: "Schedule update has conflicts that need to be resolved",
-                    conflicts,
-                };
-            }
-
-            if (conflicts.length > 0) {
-                const updateData: Record<string, unknown> = {};
-                if (data.shiftStart) {
-                    updateData.shiftStart = data.shiftStart;
-                    updateData.weekStart = getWeekStartInternal(data.shiftStart);
-                }
-                if (data.shiftEnd) {
-                    updateData.shiftEnd = data.shiftEnd;
-                }
-
-                const schedule = await prisma.schedule.update({
-                    where: { id },
-                    data: updateData,
-                    include: { user: { select: { id: true, name: true } } },
-                });
-
-                await createAuditLog(session.user.id, "UPDATE", "Schedule", id, {
-                    ...data,
-                    conflicts: conflicts.length,
-                });
-
-                revalidatePath("/admin/scheduler");
-                revalidatePath("/schedule");
-                revalidateTag("schedules", "max");
-                return { success: true, schedule, conflicts };
-            }
-        }
-
-        const updateData: Record<string, unknown> = {};
-        if (data.shiftStart) {
-            updateData.shiftStart = data.shiftStart;
-            updateData.weekStart = getWeekStartInternal(data.shiftStart);
-        }
-        if (data.shiftEnd) {
-            updateData.shiftEnd = data.shiftEnd;
-        }
-
-        const schedule = await prisma.schedule.update({
-            where: { id },
-            data: updateData,
-            include: { user: { select: { id: true, name: true } } },
-        });
-
-        await createAuditLog(
-            session.user.id,
-            "UPDATE",
-            "Schedule",
-            id,
-            data
-        );
-
-        revalidatePath("/admin/scheduler");
-        revalidatePath("/schedule");
-        revalidateTag("schedules", "max");
-        return { success: true, schedule };
-    } catch (error) {
-        console.error("Failed to update schedule:", error);
-        return { success: false, error: "Failed to update shift. Please try again." };
-    }
-}
-
-// Delete a schedule block (ADMIN/SUPER_ADMIN only)
-export async function deleteScheduleBlock(id: string): Promise<{ success: boolean; error?: string }> {
-    try {
-        const session = await requireAdmin();
-
-        await prisma.schedule.delete({ where: { id } });
-
-        await createAuditLog(
-            session.user.id,
-            "DELETE",
-            "Schedule",
-            id
-        );
-
-        revalidatePath("/admin/scheduler");
-        revalidatePath("/schedule");
-        revalidateTag("schedules", "max");
-        return { success: true };
-    } catch (error) {
-        console.error("Failed to delete schedule:", error);
-        return { success: false, error: "Failed to delete shift. Please try again." };
-    }
-}
-
-// Publish all schedules for a week (ADMIN/SUPER_ADMIN only)
-export async function publishWeekSchedules(weekStart: Date): Promise<{ success: boolean; error?: string }> {
-    try {
-        const session = await requireAdmin();
-
-        // Use milliseconds for timezone-safe date calculation
-        const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-        const weekEnd = new Date(weekStart.getTime() + SEVEN_DAYS_MS);
-
-        const result = await prisma.schedule.updateMany({
-            where: {
-                shiftStart: {
-                    gte: weekStart,
-                    lt: weekEnd,
-                },
-            },
-            data: { isPublished: true },
-        });
-
-        await createAuditLog(
-            session.user.id,
-            "UPDATE",
-            "Schedule",
-            undefined,
-            { action: "publish_week", weekStart: weekStart.toISOString(), count: result.count }
-        );
-
-        // Notify all dispatchers with shifts this week
-        await notifySchedulePublished(weekStart);
-
-        revalidatePath("/admin/scheduler");
-        revalidatePath("/schedule");
-        revalidateTag("schedules", "max");
-        return { success: true };
-    } catch (error) {
-        console.error("Failed to publish schedules:", error);
-        return { success: false, error: "Failed to publish schedule. Please try again." };
-    }
-}
-
-// Unpublish all schedules for a week (ADMIN/SUPER_ADMIN only)
-export async function unpublishWeekSchedules(weekStart: Date): Promise<{ success: boolean; error?: string }> {
-    try {
-        const session = await requireAdmin();
-
-        // Use milliseconds for timezone-safe date calculation
-        const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-        const weekEnd = new Date(weekStart.getTime() + SEVEN_DAYS_MS);
-
-        const result = await prisma.schedule.updateMany({
-            where: {
-                shiftStart: {
-                    gte: weekStart,
-                    lt: weekEnd,
-                },
-            },
-            data: { isPublished: false },
-        });
-
-        await createAuditLog(
-            session.user.id,
-            "UPDATE",
-            "Schedule",
-            undefined,
-            { action: "unpublish_week", weekStart: weekStart.toISOString(), count: result.count }
-        );
-
-        revalidatePath("/admin/scheduler");
-        revalidatePath("/schedule");
-        revalidateTag("schedules", "max");
-        return { success: true };
-    } catch (error) {
-        console.error("Failed to unpublish schedules:", error);
-        return { success: false, error: "Failed to unpublish schedule. Please try again." };
-    }
-}
-
-// Check if week is published (ADMIN/SUPER_ADMIN only)
-export async function isWeekPublished(weekStart: Date): Promise<boolean> {
-    await requireAdmin();
-
-    // Use milliseconds for timezone-safe date calculation
-    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-    const weekEnd = new Date(weekStart.getTime() + SEVEN_DAYS_MS);
-
-    const count = await prisma.schedule.count({
-        where: {
-            shiftStart: {
-                gte: weekStart,
-                lt: weekEnd,
-            },
-            isPublished: true,
-        },
-    });
-
-    return count > 0;
-}
-
-// Copy schedules from previous week to target week (ADMIN/SUPER_ADMIN only)
-export async function copyPreviousWeekSchedules(targetWeekStart: Date) {
-    const session = await requireAdmin();
-
-    // Use milliseconds to add exactly 7 days (avoids timezone issues with setDate)
-    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-
-    // Calculate previous week start (7 days before target)
-    const previousWeekStart = new Date(targetWeekStart.getTime() - SEVEN_DAYS_MS);
-    const previousWeekEnd = new Date(previousWeekStart.getTime() + SEVEN_DAYS_MS);
-    const targetWeekEnd = new Date(targetWeekStart.getTime() + SEVEN_DAYS_MS);
-
-    // Get all schedules from previous week
-    const previousSchedules = await prisma.schedule.findMany({
-        where: {
-            shiftStart: {
-                gte: previousWeekStart,
-                lt: previousWeekEnd,
-            },
-        },
-        include: { user: { select: { id: true, name: true } } },
-    });
-
-    if (previousSchedules.length === 0) {
-        return { success: false, copied: 0, message: "No schedules found in previous week" };
-    }
-
-    // Check for existing schedules in target week
-    const existingCount = await prisma.schedule.count({
-        where: {
-            shiftStart: {
-                gte: targetWeekStart,
-                lt: targetWeekEnd,
-            },
-        },
-    });
-
-    if (existingCount > 0) {
-        return {
-            success: false,
-            copied: 0,
-            message: `Target week already has ${existingCount} schedule(s). Clear them first or add manually.`
-        };
-    }
-
-    try {
-        // Batch insert: prepare all schedule data
-        const scheduleData = previousSchedules.map((schedule) => ({
-            userId: schedule.userId,
-            shiftStart: new Date(schedule.shiftStart.getTime() + SEVEN_DAYS_MS),
-            shiftEnd: new Date(schedule.shiftEnd.getTime() + SEVEN_DAYS_MS),
-            weekStart: targetWeekStart,
-            isPublished: false,
-        }));
-
-        // Create all schedules in a single database call
-        await prisma.schedule.createMany({ data: scheduleData });
-
-        // Fetch the newly created schedules with user relations
-        const newSchedules = await prisma.schedule.findMany({
-            where: {
-                weekStart: targetWeekStart,
-                shiftStart: { gte: targetWeekStart, lt: targetWeekEnd },
-            },
-            include: { user: { select: { id: true, name: true } } },
-            orderBy: { shiftStart: "asc" },
-        });
-
-        await createAuditLog(
-            session.user.id,
-            "CREATE",
-            "Schedule",
-            undefined,
-            {
-                action: "copy_previous_week",
-                sourceWeek: previousWeekStart.toISOString(),
-                targetWeek: targetWeekStart.toISOString(),
-                copiedCount: newSchedules.length
-            }
-        );
-
-        revalidatePath("/admin/scheduler");
-        revalidateTag("schedules", "max");
-
-        return {
-            success: true,
-            copied: newSchedules.length,
-            schedules: newSchedules,
-            message: `Copied ${newSchedules.length} schedule(s) from previous week`
-        };
-    } catch (error) {
-        console.error("Failed to copy schedules:", error);
-        return {
-            success: false,
-            copied: 0,
-            message: "Failed to copy schedules. Please try again."
-        };
-    }
-}
-
-// Get user's next scheduled shift (for any authenticated user)
-export async function getUserNextShift(userId: string) {
-    await requireAuth();
-
-    const now = new Date();
-
-    return prisma.schedule.findFirst({
-        where: {
-            userId,
-            isPublished: true,
-            shiftStart: { gte: now },
-        },
-        orderBy: { shiftStart: "asc" },
-        select: {
-            id: true,
-            shiftStart: true,
-            shiftEnd: true,
-        },
-    });
-}
-
-// Types for week stats
-export interface WeekStats {
-    totalHours: number;
-    shiftCount: number;
-    dispatcherCount: number;
-    hoursByDispatcher: { userId: string; name: string | null; hours: number }[];
-    coverageByDay: { day: number; hours: number; shiftCount: number }[];
+import type {
+  Dispatcher,
+  ScheduleRecord,
+  ScheduleInput,
+  WeekScheduleData,
+  ValidationError,
+  Market,
+  ShiftType,
+} from "@/types/schedule";
+import { getWeekStart, addDays, getShiftDuration } from "@/types/schedule";
+
+// ============ QUERY FUNCTIONS ============
+
+/**
+ * Get all active dispatchers
+ */
+export async function getDispatchers(): Promise<Dispatcher[]> {
+  await requireAdmin();
+
+  return prisma.user.findMany({
+    where: { role: "DISPATCHER", isActive: true },
+    select: { id: true, name: true, email: true },
+    orderBy: { name: "asc" },
+  });
 }
 
 /**
- * Get aggregated stats for a week using raw SQL for performance
- * (ADMIN/SUPER_ADMIN only)
+ * Get schedules for a week (Monday-Sunday)
  */
-export async function getWeekStats(weekStart: Date): Promise<WeekStats> {
-    await requireAdmin();
+export async function getWeekSchedules(weekStart: Date): Promise<WeekScheduleData> {
+  await requireAdmin();
 
-    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-    const weekEnd = new Date(weekStart.getTime() + SEVEN_DAYS_MS);
+  const normalizedWeekStart = getWeekStart(weekStart);
+  const weekEnd = addDays(normalizedWeekStart, 7);
 
-    // Run all queries in parallel for efficiency
-    const [totalStats, hoursByDispatcher, coverageByDay] = await Promise.all([
-        // Total hours and counts
-        prisma.$queryRaw<{ total_hours: number | null; shift_count: bigint; dispatcher_count: bigint }[]>`
-            SELECT
-                SUM(EXTRACT(EPOCH FROM ("shiftEnd" - "shiftStart")) / 3600) as total_hours,
-                COUNT(*) as shift_count,
-                COUNT(DISTINCT "userId") as dispatcher_count
-            FROM "Schedule"
-            WHERE "shiftStart" >= ${weekStart}
-              AND "shiftStart" < ${weekEnd}
-        `,
+  const schedules = await prisma.schedule.findMany({
+    where: {
+      weekStart: normalizedWeekStart,
+    },
+    include: { user: { select: { id: true, name: true } } },
+    orderBy: [{ date: "asc" }, { startHour: "asc" }],
+  });
 
-        // Hours by dispatcher
-        prisma.$queryRaw<{ userId: string; name: string | null; hours: number }[]>`
-            SELECT
-                s."userId",
-                u."name",
-                SUM(EXTRACT(EPOCH FROM (s."shiftEnd" - s."shiftStart")) / 3600) as hours
-            FROM "Schedule" s
-            JOIN "User" u ON s."userId" = u.id
-            WHERE s."shiftStart" >= ${weekStart}
-              AND s."shiftStart" < ${weekEnd}
-            GROUP BY s."userId", u."name"
-            ORDER BY hours DESC
-        `,
+  const records: ScheduleRecord[] = schedules.map((s) => ({
+    id: s.id,
+    userId: s.userId,
+    userName: s.user.name,
+    date: s.date,
+    startHour: s.startHour,
+    endHour: s.endHour,
+    market: s.market as Market | null,
+    shiftType: s.shiftType as ShiftType,
+    isPublished: s.isPublished,
+    notes: s.notes,
+  }));
 
-        // Coverage by day of week (0 = Sunday)
-        prisma.$queryRaw<{ day: number; hours: number; shift_count: bigint }[]>`
-            SELECT
-                EXTRACT(DOW FROM "shiftStart" AT TIME ZONE 'America/Chicago') as day,
-                SUM(EXTRACT(EPOCH FROM ("shiftEnd" - "shiftStart")) / 3600) as hours,
-                COUNT(*) as shift_count
-            FROM "Schedule"
-            WHERE "shiftStart" >= ${weekStart}
-              AND "shiftStart" < ${weekEnd}
-            GROUP BY day
-            ORDER BY day
-        `,
-    ]);
+  const isPublished = schedules.length > 0 && schedules.some((s) => s.isPublished);
 
-    const stats = totalStats[0] || { total_hours: 0, shift_count: BigInt(0), dispatcher_count: BigInt(0) };
-
-    return {
-        totalHours: Number(stats.total_hours) || 0,
-        shiftCount: Number(stats.shift_count),
-        dispatcherCount: Number(stats.dispatcher_count),
-        hoursByDispatcher: hoursByDispatcher.map(d => ({
-            userId: d.userId,
-            name: d.name,
-            hours: Number(d.hours) || 0,
-        })),
-        coverageByDay: coverageByDay.map(d => ({
-            day: Number(d.day),
-            hours: Number(d.hours) || 0,
-            shiftCount: Number(d.shift_count),
-        })),
-    };
+  return {
+    schedules: records,
+    weekStart: normalizedWeekStart,
+    weekEnd,
+    isPublished,
+  };
 }
 
-// Cached version of getWeekStats - 30 second cache
-const getCachedWeekStatsInternal = unstable_cache(
-    async (weekStartISO: string) => {
-        const weekStart = new Date(weekStartISO);
-        const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-        const weekEnd = new Date(weekStart.getTime() + SEVEN_DAYS_MS);
+/**
+ * Get a single schedule by ID
+ */
+export async function getSchedule(id: string): Promise<ScheduleRecord | null> {
+  await requireAdmin();
 
-        const [totalStats, hoursByDispatcher, coverageByDay] = await Promise.all([
-            prisma.$queryRaw<{ total_hours: number | null; shift_count: bigint; dispatcher_count: bigint }[]>`
-                SELECT
-                    SUM(EXTRACT(EPOCH FROM ("shiftEnd" - "shiftStart")) / 3600) as total_hours,
-                    COUNT(*) as shift_count,
-                    COUNT(DISTINCT "userId") as dispatcher_count
-                FROM "Schedule"
-                WHERE "shiftStart" >= ${weekStart}
-                  AND "shiftStart" < ${weekEnd}
-            `,
-            prisma.$queryRaw<{ userId: string; name: string | null; hours: number }[]>`
-                SELECT
-                    s."userId",
-                    u."name",
-                    SUM(EXTRACT(EPOCH FROM (s."shiftEnd" - s."shiftStart")) / 3600) as hours
-                FROM "Schedule" s
-                JOIN "User" u ON s."userId" = u.id
-                WHERE s."shiftStart" >= ${weekStart}
-                  AND s."shiftStart" < ${weekEnd}
-                GROUP BY s."userId", u."name"
-                ORDER BY hours DESC
-            `,
-            prisma.$queryRaw<{ day: number; hours: number; shift_count: bigint }[]>`
-                SELECT
-                    EXTRACT(DOW FROM "shiftStart" AT TIME ZONE 'America/Chicago') as day,
-                    SUM(EXTRACT(EPOCH FROM ("shiftEnd" - "shiftStart")) / 3600) as hours,
-                    COUNT(*) as shift_count
-                FROM "Schedule"
-                WHERE "shiftStart" >= ${weekStart}
-                  AND "shiftStart" < ${weekEnd}
-                GROUP BY day
-                ORDER BY day
-            `,
-        ]);
+  const schedule = await prisma.schedule.findUnique({
+    where: { id },
+    include: { user: { select: { id: true, name: true } } },
+  });
 
-        const stats = totalStats[0] || { total_hours: 0, shift_count: BigInt(0), dispatcher_count: BigInt(0) };
+  if (!schedule) return null;
 
+  return {
+    id: schedule.id,
+    userId: schedule.userId,
+    userName: schedule.user.name,
+    date: schedule.date,
+    startHour: schedule.startHour,
+    endHour: schedule.endHour,
+    market: schedule.market as Market | null,
+    shiftType: schedule.shiftType as ShiftType,
+    isPublished: schedule.isPublished,
+    notes: schedule.notes,
+  };
+}
+
+// ============ MUTATION FUNCTIONS ============
+
+/**
+ * Create a new schedule
+ */
+export async function createSchedule(data: ScheduleInput): Promise<{
+  success: boolean;
+  schedule?: ScheduleRecord;
+  errors?: ValidationError[];
+}> {
+  try {
+    const session = await requireAdmin();
+
+    // Validate hours
+    if (data.startHour < 0 || data.startHour > 23 || data.endHour < 0 || data.endHour > 23) {
+      return {
+        success: false,
+        errors: [{ type: "invalid_hours", severity: "error", message: "Hours must be between 0 and 23" }],
+      };
+    }
+
+    // Check for overlaps
+    const overlaps = await checkOverlaps(data.userId, data.date, data.startHour, data.endHour);
+    if (overlaps.length > 0) {
+      return { success: false, errors: overlaps };
+    }
+
+    const weekStart = getWeekStart(data.date);
+
+    const schedule = await prisma.schedule.create({
+      data: {
+        userId: data.userId,
+        date: data.date,
+        startHour: data.startHour,
+        endHour: data.endHour,
+        market: data.market,
+        shiftType: data.shiftType || "CUSTOM",
+        weekStart,
+        isPublished: false,
+        notes: data.notes,
+      },
+      include: { user: { select: { id: true, name: true } } },
+    });
+
+    await createAuditLog(session.user.id, "CREATE", "Schedule", schedule.id, {
+      userId: data.userId,
+      date: data.date,
+      startHour: data.startHour,
+      endHour: data.endHour,
+      market: data.market,
+    });
+
+    revalidatePath("/admin/scheduler");
+
+    return {
+      success: true,
+      schedule: {
+        id: schedule.id,
+        userId: schedule.userId,
+        userName: schedule.user.name,
+        date: schedule.date,
+        startHour: schedule.startHour,
+        endHour: schedule.endHour,
+        market: schedule.market as Market | null,
+        shiftType: schedule.shiftType as ShiftType,
+        isPublished: schedule.isPublished,
+        notes: schedule.notes,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to create schedule:", error);
+    return {
+      success: false,
+      errors: [{ type: "overlap", severity: "error", message: "Failed to create shift. Please try again." }],
+    };
+  }
+}
+
+/**
+ * Update an existing schedule
+ */
+export async function updateSchedule(
+  id: string,
+  data: Partial<ScheduleInput>
+): Promise<{
+  success: boolean;
+  schedule?: ScheduleRecord;
+  errors?: ValidationError[];
+}> {
+  try {
+    const session = await requireAdmin();
+
+    const existing = await prisma.schedule.findUnique({ where: { id } });
+    if (!existing) {
+      return {
+        success: false,
+        errors: [{ type: "overlap", severity: "error", message: "Schedule not found" }],
+      };
+    }
+
+    // Merge with existing data for validation
+    const finalData = {
+      userId: data.userId ?? existing.userId,
+      date: data.date ?? existing.date,
+      startHour: data.startHour ?? existing.startHour,
+      endHour: data.endHour ?? existing.endHour,
+    };
+
+    // Validate hours if changed
+    if (data.startHour !== undefined || data.endHour !== undefined) {
+      if (finalData.startHour < 0 || finalData.startHour > 23 || finalData.endHour < 0 || finalData.endHour > 23) {
         return {
-            totalHours: Number(stats.total_hours) || 0,
-            shiftCount: Number(stats.shift_count),
-            dispatcherCount: Number(stats.dispatcher_count),
-            hoursByDispatcher: hoursByDispatcher.map(d => ({
-                userId: d.userId,
-                name: d.name,
-                hours: Number(d.hours) || 0,
-            })),
-            coverageByDay: coverageByDay.map(d => ({
-                day: Number(d.day),
-                hours: Number(d.hours) || 0,
-                shiftCount: Number(d.shift_count),
-            })),
+          success: false,
+          errors: [{ type: "invalid_hours", severity: "error", message: "Hours must be between 0 and 23" }],
         };
-    },
-    ["week-stats"],
-    { revalidate: 30, tags: ["schedules"] }
-);
+      }
+    }
 
-export async function getCachedWeekStats(weekStart: Date): Promise<WeekStats> {
-    await requireAdmin();
-    return getCachedWeekStatsInternal(weekStart.toISOString());
+    // Check for overlaps (excluding self)
+    const overlaps = await checkOverlaps(finalData.userId, finalData.date, finalData.startHour, finalData.endHour, id);
+    if (overlaps.length > 0) {
+      return { success: false, errors: overlaps };
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (data.date !== undefined) {
+      updateData.date = data.date;
+      updateData.weekStart = getWeekStart(data.date);
+    }
+    if (data.startHour !== undefined) updateData.startHour = data.startHour;
+    if (data.endHour !== undefined) updateData.endHour = data.endHour;
+    if (data.market !== undefined) updateData.market = data.market;
+    if (data.shiftType !== undefined) updateData.shiftType = data.shiftType;
+    if (data.notes !== undefined) updateData.notes = data.notes;
+
+    const schedule = await prisma.schedule.update({
+      where: { id },
+      data: updateData,
+      include: { user: { select: { id: true, name: true } } },
+    });
+
+    await createAuditLog(session.user.id, "UPDATE", "Schedule", id, data);
+
+    revalidatePath("/admin/scheduler");
+    revalidatePath("/schedule");
+
+    return {
+      success: true,
+      schedule: {
+        id: schedule.id,
+        userId: schedule.userId,
+        userName: schedule.user.name,
+        date: schedule.date,
+        startHour: schedule.startHour,
+        endHour: schedule.endHour,
+        market: schedule.market as Market | null,
+        shiftType: schedule.shiftType as ShiftType,
+        isPublished: schedule.isPublished,
+        notes: schedule.notes,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to update schedule:", error);
+    return {
+      success: false,
+      errors: [{ type: "overlap", severity: "error", message: "Failed to update shift. Please try again." }],
+    };
+  }
+}
+
+/**
+ * Delete a schedule
+ */
+export async function deleteSchedule(id: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await requireAdmin();
+
+    await prisma.schedule.delete({ where: { id } });
+
+    await createAuditLog(session.user.id, "DELETE", "Schedule", id);
+
+    revalidatePath("/admin/scheduler");
+    revalidatePath("/schedule");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to delete schedule:", error);
+    return { success: false, error: "Failed to delete shift. Please try again." };
+  }
+}
+
+// ============ BULK OPERATIONS ============
+
+/**
+ * Preview what would be copied from previous week
+ */
+export async function previewCopyPreviousWeek(targetWeekStart: Date): Promise<{
+  schedules: ScheduleRecord[];
+  conflicts: string[];
+}> {
+  await requireAdmin();
+
+  const normalized = getWeekStart(targetWeekStart);
+  const prevWeekStart = addDays(normalized, -7);
+
+  const prevSchedules = await prisma.schedule.findMany({
+    where: { weekStart: prevWeekStart },
+    include: { user: { select: { id: true, name: true } } },
+    orderBy: [{ date: "asc" }, { startHour: "asc" }],
+  });
+
+  // Check for existing schedules in target week
+  const existingCount = await prisma.schedule.count({
+    where: { weekStart: normalized },
+  });
+
+  const conflicts: string[] = [];
+  if (existingCount > 0) {
+    conflicts.push(`Target week has ${existingCount} existing schedule(s). Clear first.`);
+  }
+
+  const schedules: ScheduleRecord[] = prevSchedules.map((s) => ({
+    id: s.id,
+    userId: s.userId,
+    userName: s.user.name,
+    date: addDays(s.date, 7), // Preview with +7 days
+    startHour: s.startHour,
+    endHour: s.endHour,
+    market: s.market as Market | null,
+    shiftType: s.shiftType as ShiftType,
+    isPublished: false,
+    notes: null,
+  }));
+
+  return { schedules, conflicts };
+}
+
+/**
+ * Copy previous week's schedules to target week
+ * NO TIMEZONE CONVERSION - just add 7 days to each date
+ */
+export async function copyPreviousWeek(targetWeekStart: Date): Promise<{
+  success: boolean;
+  copied: number;
+  skipped: number;
+  errors: string[];
+}> {
+  try {
+    const session = await requireAdmin();
+
+    const normalized = getWeekStart(targetWeekStart);
+    const prevWeekStart = addDays(normalized, -7);
+
+    // Get previous week's schedules
+    const prevSchedules = await prisma.schedule.findMany({
+      where: { weekStart: prevWeekStart },
+      include: { user: { select: { id: true, name: true } } },
+    });
+
+    if (prevSchedules.length === 0) {
+      return { success: false, copied: 0, skipped: 0, errors: ["No schedules in previous week"] };
+    }
+
+    // Check target week is empty
+    const existingCount = await prisma.schedule.count({
+      where: { weekStart: normalized },
+    });
+
+    if (existingCount > 0) {
+      return {
+        success: false,
+        copied: 0,
+        skipped: existingCount,
+        errors: [`Target week has ${existingCount} existing schedules. Clear first.`],
+      };
+    }
+
+    // Create new schedules with dates shifted +7 days
+    // NO TIMEZONE CONVERSION - just add 7 days to the date
+    // startHour and endHour are UNCHANGED - they're just integers
+    const newSchedules = prevSchedules.map((s) => ({
+      userId: s.userId,
+      date: addDays(s.date, 7),
+      startHour: s.startHour, // UNCHANGED
+      endHour: s.endHour, // UNCHANGED
+      market: s.market, // UNCHANGED
+      shiftType: s.shiftType, // UNCHANGED
+      weekStart: normalized,
+      isPublished: false,
+      notes: null, // Don't copy notes
+    }));
+
+    await prisma.schedule.createMany({ data: newSchedules });
+
+    await createAuditLog(session.user.id, "CREATE", "Schedule", undefined, {
+      action: "copy_previous_week",
+      sourceWeek: prevWeekStart.toISOString(),
+      targetWeek: normalized.toISOString(),
+      copiedCount: newSchedules.length,
+    });
+
+    revalidatePath("/admin/scheduler");
+
+    return { success: true, copied: newSchedules.length, skipped: 0, errors: [] };
+  } catch (error) {
+    console.error("Failed to copy schedules:", error);
+    return { success: false, copied: 0, skipped: 0, errors: ["Failed to copy schedules. Please try again."] };
+  }
+}
+
+/**
+ * Clear all schedules for a week
+ */
+export async function clearWeekSchedules(weekStart: Date): Promise<{
+  success: boolean;
+  deleted: number;
+  error?: string;
+}> {
+  try {
+    const session = await requireAdmin();
+
+    const normalized = getWeekStart(weekStart);
+
+    const result = await prisma.schedule.deleteMany({
+      where: { weekStart: normalized },
+    });
+
+    await createAuditLog(session.user.id, "DELETE", "Schedule", undefined, {
+      action: "clear_week",
+      weekStart: normalized.toISOString(),
+      deletedCount: result.count,
+    });
+
+    revalidatePath("/admin/scheduler");
+    revalidatePath("/schedule");
+
+    return { success: true, deleted: result.count };
+  } catch (error) {
+    console.error("Failed to clear schedules:", error);
+    return { success: false, deleted: 0, error: "Failed to clear schedules. Please try again." };
+  }
+}
+
+/**
+ * Publish all schedules for a week
+ */
+export async function publishWeek(weekStart: Date): Promise<{ success: boolean; count: number; error?: string }> {
+  try {
+    const session = await requireAdmin();
+
+    const normalized = getWeekStart(weekStart);
+
+    const result = await prisma.schedule.updateMany({
+      where: { weekStart: normalized },
+      data: { isPublished: true },
+    });
+
+    await createAuditLog(session.user.id, "UPDATE", "Schedule", undefined, {
+      action: "publish_week",
+      weekStart: normalized.toISOString(),
+      count: result.count,
+    });
+
+    // Notify dispatchers
+    await notifySchedulePublished(normalized);
+
+    revalidatePath("/admin/scheduler");
+    revalidatePath("/schedule");
+
+    return { success: true, count: result.count };
+  } catch (error) {
+    console.error("Failed to publish schedules:", error);
+    return { success: false, count: 0, error: "Failed to publish schedule. Please try again." };
+  }
+}
+
+/**
+ * Unpublish all schedules for a week
+ */
+export async function unpublishWeek(weekStart: Date): Promise<{ success: boolean; count: number; error?: string }> {
+  try {
+    const session = await requireAdmin();
+
+    const normalized = getWeekStart(weekStart);
+
+    const result = await prisma.schedule.updateMany({
+      where: { weekStart: normalized },
+      data: { isPublished: false },
+    });
+
+    await createAuditLog(session.user.id, "UPDATE", "Schedule", undefined, {
+      action: "unpublish_week",
+      weekStart: normalized.toISOString(),
+      count: result.count,
+    });
+
+    revalidatePath("/admin/scheduler");
+    revalidatePath("/schedule");
+
+    return { success: true, count: result.count };
+  } catch (error) {
+    console.error("Failed to unpublish schedules:", error);
+    return { success: false, count: 0, error: "Failed to unpublish schedule. Please try again." };
+  }
+}
+
+// ============ VALIDATION HELPERS ============
+
+/**
+ * Check if two shifts overlap (accounting for overnight shifts)
+ */
+function shiftsOverlap(a: { startHour: number; endHour: number }, b: { startHour: number; endHour: number }): boolean {
+  // Convert to hour ranges, handling overnight wrapping
+  const getHourSet = (start: number, end: number): Set<number> => {
+    const hours = new Set<number>();
+    if (end > start) {
+      // Normal shift
+      for (let h = start; h < end; h++) hours.add(h);
+    } else {
+      // Overnight shift
+      for (let h = start; h < 24; h++) hours.add(h);
+      for (let h = 0; h < end; h++) hours.add(h);
+    }
+    return hours;
+  };
+
+  const aHours = getHourSet(a.startHour, a.endHour);
+  const bHours = getHourSet(b.startHour, b.endHour);
+
+  // Check intersection
+  for (const h of aHours) {
+    if (bHours.has(h)) return true;
+  }
+  return false;
+}
+
+/**
+ * Check for overlapping schedules on the same date for the same user
+ */
+async function checkOverlaps(
+  userId: string,
+  date: Date,
+  startHour: number,
+  endHour: number,
+  excludeId?: string
+): Promise<ValidationError[]> {
+  const errors: ValidationError[] = [];
+
+  // Get existing schedules for this user on this date
+  const existing = await prisma.schedule.findMany({
+    where: {
+      userId,
+      date,
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+    },
+  });
+
+  for (const schedule of existing) {
+    if (shiftsOverlap({ startHour, endHour }, { startHour: schedule.startHour, endHour: schedule.endHour })) {
+      const existingDisplay = `${formatHourSimple(schedule.startHour)}-${formatHourSimple(schedule.endHour)}`;
+      errors.push({
+        type: "overlap",
+        severity: "error",
+        message: `Overlaps with existing shift (${existingDisplay})`,
+        userId,
+        date,
+      });
+    }
+  }
+
+  return errors;
+}
+
+function formatHourSimple(h: number): string {
+  if (h === 0) return "12A";
+  if (h < 12) return `${h}A`;
+  if (h === 12) return "12P";
+  return `${h - 12}P`;
+}
+
+// ============ COVERAGE REPORT ============
+
+/**
+ * Get coverage report for a week
+ */
+export async function getWeekCoverageReport(weekStart: Date): Promise<{
+  byDay: { date: Date; dayName: string; shifts: number; hours: number; markets: (Market | null)[] }[];
+  totalHours: number;
+  dispatcherHours: { userId: string; name: string; hours: number }[];
+}> {
+  await requireAdmin();
+
+  const normalized = getWeekStart(weekStart);
+  const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  const schedules = await prisma.schedule.findMany({
+    where: { weekStart: normalized },
+    include: { user: { select: { id: true, name: true } } },
+  });
+
+  // Group by day
+  const byDay = [];
+  for (let i = 0; i < 7; i++) {
+    const dayDate = addDays(normalized, i);
+    const daySchedules = schedules.filter(
+      (s) => s.date.toDateString() === dayDate.toDateString()
+    );
+
+    const hours = daySchedules.reduce((sum, s) => sum + getShiftDuration(s.startHour, s.endHour), 0);
+    const markets = [...new Set(daySchedules.map((s) => s.market as Market | null))];
+
+    byDay.push({
+      date: dayDate,
+      dayName: DAY_NAMES[i],
+      shifts: daySchedules.length,
+      hours,
+      markets,
+    });
+  }
+
+  // Total hours
+  const totalHours = schedules.reduce((sum, s) => sum + getShiftDuration(s.startHour, s.endHour), 0);
+
+  // Hours by dispatcher
+  const dispatcherMap = new Map<string, { name: string; hours: number }>();
+  for (const s of schedules) {
+    const existing = dispatcherMap.get(s.userId) || { name: s.user.name || "Unknown", hours: 0 };
+    existing.hours += getShiftDuration(s.startHour, s.endHour);
+    dispatcherMap.set(s.userId, existing);
+  }
+
+  const dispatcherHours = Array.from(dispatcherMap.entries())
+    .map(([userId, data]) => ({ userId, name: data.name, hours: data.hours }))
+    .sort((a, b) => b.hours - a.hours);
+
+  return { byDay, totalHours, dispatcherHours };
+}
+
+// ============ DISPATCHER VIEW ============
+
+/**
+ * Get user's next scheduled shift (for any authenticated user)
+ */
+export async function getUserNextShift(userId: string) {
+  await requireAuth();
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return prisma.schedule.findFirst({
+    where: {
+      userId,
+      isPublished: true,
+      date: { gte: today },
+    },
+    orderBy: [{ date: "asc" }, { startHour: "asc" }],
+    select: {
+      id: true,
+      date: true,
+      startHour: true,
+      endHour: true,
+      market: true,
+    },
+  });
+}
+
+/**
+ * Get user's schedules for current and next week
+ */
+export async function getUserUpcomingSchedules(userId: string) {
+  await requireAuth();
+
+  const today = new Date();
+  const thisWeekStart = getWeekStart(today);
+  const nextWeekEnd = addDays(thisWeekStart, 14);
+
+  const schedules = await prisma.schedule.findMany({
+    where: {
+      userId,
+      isPublished: true,
+      date: {
+        gte: thisWeekStart,
+        lt: nextWeekEnd,
+      },
+    },
+    orderBy: [{ date: "asc" }, { startHour: "asc" }],
+    select: {
+      id: true,
+      date: true,
+      startHour: true,
+      endHour: true,
+      market: true,
+      shiftType: true,
+    },
+  });
+
+  return schedules.map((s) => ({
+    ...s,
+    market: s.market as Market | null,
+    shiftType: s.shiftType as ShiftType,
+  }));
 }

@@ -47,10 +47,10 @@ export default async function SchedulePage() {
         prisma.schedule.findMany({
             where: {
                 userId: session.user.id,
-                shiftStart: { gte: new Date() },
+                date: { gte: new Date() },
                 isPublished: true,
             },
-            orderBy: { shiftStart: "asc" },
+            orderBy: [{ date: "asc" }, { startHour: "asc" }],
             take: 20,
         }),
     ]);

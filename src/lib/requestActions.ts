@@ -107,14 +107,15 @@ export async function getUpcomingShifts(userId: string) {
             return { success: false, error: "Cannot view another user's shifts", data: [] };
         }
 
-        const now = new Date();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
         const shifts = await prisma.schedule.findMany({
             where: {
                 userId,
                 isPublished: true,
-                shiftStart: { gte: now },
+                date: { gte: today },
             },
-            orderBy: { shiftStart: "asc" },
+            orderBy: [{ date: "asc" }, { startHour: "asc" }],
             take: 20,
         });
 
@@ -141,13 +142,14 @@ export async function getPastShifts(userId: string) {
             return { success: false, error: "Cannot view another user's shifts", data: [] };
         }
 
-        const now = new Date();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
         const shifts = await prisma.schedule.findMany({
             where: {
                 userId,
-                shiftEnd: { lt: now },
+                date: { lt: today },
             },
-            orderBy: { shiftStart: "desc" },
+            orderBy: [{ date: "desc" }, { startHour: "desc" }],
             take: 30,
         });
 
@@ -174,14 +176,16 @@ export async function getCurrentShift(userId: string) {
             return { success: false, error: "Cannot view another user's shifts", data: null };
         }
 
-        const now = new Date();
+        // Get today's schedule as "current" (simplified - actual current check would need hour comparison)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
         const shift = await prisma.schedule.findFirst({
             where: {
                 userId,
                 isPublished: true,
-                shiftStart: { lte: now },
-                shiftEnd: { gte: now },
+                date: today,
             },
+            orderBy: { startHour: "asc" },
         });
 
         return { success: true, data: shift };

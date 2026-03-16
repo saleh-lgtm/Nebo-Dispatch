@@ -112,6 +112,21 @@ enum VehicleStatus {
   RETIRED
 }
 
+// Scheduler - Market locations
+enum Market {
+  DFW // Dallas-Fort Worth
+  AUS // Austin
+  SAT // San Antonio
+}
+
+// Scheduler - Shift type presets
+enum ShiftType {
+  MORNING   // 6-14
+  AFTERNOON // 14-22
+  NIGHT     // 22-6 (overnight)
+  CUSTOM    // User-defined hours
+}
+
 model User {
   id             String          @id @default(cuid())
   name           String?
@@ -461,24 +476,40 @@ model CourtReport {
 }
 
 model Schedule {
-  id           String              @id @default(cuid())
-  userId       String
-  user         User                @relation(fields: [userId], references: [id])
-  isPublished  Boolean             @default(false)
-  shiftStart   DateTime
-  shiftEnd     DateTime
-  weekStart    DateTime? // Sunday 00:00:00 of the week for efficient queries
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+
+  // Core shift data - NO TIMEZONE CONVERSION
+  // Hours are always Central Time (implicit, no conversion needed)
+  date      DateTime  @db.Date // Pure date: 2024-03-15, no time component
+  startHour Int                // 0-23, hour in Central Time
+  endHour   Int                // 0-23, if <= startHour = overnight shift
+
+  // Categorization
+  market    Market?            // DFW, AUS, SAT
+  shiftType ShiftType @default(CUSTOM)
+
+  // Week grouping for efficient queries (Monday of that week)
+  weekStart DateTime  @db.Date
+
+  // Status
+  isPublished Boolean @default(false)
+  notes       String?
+
+  // Relations
   requests     SchedulingRequest[]
   swapRequests SchedulingRequest[] @relation("SwapTargetSchedule")
-
-  // Shift Swap relations
   swapRequestsAsRequester ShiftSwapRequest[] @relation("RequesterShift")
   swapRequestsAsTarget    ShiftSwapRequest[] @relation("TargetShift")
 
-  @@index([weekStart])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([weekStart, isPublished])
   @@index([userId, weekStart])
-  @@index([userId, shiftStart])      // User schedule lookups by date range
-  @@index([shiftStart, isPublished]) // Week-view queries for published schedules
+  @@index([userId, date])
+  @@index([date, market])
 }
 
 model Affiliate {
@@ -2064,24 +2095,26 @@ model ScheduleTemplate {
 
 // Individual shift definitions within a template
 model ScheduleTemplateShift {
-  id            String           @id @default(cuid())
-  templateId    String
-  template      ScheduleTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  id           String           @id @default(cuid())
+  templateId   String
+  template     ScheduleTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
-  // Day of week (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
-  dayOfWeek     Int
+  // Day of week (0 = Monday, 1 = Tuesday, ..., 6 = Sunday)
+  dayOfWeek    Int
 
-  // Time in hours from midnight (e.g., 8.5 = 8:30 AM, 14 = 2:00 PM)
-  startHour     Float
+  // Hours (0-23, Central Time - no timezone conversion)
+  startHour    Int // 0-23
+  endHour      Int // 0-23, if <= startHour = overnight shift
 
-  // Duration in hours (e.g., 8 = 8 hours, 4.5 = 4 hours 30 minutes)
-  durationHours Float
+  // Categorization
+  market       Market?
+  shiftType    ShiftType @default(CUSTOM)
 
   // Optional default dispatcher assignment
-  dispatcherId  String?
+  dispatcherId String?
 
   // Display order within the template
-  order         Int              @default(0)
+  order        Int @default(0)
 
   @@index([templateId])
   @@index([dayOfWeek])

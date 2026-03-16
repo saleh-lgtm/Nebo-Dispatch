@@ -415,7 +415,7 @@ export async function notifySchedulePublished(weekStart: Date) {
         // Get all users who have schedules for this week
         const schedules = await prisma.schedule.findMany({
             where: {
-                shiftStart: {
+                date: {
                     gte: weekStart,
                     lt: weekEnd,
                 },
@@ -440,7 +440,7 @@ export async function notifySchedulePublished(weekStart: Date) {
         const shiftCounts = await prisma.schedule.groupBy({
             by: ["userId"],
             where: {
-                shiftStart: {
+                date: {
                     gte: weekStart,
                     lt: weekEnd,
                 },

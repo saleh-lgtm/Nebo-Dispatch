@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { Calendar, User, AlertTriangle, Check, X } from "lucide-react";
 import {
     applyTemplateToWeek,
     type ScheduleTemplateWithShifts,
 } from "@/lib/scheduleTemplateActions";
 import { useToastContext } from "@/components/ui/ToastProvider";
+import { DAY_NAMES_FULL, formatHour, getShiftDuration } from "@/types/schedule";
 import styles from "./apply-template-modal.module.css";
 
 interface Dispatcher {
@@ -20,16 +21,6 @@ interface ApplyTemplateModalProps {
     dispatchers: Dispatcher[];
     onClose: () => void;
     onApplied: () => void;
-}
-
-const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-function formatHour(hour: number): string {
-    const h = Math.floor(hour);
-    const m = Math.round((hour - h) * 60);
-    const period = h >= 12 ? "PM" : "AM";
-    const displayHour = h > 12 ? h - 12 : h === 0 ? 12 : h;
-    return m === 0 ? `${displayHour}${period}` : `${displayHour}:${m.toString().padStart(2, "0")}${period}`;
 }
 
 function formatWeekDate(date: Date): string {
@@ -139,13 +130,13 @@ export function ApplyTemplateModal({
                             <div key={shift.id} className={styles.shiftRow}>
                                 <div className={styles.shiftInfo}>
                                     <span className={styles.shiftDay}>
-                                        {DAY_NAMES[shift.dayOfWeek]}
+                                        {DAY_NAMES_FULL[shift.dayOfWeek]}
                                     </span>
                                     <span className={styles.shiftTime}>
-                                        {formatHour(shift.startHour)} - {formatHour(shift.startHour + shift.durationHours)}
+                                        {formatHour(shift.startHour)} - {formatHour(shift.endHour)}
                                     </span>
                                     <span className={styles.shiftDuration}>
-                                        ({shift.durationHours}h)
+                                        ({getShiftDuration(shift.startHour, shift.endHour)}h)
                                     </span>
                                 </div>
 

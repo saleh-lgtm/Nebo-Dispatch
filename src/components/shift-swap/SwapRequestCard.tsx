@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { User, Calendar, ChevronDown, ChevronUp, ArrowLeftRight } from "lucide-react";
 import { SwapRequest, STATUS_CONFIG } from "./types";
-import { formatDateTime, formatShortDateTime } from "./utils";
+import { formatDate, formatShiftTime, formatShortDateTime } from "./utils";
 import styles from "./SwapRequestCard.module.css";
 
 interface SwapRequestCardProps {
@@ -63,7 +63,7 @@ export default function SwapRequestCard({
           </div>
           <div className={styles.shiftTime}>
             <Calendar size={12} />
-            <span>{formatDateTime(request.requesterShift.shiftStart)}</span>
+            <span>{formatDate(request.requesterShift.date)} {formatShiftTime(request.requesterShift.startHour, request.requesterShift.endHour)}</span>
           </div>
         </div>
 
@@ -80,7 +80,7 @@ export default function SwapRequestCard({
           </div>
           <div className={styles.shiftTime}>
             <Calendar size={12} />
-            <span>{formatDateTime(request.targetShift.shiftStart)}</span>
+            <span>{formatDate(request.targetShift.date)} {formatShiftTime(request.targetShift.startHour, request.targetShift.endHour)}</span>
           </div>
         </div>
       </div>

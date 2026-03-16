@@ -1,0 +1,16 @@
+{
+  "skills": {
+    "disabled": [
+      "acf-local-json",
+      "elementor-to-generateblocks",
+      "generateblocks-layouts",
+      "html-to-generateblocks",
+      "wordpress-content",
+      "wordpress-performance-best-practices",
+      "wordpress-pro",
+      "wordpress-testing-qa",
+      "wp-rest-api",
+      "wp-wpcli-and-ops"
+    ]
+  }
+}

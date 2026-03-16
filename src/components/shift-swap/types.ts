@@ -10,8 +10,9 @@ export type SwapStatus =
 export interface Schedule {
   id: string;
   userId: string;
-  shiftStart: Date;
-  shiftEnd: Date;
+  date: Date;
+  startHour: number;
+  endHour: number;
   isPublished: boolean;
   user?: { id: string; name: string | null };
 }

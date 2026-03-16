@@ -30,6 +30,12 @@ export interface SchedulingSuggestion {
     };
 }
 
+// Helper to calculate shift duration from integer hours
+function getShiftDuration(startHour: number, endHour: number): number {
+    if (endHour > startHour) return endHour - startHour;
+    return 24 - startHour + endHour; // Overnight shift
+}
+
 // Constants
 const TARGET_HOURS_PER_WEEK = 40;
 const MIN_DISPATCHERS_PER_SHIFT = 1;
@@ -63,7 +69,7 @@ export async function getSchedulingSuggestions(
         // Current week schedules
         prisma.schedule.findMany({
             where: {
-                shiftStart: { gte: normalizedWeekStart, lt: weekEnd },
+                date: { gte: normalizedWeekStart, lt: weekEnd },
             },
             include: {
                 user: { select: { id: true, name: true } },
@@ -96,7 +102,7 @@ export async function getSchedulingSuggestions(
     }
 
     for (const schedule of schedules) {
-        const hours = (schedule.shiftEnd.getTime() - schedule.shiftStart.getTime()) / (1000 * 60 * 60);
+        const hours = getShiftDuration(schedule.startHour, schedule.endHour);
         const current = hoursPerDispatcher.get(schedule.userId) || 0;
         hoursPerDispatcher.set(schedule.userId, current + hours);
     }
@@ -179,7 +185,7 @@ export async function getSchedulingSuggestions(
             const scheduledDays = new Set(
                 schedules
                     .filter((s) => s.userId === pref.userId)
-                    .map((s) => getDayName(s.shiftStart.getUTCDay()))
+                    .map((s) => getDayName(new Date(s.date).getUTCDay()))
             );
 
             const unscheduledPreferredDays = pref.preferredDays.filter((d) => !scheduledDays.has(d));
@@ -212,8 +218,9 @@ export async function getSchedulingSuggestions(
 }
 
 // Analyze coverage by day and shift period
+// Using new schedule model with date/startHour/endHour
 function analyzeCoverage(
-    schedules: Array<{ shiftStart: Date; shiftEnd: Date }>,
+    schedules: Array<{ date: Date; startHour: number; endHour: number }>,
     weekStart: Date
 ) {
     const gaps: Array<{
@@ -225,23 +232,27 @@ function analyzeCoverage(
     }> = [];
 
     for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
+        const targetDate = new Date(weekStart);
+        targetDate.setUTCDate(targetDate.getUTCDate() + dayOfWeek);
+        targetDate.setUTCHours(0, 0, 0, 0);
+
         for (const slot of PREFERRED_SHIFT_SLOTS) {
-            const dayStart = new Date(weekStart);
-            dayStart.setUTCDate(dayStart.getUTCDate() + dayOfWeek);
-
-            const slotStart = new Date(dayStart);
-            slotStart.setUTCHours(slot.startHour, 0, 0, 0);
-
-            const slotEnd = new Date(dayStart);
-            if (slot.endHour <= slot.startHour) {
-                // Night shift wraps to next day
-                slotEnd.setUTCDate(slotEnd.getUTCDate() + 1);
-            }
-            slotEnd.setUTCHours(slot.endHour, 0, 0, 0);
-
-            // Count schedules that cover this slot
+            // Count schedules for this day that cover this slot
             const coverage = schedules.filter((s) => {
-                return s.shiftStart < slotEnd && s.shiftEnd > slotStart;
+                const schedDate = new Date(s.date);
+                schedDate.setUTCHours(0, 0, 0, 0);
+                if (schedDate.getTime() !== targetDate.getTime()) return false;
+
+                // Check if shift covers this slot (simplified check)
+                const isOvernight = s.endHour <= s.startHour;
+                if (isOvernight) {
+                    // Overnight shift covers this slot if:
+                    // - slot starts before shift ends, or
+                    // - slot starts after shift starts
+                    return s.startHour <= slot.endHour || slot.startHour >= s.startHour || slot.startHour < s.endHour;
+                }
+                // Regular shift: check overlap
+                return s.startHour < slot.endHour && s.endHour > slot.startHour;
             }).length;
 
             gaps.push({

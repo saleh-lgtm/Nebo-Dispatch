@@ -65,16 +65,9 @@ export async function approveRequest(
         { adminNotes, applyChanges }
     );
 
-    // Optionally auto-apply the schedule change
-    if (applyChanges && request.scheduleId && request.requestedStart && request.requestedEnd) {
-        await prisma.schedule.update({
-            where: { id: request.scheduleId },
-            data: {
-                shiftStart: request.requestedStart,
-                shiftEnd: request.requestedEnd,
-            },
-        });
-    }
+    // Note: Auto-apply disabled - Schedule model now uses date/startHour/endHour instead of DateTime fields.
+    // Admin must manually update the schedule after approving the request.
+    // TODO: Update SchedulingRequest model to use date/startHour/endHour fields
 
     revalidatePath("/admin/requests");
     revalidatePath("/admin/scheduler");

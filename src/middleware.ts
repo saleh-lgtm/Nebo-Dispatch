@@ -12,6 +12,12 @@ const protectedRoutes = [
     "/accounting",
 ];
 
+// Admin routes that ACCOUNTING role can access (finance-related)
+const accountingAdminRoutes = [
+    "/admin/pricing",
+    "/admin/affiliate-audit",
+];
+
 // Routes only for unauthenticated users
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const authRoutes = ["/login"];
@@ -54,7 +60,16 @@ export async function middleware(request: NextRequest) {
     if (pathname.startsWith("/admin") && isAuthenticated) {
         const userRole = token.role as string;
 
-        // Only ADMIN and SUPER_ADMIN can access admin routes
+        // Allow ACCOUNTING for specific finance-related admin routes
+        const isAccountingAllowedRoute = accountingAdminRoutes.some(
+            (route) => pathname === route || pathname.startsWith(route + "/")
+        );
+
+        if (userRole === "ACCOUNTING" && isAccountingAllowedRoute) {
+            return NextResponse.next();
+        }
+
+        // Only ADMIN and SUPER_ADMIN can access other admin routes
         if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
             return NextResponse.redirect(new URL("/dashboard", request.url));
         }

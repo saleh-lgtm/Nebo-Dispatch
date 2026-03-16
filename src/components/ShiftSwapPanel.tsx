@@ -29,8 +29,9 @@ import { useToastContext } from "./ui/ToastProvider";
 interface Schedule {
     id: string;
     userId: string;
-    shiftStart: Date;
-    shiftEnd: Date;
+    date: Date;
+    startHour: number;
+    endHour: number;
     isPublished: boolean;
     user?: { id: string; name: string | null };
 }
@@ -124,18 +125,25 @@ export default function ShiftSwapPanel({
         },
     };
 
-    const formatDateTime = (date: Date) => {
-        return new Date(date).toLocaleString(undefined, {
-            weekday: "short",
-            month: "short",
-            day: "numeric",
-            hour: "numeric",
-            minute: "2-digit",
-        });
+    const formatHour = (hour: number) => {
+        if (hour === 0) return "12:00 AM";
+        if (hour < 12) return `${hour}:00 AM`;
+        if (hour === 12) return "12:00 PM";
+        return `${hour - 12}:00 PM`;
     };
 
-    const formatShortDateTime = (date: Date) => {
-        return new Date(date).toLocaleString(undefined, {
+    const formatShiftTime = (schedule: Schedule) => {
+        const d = new Date(schedule.date);
+        return `${d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} ${formatHour(schedule.startHour)} - ${formatHour(schedule.endHour)}`;
+    };
+
+    const formatShortShift = (schedule: Schedule) => {
+        const d = new Date(schedule.date);
+        return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${formatHour(schedule.startHour)}`
+    };
+
+    const formatDateTime = (date: Date) => {
+        return new Date(date).toLocaleDateString(undefined, {
             month: "short",
             day: "numeric",
             hour: "numeric",
@@ -344,12 +352,12 @@ export default function ShiftSwapPanel({
                         >
                             <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
                                 <Calendar size={12} />
-                                {formatShortDateTime(request.requesterShift.shiftStart)}
+                                {formatShortShift(request.requesterShift)}
                             </div>
                             <ArrowLeftRight size={12} />
                             <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
                                 <Calendar size={12} />
-                                {formatShortDateTime(request.targetShift.shiftStart)}
+                                {formatShortShift(request.targetShift)}
                             </div>
                         </div>
 
@@ -699,7 +707,7 @@ export default function ShiftSwapPanel({
                                     <option value="">Select your shift...</option>
                                     {myShifts.map((shift) => (
                                         <option key={shift.id} value={shift.id}>
-                                            {formatDateTime(shift.shiftStart)} - {formatShortDateTime(shift.shiftEnd)}
+                                            {formatShiftTime(shift)}
                                         </option>
                                     ))}
                                 </select>
@@ -731,7 +739,7 @@ export default function ShiftSwapPanel({
                                         <option value="">Select a shift to swap with...</option>
                                         {availableShifts.map((shift) => (
                                             <option key={shift.id} value={shift.id}>
-                                                {shift.user?.name || "Unknown"} - {formatDateTime(shift.shiftStart)}
+                                                {shift.user?.name || "Unknown"} - {formatShiftTime(shift)}
                                             </option>
                                         ))}
                                     </select>

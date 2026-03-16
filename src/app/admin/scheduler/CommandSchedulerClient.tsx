@@ -17,55 +17,59 @@ import {
     Loader2,
 } from "lucide-react";
 import {
-    createScheduleBlock,
-    updateScheduleBlock,
-    deleteScheduleBlock,
-    publishWeekSchedules,
-    unpublishWeekSchedules,
+    createSchedule,
+    updateSchedule,
+    deleteSchedule,
+    publishWeek,
+    unpublishWeek,
     getWeekSchedules,
-    copyPreviousWeekSchedules,
+    copyPreviousWeek,
+    clearWeekSchedules,
 } from "@/lib/schedulerActions";
 import { useToastContext } from "@/components/ui/ToastProvider";
 import { useRealtimeSchedule } from "@/hooks/useRealtimeSchedule";
+import type { ScheduleRecord, Dispatcher, Market, ShiftType } from "@/types/schedule";
+import {
+    DAY_NAMES,
+    DAY_NAMES_FULL,
+    MARKET_COLORS,
+    SHIFT_PRESETS,
+    formatHour,
+    formatHourFull,
+    formatShiftShort,
+    getShiftDuration,
+    getWeekStart,
+    addDays,
+    formatWeekLabel,
+    isOvernightShift,
+} from "@/types/schedule";
 import "./scheduler-command.css";
 
-// Types
-interface Dispatcher {
-    id: string;
-    name: string | null;
-    email: string | null;
-}
-
-interface ScheduleData {
-    id: string;
-    userId: string;
-    shiftStart: Date;
-    shiftEnd: Date;
-    isPublished: boolean;
-    user: { id: string; name: string | null };
-}
+// ============ Types ============
 
 interface ShiftBlock {
     id: string;
     dispatcherId: string;
     dispatcherName: string;
-    day: number;
+    dayIndex: number; // 0=Mon, 6=Sun
     startHour: number;
+    endHour: number;
     duration: number;
+    market: Market | null;
+    shiftType: ShiftType;
     isPublished: boolean;
     color: string;
-    isCrossMidnight?: boolean;
-    isContinuation?: boolean;
+    isOvernight: boolean;
 }
 
-// Constants
-const DAYS_IN_WEEK = 7;
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const DAY_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const SHIFT_START = 0; // Start at 12am (midnight)
-const COMPANY_TIMEZONE = "America/Chicago";
+// ============ Constants ============
 
-// Command Center color palette - vibrant, glowing colors
+const DAYS_IN_WEEK = 7;
+const GRID_HOURS: number[] = Array.from({ length: 24 }, (_, i) => i); // 0-23
+const HOUR_TO_ROW: Record<number, number> = {};
+GRID_HOURS.forEach((h, i) => { HOUR_TO_ROW[h] = i; });
+
+// Command Center color palette
 const COLORS = [
     "#00f0ff", // Cyan
     "#f472b6", // Pink
@@ -79,88 +83,12 @@ const COLORS = [
     "#e879f9", // Fuchsia
 ];
 
-// Grid hour order
-const GRID_HOURS: number[] = [];
-for (let i = 0; i < 24; i++) GRID_HOURS.push((SHIFT_START + i) % 24);
+// ============ Helpers ============
 
-const HOUR_TO_ROW: Record<number, number> = {};
-GRID_HOURS.forEach((h, i) => { HOUR_TO_ROW[h] = i; });
-
-function formatHour(h: number): string {
-    if (h === 0) return "12a";
-    if (h < 12) return `${h}a`;
-    if (h === 12) return "12p";
-    return `${h - 12}p`;
-}
-
-function formatHourFull(h: number): string {
-    const hour = ((h % 24) + 24) % 24;
-    if (hour === 0) return "12:00 AM";
-    if (hour < 12) return `${hour}:00 AM`;
-    if (hour === 12) return "12:00 PM";
-    return `${hour - 12}:00 PM`;
-}
-
-// Helper to get date parts in company timezone
-function getDateInTimezone(date: Date): { year: number; month: number; day: number; hour: number; dayOfWeek: number } {
-    const formatter = new Intl.DateTimeFormat("en-US", {
-        timeZone: COMPANY_TIMEZONE,
-        year: "numeric",
-        month: "numeric",
-        day: "numeric",
-        hour: "numeric",
-        hour12: false,
-        weekday: "short",
-    });
-    const parts = formatter.formatToParts(date);
-    const dayOfWeekStr = parts.find(p => p.type === "weekday")?.value || "Sun";
-    const dayOfWeekMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-    return {
-        year: parseInt(parts.find(p => p.type === "year")?.value || "0"),
-        month: parseInt(parts.find(p => p.type === "month")?.value || "0") - 1,
-        day: parseInt(parts.find(p => p.type === "day")?.value || "0"),
-        hour: parseInt(parts.find(p => p.type === "hour")?.value || "0"),
-        dayOfWeek: dayOfWeekMap[dayOfWeekStr] ?? 0,
-    };
-}
-
-// Helper to create a UTC Date from Central Time components
-function createDateInTimezone(year: number, month: number, day: number, hour: number): Date {
-    // Create a date string in the target timezone format
-    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}T${String(hour).padStart(2, "0")}:00:00`;
-
-    // Get the UTC offset for this date in the company timezone
-    const tempDate = new Date(dateStr + "Z"); // Treat as UTC temporarily
-    const formatter = new Intl.DateTimeFormat("en-US", {
-        timeZone: COMPANY_TIMEZONE,
-        hour: "numeric",
-        hour12: false,
-    });
-
-    // Calculate offset by comparing: we want `hour` in Central, find what UTC hour gives us that
-    // Binary search or iterative approach - try UTC times until Central matches
-    for (let offset = -12; offset <= 14; offset++) {
-        const testDate = new Date(tempDate.getTime() + offset * 60 * 60 * 1000);
-        const testHour = parseInt(formatter.format(testDate));
-        if (testHour === hour) {
-            // Verify the date is also correct
-            const fullFormatter = new Intl.DateTimeFormat("en-US", {
-                timeZone: COMPANY_TIMEZONE,
-                year: "numeric",
-                month: "numeric",
-                day: "numeric",
-            });
-            const parts = fullFormatter.formatToParts(testDate);
-            const testDay = parseInt(parts.find(p => p.type === "day")?.value || "0");
-            if (testDay === day) {
-                return testDate;
-            }
-        }
-    }
-
-    // Fallback: assume Central is UTC-6 (CST) or UTC-5 (CDT)
-    // This shouldn't happen but provides a reasonable default
-    return new Date(tempDate.getTime() + 6 * 60 * 60 * 1000);
+function getErrorMessage(errors?: { message: string }[] | string[]): string {
+    if (!errors || errors.length === 0) return "An error occurred";
+    const first = errors[0];
+    return typeof first === "string" ? first : first.message;
 }
 
 function getContrastColor(hex: string): string {
@@ -175,71 +103,46 @@ function getDispatcherColor(index: number): string {
     return COLORS[index % COLORS.length];
 }
 
-function getWeekStart(date: Date): Date {
-    const d = new Date(date);
-    const day = d.getUTCDay();
-    d.setUTCDate(d.getUTCDate() - day);
-    d.setUTCHours(0, 0, 0, 0);
-    return d;
+function getShiftColor(shift: { market: Market | null }, dispatcherIndex: number): string {
+    if (shift.market) {
+        return MARKET_COLORS[shift.market];
+    }
+    return getDispatcherColor(dispatcherIndex);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function schedulesToBlocks(schedules: ScheduleData[], dispatchers: Dispatcher[], weekStart: Date): ShiftBlock[] {
+/**
+ * Convert schedule records to shift blocks for display
+ * NO TIMEZONE CONVERSION - just use the integer hours directly
+ */
+function schedulesToBlocks(schedules: ScheduleRecord[], dispatchers: Dispatcher[], weekStart: Date): ShiftBlock[] {
     const blocks: ShiftBlock[] = [];
 
     for (const schedule of schedules) {
-        const shiftStart = new Date(schedule.shiftStart);
-        const shiftEnd = new Date(schedule.shiftEnd);
+        // Get day index from date difference (0=Mon, 6=Sun)
+        const schedDate = new Date(schedule.date);
+        const diffTime = schedDate.getTime() - weekStart.getTime();
+        const dayIndex = Math.floor(diffTime / (24 * 60 * 60 * 1000));
 
-        // Get day and hour in company timezone for display
-        const startInTz = getDateInTimezone(shiftStart);
-        const dayOfWeek = startInTz.dayOfWeek;
-        const startHour = startInTz.hour;
-        const totalDuration = Math.ceil((shiftEnd.getTime() - shiftStart.getTime()) / (1000 * 60 * 60));
+        if (dayIndex < 0 || dayIndex > 6) continue;
 
         const dispatcherIndex = dispatchers.findIndex((d) => d.id === schedule.userId);
-        const color = dispatcherIndex >= 0 ? getDispatcherColor(dispatcherIndex) : COLORS[0];
+        const duration = getShiftDuration(schedule.startHour, schedule.endHour);
+        const overnight = isOvernightShift(schedule.startHour, schedule.endHour);
 
-        const hoursUntilMidnight = 24 - startHour;
-
-        if (totalDuration > hoursUntilMidnight && startHour !== 0) {
-            blocks.push({
-                id: schedule.id,
-                dispatcherId: schedule.userId,
-                dispatcherName: schedule.user.name || "Unknown",
-                day: dayOfWeek,
-                startHour,
-                duration: hoursUntilMidnight,
-                isPublished: schedule.isPublished,
-                color,
-                isCrossMidnight: true,
-            });
-
-            const nextDay = (dayOfWeek + 1) % 7;
-            const remainingHours = totalDuration - hoursUntilMidnight;
-            blocks.push({
-                id: `${schedule.id}-cont`,
-                dispatcherId: schedule.userId,
-                dispatcherName: schedule.user.name || "Unknown",
-                day: nextDay,
-                startHour: 0,
-                duration: remainingHours,
-                isPublished: schedule.isPublished,
-                color,
-                isContinuation: true,
-            });
-        } else {
-            blocks.push({
-                id: schedule.id,
-                dispatcherId: schedule.userId,
-                dispatcherName: schedule.user.name || "Unknown",
-                day: dayOfWeek,
-                startHour,
-                duration: totalDuration,
-                isPublished: schedule.isPublished,
-                color,
-            });
-        }
+        blocks.push({
+            id: schedule.id,
+            dispatcherId: schedule.userId,
+            dispatcherName: schedule.userName || "Unknown",
+            dayIndex,
+            startHour: schedule.startHour,
+            endHour: schedule.endHour,
+            duration,
+            market: schedule.market,
+            shiftType: schedule.shiftType,
+            isPublished: schedule.isPublished,
+            color: getShiftColor(schedule, dispatcherIndex),
+            isOvernight: overnight,
+        });
     }
 
     return blocks;
@@ -250,16 +153,30 @@ function calculateOverlapPositions(shifts: ShiftBlock[]): Map<string, { index: n
     const shiftsByDay: Map<number, ShiftBlock[]> = new Map();
 
     for (const shift of shifts) {
-        if (!shiftsByDay.has(shift.day)) {
-            shiftsByDay.set(shift.day, []);
+        if (!shiftsByDay.has(shift.dayIndex)) {
+            shiftsByDay.set(shift.dayIndex, []);
         }
-        shiftsByDay.get(shift.day)!.push(shift);
+        shiftsByDay.get(shift.dayIndex)!.push(shift);
     }
 
     const shiftsOverlap = (a: ShiftBlock, b: ShiftBlock): boolean => {
-        const aEnd = a.startHour + a.duration;
-        const bEnd = b.startHour + b.duration;
-        return !(aEnd <= b.startHour || bEnd <= a.startHour);
+        // Use hour sets for accurate overnight overlap detection
+        const getHourSet = (start: number, end: number): Set<number> => {
+            const hours = new Set<number>();
+            if (end > start) {
+                for (let h = start; h < end; h++) hours.add(h);
+            } else {
+                for (let h = start; h < 24; h++) hours.add(h);
+                for (let h = 0; h < end; h++) hours.add(h);
+            }
+            return hours;
+        };
+        const aHours = getHourSet(a.startHour, a.endHour);
+        const bHours = getHourSet(b.startHour, b.endHour);
+        for (const h of aHours) {
+            if (bHours.has(h)) return true;
+        }
+        return false;
     };
 
     for (const [, dayShifts] of shiftsByDay) {
@@ -319,19 +236,23 @@ function calculateOverlapPositions(shifts: ShiftBlock[]): Map<string, { index: n
     return positions;
 }
 
+// ============ Component ============
+
 interface Props {
     dispatchers: Dispatcher[];
-    initialSchedules: ScheduleData[];
+    initialSchedules: ScheduleRecord[];
     initialWeekStart: string;
 }
 
 export default function CommandSchedulerClient({ dispatchers, initialSchedules, initialWeekStart }: Props) {
     const { addToast } = useToastContext();
-    const [weekStart, setWeekStart] = useState<Date>(new Date(initialWeekStart));
+    const [weekStart, setWeekStart] = useState<Date>(() => new Date(initialWeekStart));
     const [shifts, setShifts] = useState<ShiftBlock[]>(() =>
         schedulesToBlocks(initialSchedules, dispatchers, new Date(initialWeekStart))
     );
-    const [defaultDuration, setDefaultDuration] = useState(8);
+    const [selectedShiftType, setSelectedShiftType] = useState<ShiftType>("CUSTOM");
+    const [customDuration, setCustomDuration] = useState(8);
+    const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
     const [isPublished, setIsPublished] = useState(() =>
         initialSchedules.some((s) => s.isPublished)
     );
@@ -341,57 +262,27 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
         dispatcherName: string;
         color: string;
         shiftId?: string;
-        duration: number;
+        startHour: number;
+        endHour: number;
     } | null>(null);
     const [ghostPosition, setGhostPosition] = useState({ x: 0, y: 0 });
     const [highlightCell, setHighlightCell] = useState<{ day: number; hour: number } | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isNavigating, setIsNavigating] = useState(false);
-    const [actionInProgress, setActionInProgress] = useState<string | null>(null); // Tracks shift ID being modified
+    const [actionInProgress, setActionInProgress] = useState<string | null>(null);
     const [focusedCell, setFocusedCell] = useState<{ day: number; hour: number } | null>(null);
+    const [copying, setCopying] = useState(false);
 
     const gridRef = useRef<HTMLDivElement>(null);
 
-    // Keyboard navigation handler for grid cells
-    const handleCellKeyDown = useCallback((e: React.KeyboardEvent, day: number, hour: number) => {
-        const hourIndex = GRID_HOURS.indexOf(hour);
-        let newDay = day;
-        let newHourIndex = hourIndex;
-
-        switch (e.key) {
-            case "ArrowUp":
-                e.preventDefault();
-                newHourIndex = Math.max(0, hourIndex - 1);
-                break;
-            case "ArrowDown":
-                e.preventDefault();
-                newHourIndex = Math.min(23, hourIndex + 1);
-                break;
-            case "ArrowLeft":
-                e.preventDefault();
-                newDay = Math.max(0, day - 1);
-                break;
-            case "ArrowRight":
-                e.preventDefault();
-                newDay = Math.min(6, day + 1);
-                break;
-            case "Enter":
-            case " ":
-                e.preventDefault();
-                // Could trigger shift creation here if dispatcher selected
-                break;
-            default:
-                return;
+    // Get shift start/end based on type
+    const getShiftHours = useCallback((): { startHour: number; endHour: number } => {
+        if (selectedShiftType === "CUSTOM") {
+            // For custom, use the clicked hour as start
+            return { startHour: 6, endHour: 6 + customDuration };
         }
-
-        const newHour = GRID_HOURS[newHourIndex];
-        setFocusedCell({ day: newDay, hour: newHour });
-
-        // Focus the new cell
-        const cellId = `cell-${newDay}-${newHour}`;
-        const cell = document.getElementById(cellId);
-        cell?.focus();
-    }, []);
+        return SHIFT_PRESETS[selectedShiftType];
+    }, [selectedShiftType, customDuration]);
 
     const overlapPositions = useMemo(() => calculateOverlapPositions(shifts), [shifts]);
 
@@ -404,13 +295,13 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
     }, [shifts]);
 
     const loadWeekSchedules = useCallback(async (newWeekStart: Date) => {
-        const schedules = await getWeekSchedules(newWeekStart);
-        const blocks = schedulesToBlocks(schedules, dispatchers, newWeekStart);
+        const result = await getWeekSchedules(newWeekStart);
+        const blocks = schedulesToBlocks(result.schedules, dispatchers, newWeekStart);
         setShifts(blocks);
-        setIsPublished(schedules.some((s) => s.isPublished));
+        setIsPublished(result.isPublished);
     }, [dispatchers]);
 
-    // Real-time schedule updates - reload when changes detected from other sessions
+    // Real-time schedule updates
     const handleRealtimeChange = useCallback(() => {
         loadWeekSchedules(weekStart);
     }, [loadWeekSchedules, weekStart]);
@@ -424,10 +315,10 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
     const goToPrevWeek = async () => {
         setIsNavigating(true);
         try {
-            const newWeek = new Date(weekStart);
-            newWeek.setUTCDate(newWeek.getUTCDate() - 7);
-            setWeekStart(newWeek);
-            await loadWeekSchedules(newWeek);
+            const newWeek = addDays(weekStart, -7);
+            const normalized = getWeekStart(newWeek);
+            setWeekStart(normalized);
+            await loadWeekSchedules(normalized);
         } finally {
             setIsNavigating(false);
         }
@@ -436,10 +327,10 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
     const goToNextWeek = async () => {
         setIsNavigating(true);
         try {
-            const newWeek = new Date(weekStart);
-            newWeek.setUTCDate(newWeek.getUTCDate() + 7);
-            setWeekStart(newWeek);
-            await loadWeekSchedules(newWeek);
+            const newWeek = addDays(weekStart, 7);
+            const normalized = getWeekStart(newWeek);
+            setWeekStart(normalized);
+            await loadWeekSchedules(normalized);
         } finally {
             setIsNavigating(false);
         }
@@ -456,37 +347,60 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
         }
     };
 
-    const formatWeekRange = () => {
-        const start = new Date(weekStart);
-        const end = new Date(weekStart);
-        end.setUTCDate(end.getUTCDate() + 6);
-        const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", timeZone: COMPANY_TIMEZONE };
-        return `${start.toLocaleDateString(undefined, opts)} – ${end.toLocaleDateString(undefined, opts)}, ${start.getUTCFullYear()}`;
-    };
-
     const getDateForDay = (dayIndex: number): Date => {
-        const date = new Date(weekStart);
-        date.setUTCDate(date.getUTCDate() + dayIndex);
-        return date;
+        return addDays(weekStart, dayIndex);
     };
 
     const isToday = (dayIndex: number): boolean => {
         const date = getDateForDay(dayIndex);
-        const dateInTz = getDateInTimezone(date);
-        const todayInTz = getDateInTimezone(new Date());
-        return dateInTz.day === todayInTz.day &&
-            dateInTz.month === todayInTz.month &&
-            dateInTz.year === todayInTz.year;
+        const today = new Date();
+        return date.getDate() === today.getDate() &&
+            date.getMonth() === today.getMonth() &&
+            date.getFullYear() === today.getFullYear();
     };
+
+    // Keyboard navigation
+    const handleCellKeyDown = useCallback((e: React.KeyboardEvent, day: number, hour: number) => {
+        let newDay = day;
+        let newHour = hour;
+
+        switch (e.key) {
+            case "ArrowUp":
+                e.preventDefault();
+                newHour = Math.max(0, hour - 1);
+                break;
+            case "ArrowDown":
+                e.preventDefault();
+                newHour = Math.min(23, hour + 1);
+                break;
+            case "ArrowLeft":
+                e.preventDefault();
+                newDay = Math.max(0, day - 1);
+                break;
+            case "ArrowRight":
+                e.preventDefault();
+                newDay = Math.min(6, day + 1);
+                break;
+            default:
+                return;
+        }
+
+        setFocusedCell({ day: newDay, hour: newHour });
+        const cellId = `cell-${newDay}-${newHour}`;
+        const cell = document.getElementById(cellId);
+        cell?.focus();
+    }, []);
 
     const handleDispatcherDragStart = (dispatcher: Dispatcher, e: React.DragEvent) => {
         const index = dispatchers.findIndex((d) => d.id === dispatcher.id);
+        const { startHour, endHour } = getShiftHours();
         setDragState({
             type: "new",
             dispatcherId: dispatcher.id,
             dispatcherName: dispatcher.name || "Unknown",
-            color: getDispatcherColor(index),
-            duration: defaultDuration,
+            color: selectedMarket ? MARKET_COLORS[selectedMarket] : getDispatcherColor(index),
+            startHour,
+            endHour,
         });
         e.dataTransfer.setData("text/plain", dispatcher.id);
         e.dataTransfer.effectAllowed = "copy";
@@ -499,13 +413,13 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
             dispatcherName: shift.dispatcherName,
             color: shift.color,
             shiftId: shift.id,
-            duration: shift.duration,
+            startHour: shift.startHour,
+            endHour: shift.endHour,
         });
         e.dataTransfer.setData("text/plain", shift.id);
         e.dataTransfer.effectAllowed = "move";
     };
 
-    // Calculate cell from mouse position (for drops on shifts overlay)
     const getCellFromPosition = (e: React.DragEvent): { day: number; hour: number } | null => {
         if (!gridRef.current) return null;
 
@@ -513,7 +427,6 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
         const scrollLeft = gridRef.current.scrollLeft;
         const scrollTop = gridRef.current.scrollTop;
 
-        // Account for time column (64px) and header (48px)
         const x = e.clientX - rect.left + scrollLeft - 64;
         const y = e.clientY - rect.top + scrollTop - 48;
 
@@ -527,8 +440,7 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
 
         if (day < 0 || day >= 7 || rowIndex < 0 || rowIndex >= 24) return null;
 
-        const hour = GRID_HOURS[rowIndex];
-        return { day, hour };
+        return { day, hour: rowIndex };
     };
 
     const handleCellDragOver = (day: number, hour: number, e: React.DragEvent) => {
@@ -538,7 +450,6 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
         setGhostPosition({ x: e.clientX, y: e.clientY });
     };
 
-    // Handle drag over shifts overlay (for drops on existing shifts)
     const handleOverlayDragOver = (e: React.DragEvent) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = dragState?.type === "new" ? "copy" : "move";
@@ -549,7 +460,6 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
         setGhostPosition({ x: e.clientX, y: e.clientY });
     };
 
-    // Handle drop on shifts overlay
     const handleOverlayDrop = async (e: React.DragEvent) => {
         e.preventDefault();
         const cell = getCellFromPosition(e);
@@ -558,24 +468,31 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
         }
     };
 
-    const handleCellDrop = async (day: number, hour: number) => {
+    const handleCellDrop = async (dayIndex: number, clickedHour: number) => {
         if (!dragState) return;
 
-        // Get the date for this day column and create shift time in company timezone
-        const date = getDateForDay(day);
-        const dateInTz = getDateInTimezone(date);
-
-        // Create shift start time: the clicked hour in Central Time, converted to UTC
-        const shiftStart = createDateInTimezone(dateInTz.year, dateInTz.month, dateInTz.day, hour);
-
-        // Shift end is duration hours after start
-        const shiftEnd = new Date(shiftStart.getTime() + dragState.duration * 60 * 60 * 1000);
+        const date = getDateForDay(dayIndex);
+        let startHour: number;
+        let endHour: number;
 
         if (dragState.type === "new") {
-            const result = await createScheduleBlock({
+            // For new shifts, use the clicked hour as start
+            if (selectedShiftType === "CUSTOM") {
+                startHour = clickedHour;
+                endHour = (clickedHour + customDuration) % 24;
+            } else {
+                const preset = SHIFT_PRESETS[selectedShiftType];
+                startHour = preset.startHour;
+                endHour = preset.endHour;
+            }
+
+            const result = await createSchedule({
                 userId: dragState.dispatcherId,
-                shiftStart,
-                shiftEnd,
+                date,
+                startHour,
+                endHour,
+                market: selectedMarket,
+                shiftType: selectedShiftType,
             });
 
             if (result.success && result.schedule) {
@@ -586,33 +503,50 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                         id: result.schedule!.id,
                         dispatcherId: dragState.dispatcherId,
                         dispatcherName: dragState.dispatcherName,
-                        day,
-                        startHour: hour,
-                        duration: dragState.duration,
+                        dayIndex,
+                        startHour,
+                        endHour,
+                        duration: getShiftDuration(startHour, endHour),
+                        market: selectedMarket,
+                        shiftType: selectedShiftType,
                         isPublished: false,
-                        color: getDispatcherColor(dispatcherIndex),
+                        color: selectedMarket ? MARKET_COLORS[selectedMarket] : getDispatcherColor(dispatcherIndex),
+                        isOvernight: isOvernightShift(startHour, endHour),
                     },
                 ]);
                 addToast(`Shift created for ${dragState.dispatcherName}`, "success");
             } else {
-                addToast(result.error || "Failed to create shift", "error");
+                addToast(getErrorMessage(result.errors), "error");
             }
         } else if (dragState.type === "move" && dragState.shiftId) {
-            const result = await updateScheduleBlock(dragState.shiftId, {
-                shiftStart,
-                shiftEnd,
+            // For moves, use the clicked hour as new start, keep same duration
+            const originalDuration = getShiftDuration(dragState.startHour, dragState.endHour);
+            startHour = clickedHour;
+            endHour = (clickedHour + originalDuration) % 24;
+
+            const result = await updateSchedule(dragState.shiftId, {
+                date,
+                startHour,
+                endHour,
             });
 
             if (result.success) {
                 setShifts((prev) =>
                     prev.map((s) =>
                         s.id === dragState.shiftId
-                            ? { ...s, day, startHour: hour }
+                            ? {
+                                ...s,
+                                dayIndex,
+                                startHour,
+                                endHour,
+                                duration: originalDuration,
+                                isOvernight: isOvernightShift(startHour, endHour),
+                            }
                             : s
                     )
                 );
             } else {
-                addToast(result.error || "Failed to move shift", "error");
+                addToast(getErrorMessage(result.errors), "error");
             }
         }
 
@@ -628,7 +562,7 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
     const handleDeleteShift = async (shiftId: string) => {
         setActionInProgress(shiftId);
         try {
-            const result = await deleteScheduleBlock(shiftId);
+            const result = await deleteSchedule(shiftId);
             if (result.success) {
                 setShifts((prev) => prev.filter((s) => s.id !== shiftId));
             } else {
@@ -641,7 +575,7 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
 
     const handlePublish = async () => {
         setIsLoading(true);
-        const result = await publishWeekSchedules(weekStart);
+        const result = await publishWeek(weekStart);
         setIsLoading(false);
 
         if (result.success) {
@@ -655,7 +589,7 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
 
     const handleUnpublish = async () => {
         setIsLoading(true);
-        const result = await unpublishWeekSchedules(weekStart);
+        const result = await unpublishWeek(weekStart);
         setIsLoading(false);
 
         if (result.success) {
@@ -667,37 +601,31 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
         }
     };
 
-    const [copying, setCopying] = useState(false);
-
     const handleCopyPreviousWeek = async () => {
         if (shifts.length > 0) {
             const confirmed = window.confirm(
-                "This week already has schedules. Copy will only work on empty weeks. Do you want to clear all schedules first?"
+                "This week already has schedules. Do you want to clear them and copy from last week?"
             );
             if (!confirmed) return;
 
-            // Delete all current week schedules
-            for (const shift of shifts) {
-                const result = await deleteScheduleBlock(shift.id);
-                if (!result.success) {
-                    addToast("Failed to clear existing schedules", "error");
-                    return;
-                }
+            const clearResult = await clearWeekSchedules(weekStart);
+            if (!clearResult.success) {
+                addToast("Failed to clear existing schedules", "error");
+                return;
             }
             setShifts([]);
         }
 
         setCopying(true);
         try {
-            const result = await copyPreviousWeekSchedules(weekStart);
+            const result = await copyPreviousWeek(weekStart);
 
-            if (result.success && result.copied > 0 && result.schedules) {
-                // Convert to shift blocks and update state
-                const newBlocks = schedulesToBlocks(result.schedules, dispatchers, weekStart);
-                setShifts(newBlocks);
-                addToast(result.message, "success");
+            if (result.success && result.copied > 0) {
+                // Reload to get the new schedules
+                await loadWeekSchedules(weekStart);
+                addToast(`Copied ${result.copied} shifts from last week`, "success");
             } else {
-                addToast(result.message, result.success ? "warning" : "error");
+                addToast(getErrorMessage(result.errors) || "No shifts to copy from last week", "warning");
             }
         } catch (error) {
             console.error("Failed to copy schedules:", error);
@@ -708,12 +636,12 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
     };
 
     const handleExport = () => {
-        const lines = ["Day,Dispatcher,Start,End,Hours"];
+        const lines = ["Day,Dispatcher,Start,End,Hours,Market"];
         for (let d = 0; d < DAYS_IN_WEEK; d++) {
-            const dayShifts = shifts.filter((s) => s.day === d).sort((a, b) => a.startHour - b.startHour);
+            const dayShifts = shifts.filter((s) => s.dayIndex === d).sort((a, b) => a.startHour - b.startHour);
             for (const shift of dayShifts) {
                 lines.push(
-                    `${DAY_FULL[d]},${shift.dispatcherName},${formatHourFull(shift.startHour)},${formatHourFull(shift.startHour + shift.duration)},${shift.duration}`
+                    `${DAY_NAMES_FULL[d]},${shift.dispatcherName},${formatHourFull(shift.startHour)},${formatHourFull(shift.endHour)},${shift.duration},${shift.market || ""}`
                 );
             }
         }
@@ -756,7 +684,7 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                     </button>
                     <div className="cmd-week-display">
                         <span className="cmd-week-display__label">Week</span>
-                        <span className="cmd-week-display__range">{formatWeekRange()}</span>
+                        <span className="cmd-week-display__range">{formatWeekLabel(weekStart)}</span>
                     </div>
                     <button onClick={goToNextWeek} className="cmd-nav-btn" disabled={isNavigating}>
                         {isNavigating ? <Loader2 size={18} className="cmd-spin" /> : <ChevronRight size={18} />}
@@ -813,7 +741,7 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
 
                     <div className="cmd-dispatchers">
                         {dispatchers.map((dispatcher, index) => {
-                            const color = getDispatcherColor(index);
+                            const color = selectedMarket ? MARKET_COLORS[selectedMarket] : getDispatcherColor(index);
                             return (
                                 <div
                                     key={dispatcher.id}
@@ -844,26 +772,65 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                         )}
                     </div>
 
-                    {/* Duration Control */}
+                    {/* Shift Type Selection */}
                     <div className="cmd-sidebar__section">
-                        <div className="cmd-section-title">Shift Duration</div>
-                        <div className="cmd-duration">
+                        <div className="cmd-section-title">Shift Type</div>
+                        <div className="cmd-shift-types">
+                            {(["MORNING", "AFTERNOON", "NIGHT", "CUSTOM"] as const).map((type) => (
+                                <button
+                                    key={type}
+                                    className={`cmd-shift-type ${selectedShiftType === type ? "cmd-shift-type--active" : ""}`}
+                                    onClick={() => setSelectedShiftType(type)}
+                                >
+                                    {type === "MORNING" && "6A-2P"}
+                                    {type === "AFTERNOON" && "2P-10P"}
+                                    {type === "NIGHT" && "10P-6A"}
+                                    {type === "CUSTOM" && "Custom"}
+                                </button>
+                            ))}
+                        </div>
+                        {selectedShiftType === "CUSTOM" && (
+                            <div className="cmd-duration">
+                                <button
+                                    onClick={() => setCustomDuration((d) => Math.max(1, d - 1))}
+                                    className="cmd-duration__btn"
+                                >
+                                    <Minus size={14} />
+                                </button>
+                                <span className="cmd-duration__value">
+                                    {customDuration}
+                                    <span className="cmd-duration__unit">h</span>
+                                </span>
+                                <button
+                                    onClick={() => setCustomDuration((d) => Math.min(24, d + 1))}
+                                    className="cmd-duration__btn"
+                                >
+                                    <Plus size={14} />
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Market Selection */}
+                    <div className="cmd-sidebar__section">
+                        <div className="cmd-section-title">Market</div>
+                        <div className="cmd-markets">
                             <button
-                                onClick={() => setDefaultDuration((d) => Math.max(1, d - 1))}
-                                className="cmd-duration__btn"
+                                className={`cmd-market ${selectedMarket === null ? "cmd-market--active" : ""}`}
+                                onClick={() => setSelectedMarket(null)}
                             >
-                                <Minus size={14} />
+                                None
                             </button>
-                            <span className="cmd-duration__value">
-                                {defaultDuration}
-                                <span className="cmd-duration__unit">h</span>
-                            </span>
-                            <button
-                                onClick={() => setDefaultDuration((d) => Math.min(24, d + 1))}
-                                className="cmd-duration__btn"
-                            >
-                                <Plus size={14} />
-                            </button>
+                            {(["DFW", "AUS", "SAT"] as Market[]).map((market) => (
+                                <button
+                                    key={market}
+                                    className={`cmd-market ${selectedMarket === market ? "cmd-market--active" : ""}`}
+                                    style={{ '--market-color': MARKET_COLORS[market] } as React.CSSProperties}
+                                    onClick={() => setSelectedMarket(market)}
+                                >
+                                    {market}
+                                </button>
+                            ))}
                         </div>
                     </div>
 
@@ -921,7 +888,7 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                                 <Clock size={16} className="cmd-grid__corner-icon" aria-hidden="true" />
                             </div>
 
-                            {/* Day Headers */}
+                            {/* Day Headers - Monday first */}
                             {DAY_NAMES.map((day, i) => {
                                 const date = getDateForDay(i);
                                 const today = isToday(i);
@@ -930,10 +897,10 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                                         key={day}
                                         className={`cmd-day-header ${today ? 'cmd-day-header--today' : ''}`}
                                         role="columnheader"
-                                        aria-label={`${DAY_FULL[i]}, ${date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}`}
+                                        aria-label={`${DAY_NAMES_FULL[i]}, ${date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}`}
                                     >
                                         <span className="cmd-day-header__name">{day}</span>
-                                        <span className="cmd-day-header__date">{date.getUTCDate()}</span>
+                                        <span className="cmd-day-header__date">{date.getDate()}</span>
                                     </div>
                                 );
                             })}
@@ -942,7 +909,7 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                             {GRID_HOURS.map((hour, rowIndex) => (
                                 <React.Fragment key={`row-${hour}`}>
                                     <div
-                                        className={`cmd-time-label ${hour === 23 || hour === 7 || hour === 15 ? 'cmd-time-label--shift-start' : ''}`}
+                                        className={`cmd-time-label ${hour === 6 || hour === 14 || hour === 22 ? 'cmd-time-label--shift-start' : ''}`}
                                         role="rowheader"
                                         aria-label={formatHourFull(hour)}
                                     >
@@ -953,10 +920,10 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                                         <div
                                             id={`cell-${dayIndex}-${hour}`}
                                             key={`cell-${dayIndex}-${hour}`}
-                                            className={`cmd-cell ${hour === 23 || hour === 7 || hour === 15 ? 'cmd-cell--shift-boundary' : ''} ${highlightCell?.day === dayIndex && highlightCell?.hour === hour ? 'cmd-cell--highlight' : ''} ${focusedCell?.day === dayIndex && focusedCell?.hour === hour ? 'cmd-cell--focused' : ''}`}
+                                            className={`cmd-cell ${hour === 6 || hour === 14 || hour === 22 ? 'cmd-cell--shift-boundary' : ''} ${highlightCell?.day === dayIndex && highlightCell?.hour === hour ? 'cmd-cell--highlight' : ''} ${focusedCell?.day === dayIndex && focusedCell?.hour === hour ? 'cmd-cell--focused' : ''}`}
                                             role="gridcell"
                                             tabIndex={rowIndex === 0 && dayIndex === 0 ? 0 : -1}
-                                            aria-label={`${DAY_FULL[dayIndex]} at ${formatHourFull(hour)}. Press Enter to create shift.`}
+                                            aria-label={`${DAY_NAMES_FULL[dayIndex]} at ${formatHourFull(hour)}. Press Enter to create shift.`}
                                             onDragOver={(e) => handleCellDragOver(dayIndex, hour, e)}
                                             onDrop={() => handleCellDrop(dayIndex, hour)}
                                             onKeyDown={(e) => handleCellKeyDown(e, dayIndex, hour)}
@@ -967,7 +934,7 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                             ))}
                         </div>
 
-                        {/* Shift blocks overlay - handles drops on existing shifts */}
+                        {/* Shift blocks overlay */}
                         <div
                             className="cmd-shifts-overlay"
                             onDragOver={handleOverlayDragOver}
@@ -975,22 +942,25 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                         >
                             {shifts.map((shift) => {
                                 const rowIndex = HOUR_TO_ROW[shift.startHour];
-                                const top = rowIndex * 28 + 48; // 28px row height + 48px header
+                                const top = rowIndex * 28 + 48;
 
                                 const position = overlapPositions.get(shift.id) || { index: 0, total: 1 };
                                 const { index: overlapIndex, total: overlapTotal } = position;
 
                                 const dayWidth = 100 / 7;
                                 const shiftWidth = dayWidth / overlapTotal;
-                                const left = shift.day * dayWidth + (overlapIndex * shiftWidth);
+                                const left = shift.dayIndex * dayWidth + (overlapIndex * shiftWidth);
 
-                                const height = shift.duration * 28;
+                                // For overnight shifts, only show the first part (until midnight)
+                                const displayDuration = shift.isOvernight
+                                    ? (24 - shift.startHour)
+                                    : shift.duration;
+                                const height = displayDuration * 28;
                                 const hasOverlap = overlapTotal > 1;
 
                                 const isBeingDeleted = actionInProgress === shift.id;
                                 const classNames = ["cmd-shift"];
-                                if (shift.isCrossMidnight) classNames.push("cmd-shift--cross-midnight");
-                                if (shift.isContinuation) classNames.push("cmd-shift--continuation");
+                                if (shift.isOvernight) classNames.push("cmd-shift--overnight");
                                 if (hasOverlap) classNames.push("cmd-shift--overlap");
                                 if (isBeingDeleted) classNames.push("cmd-shift--deleting");
 
@@ -1000,7 +970,7 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                                         className={classNames.join(" ")}
                                         role="button"
                                         tabIndex={0}
-                                        aria-label={`${shift.dispatcherName}'s shift on ${DAY_FULL[shift.day]}, ${formatHourFull(shift.startHour)} to ${formatHourFull(shift.startHour + shift.duration)}, ${shift.duration} hours${shift.isPublished ? ', published' : ', draft'}. Drag to move.`}
+                                        aria-label={`${shift.dispatcherName}'s shift on ${DAY_NAMES_FULL[shift.dayIndex]}, ${formatShiftShort(shift.startHour, shift.endHour)}, ${shift.duration} hours${shift.isPublished ? ', published' : ', draft'}${shift.market ? `, ${shift.market} market` : ''}. Drag to move.`}
                                         style={{
                                             '--shift-color': shift.color,
                                             top: `${top}px`,
@@ -1009,8 +979,8 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                                             height: `${height}px`,
                                             color: getContrastColor(shift.color),
                                         } as React.CSSProperties}
-                                        draggable={!shift.isContinuation && !isBeingDeleted}
-                                        onDragStart={(e) => !shift.isContinuation && handleShiftDragStart(shift, e)}
+                                        draggable={!isBeingDeleted}
+                                        onDragStart={(e) => handleShiftDragStart(shift, e)}
                                         onDragEnd={handleDragEnd}
                                     >
                                         {isBeingDeleted ? (
@@ -1019,11 +989,14 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                                             <>
                                                 <span className="cmd-shift__name">{shift.dispatcherName}</span>
                                                 <span className="cmd-shift__time">
-                                                    {formatHourFull(shift.startHour)} – {formatHourFull(shift.startHour + shift.duration)}
+                                                    {formatShiftShort(shift.startHour, shift.endHour)}
                                                 </span>
+                                                {shift.market && (
+                                                    <span className="cmd-shift__market">{shift.market}</span>
+                                                )}
                                             </>
                                         )}
-                                        {!shift.isContinuation && !isBeingDeleted && (
+                                        {!isBeingDeleted && (
                                             <button
                                                 className="cmd-shift__delete"
                                                 aria-label={`Delete ${shift.dispatcherName}'s shift`}
@@ -1055,7 +1028,9 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                     } as React.CSSProperties}
                 >
                     <span className="cmd-ghost__name">{dragState.dispatcherName}</span>
-                    <span className="cmd-ghost__time">{dragState.duration}h shift</span>
+                    <span className="cmd-ghost__time">
+                        {formatShiftShort(dragState.startHour, dragState.endHour)}
+                    </span>
                 </div>
             )}
         </div>

@@ -118,8 +118,16 @@ interface Event {
 
 interface NextShift {
     id: string;
-    shiftStart: Date;
-    shiftEnd: Date;
+    date: Date;
+    startHour: number;
+    endHour: number;
+    market: string | null;
+}
+
+function formatHour(hour: number): string {
+    const period = hour >= 12 ? "PM" : "AM";
+    const h = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    return `${h}${period}`;
 }
 
 interface Task {
@@ -360,7 +368,7 @@ export default function DashboardClient({
                                 <span className={styles.statLabel}>Next Shift</span>
                                 <span className={styles.statValue}>
                                     {nextShift ? (
-                                        new Date(nextShift.shiftStart).toLocaleDateString(undefined, {
+                                        new Date(nextShift.date).toLocaleDateString(undefined, {
                                             weekday: 'short',
                                             month: 'short',
                                             day: 'numeric',
@@ -374,15 +382,7 @@ export default function DashboardClient({
                         <div className={styles.statFooter}>
                             {nextShift ? (
                                 <span>
-                                    {new Date(nextShift.shiftStart).toLocaleTimeString(undefined, {
-                                        hour: 'numeric',
-                                        minute: '2-digit',
-                                    })}
-                                    {' - '}
-                                    {new Date(nextShift.shiftEnd).toLocaleTimeString(undefined, {
-                                        hour: 'numeric',
-                                        minute: '2-digit',
-                                    })}
+                                    {formatHour(nextShift.startHour)} - {formatHour(nextShift.endHour)}
                                 </span>
                             ) : (
                                 <span>Check schedule</span>

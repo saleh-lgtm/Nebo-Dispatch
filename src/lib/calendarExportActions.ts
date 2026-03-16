@@ -26,6 +26,24 @@ function escapeICalText(text: string): string {
 }
 
 /**
+ * Calculate shift duration from start/end hours
+ */
+function getShiftDuration(startHour: number, endHour: number): number {
+    if (endHour > startHour) return endHour - startHour;
+    return 24 - startHour + endHour; // Overnight shift
+}
+
+/**
+ * Create a Date object from a date and hour (in Central Time)
+ * Hours are integers 0-23 representing Central Time
+ */
+function createDateWithHour(date: Date, hour: number): Date {
+    const d = new Date(date);
+    d.setHours(hour, 0, 0, 0);
+    return d;
+}
+
+/**
  * Generate a unique calendar subscription token for a user
  * This token is used to authenticate calendar subscriptions without requiring login
  */
@@ -74,14 +92,15 @@ export async function generateICalFeed(userId: string): Promise<string> {
     }
 
     // Get all future published schedules for this user
-    const now = new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const schedules = await prisma.schedule.findMany({
         where: {
             userId,
             isPublished: true,
-            shiftEnd: { gte: now }, // Include currently active and future shifts
+            date: { gte: today }, // Include today and future shifts
         },
-        orderBy: { shiftStart: "asc" },
+        orderBy: [{ date: "asc" }, { startHour: "asc" }],
     });
 
     // Build iCal content
@@ -115,9 +134,13 @@ export async function generateICalFeed(userId: string): Promise<string> {
 
     // Add each schedule as an event
     for (const schedule of schedules) {
-        const startDate = new Date(schedule.shiftStart);
-        const endDate = new Date(schedule.shiftEnd);
-        const duration = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60));
+        const startDate = createDateWithHour(schedule.date, schedule.startHour);
+        // For overnight shifts, end date is next day
+        const isOvernight = schedule.endHour <= schedule.startHour && schedule.endHour !== schedule.startHour;
+        const endDate = isOvernight
+            ? createDateWithHour(new Date(schedule.date.getTime() + 24 * 60 * 60 * 1000), schedule.endHour)
+            : createDateWithHour(schedule.date, schedule.endHour);
+        const duration = getShiftDuration(schedule.startHour, schedule.endHour);
 
         // Format dates for local timezone display
         const startStr = startDate.toLocaleString("en-US", { timeZone: COMPANY_TIMEZONE });

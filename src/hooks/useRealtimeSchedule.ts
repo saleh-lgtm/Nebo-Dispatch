@@ -7,8 +7,9 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 interface SchedulePayload {
     id: string;
     userId: string;
-    shiftStart: string;
-    shiftEnd: string;
+    date: string;
+    startHour: number;
+    endHour: number;
     isPublished: boolean;
     weekStart: string | null;
     createdAt: string;
@@ -44,14 +45,14 @@ export function useRealtimeSchedule({
 
     // Helper to check if a schedule is in the current week
     const isInCurrentWeek = useCallback(
-        (shiftStartStr: string) => {
+        (dateStr: string) => {
             if (!weekStart) return true; // No filter, accept all
 
-            const shiftStart = new Date(shiftStartStr);
+            const scheduleDate = new Date(dateStr);
             const weekEnd = new Date(weekStart);
             weekEnd.setDate(weekEnd.getDate() + 7);
 
-            return shiftStart >= weekStart && shiftStart < weekEnd;
+            return scheduleDate >= weekStart && scheduleDate < weekEnd;
         },
         [weekStart]
     );
@@ -61,7 +62,7 @@ export function useRealtimeSchedule({
             const newSchedule = payload.new;
 
             // Filter by week if specified
-            if (!isInCurrentWeek(newSchedule.shiftStart)) {
+            if (!isInCurrentWeek(newSchedule.date)) {
                 return;
             }
 
@@ -76,7 +77,7 @@ export function useRealtimeSchedule({
             const updated = payload.new;
 
             // Filter by week if specified
-            if (!isInCurrentWeek(updated.shiftStart)) {
+            if (!isInCurrentWeek(updated.date)) {
                 return;
             }
 

@@ -6,172 +6,127 @@ import {
     ChevronRight,
     Send,
     Ban,
-    Clock,
     Plus,
     X,
     Trash2,
-    GripVertical,
     Loader2,
     Copy,
 } from "lucide-react";
 import {
-    createScheduleBlock,
-    updateScheduleBlock,
-    deleteScheduleBlock,
-    publishWeekSchedules,
-    unpublishWeekSchedules,
+    createSchedule,
+    deleteSchedule,
+    publishWeek,
+    unpublishWeek,
     getWeekSchedules,
-    copyPreviousWeekSchedules,
+    copyPreviousWeek,
+    clearWeekSchedules,
 } from "@/lib/schedulerActions";
 import { useToastContext } from "@/components/ui/ToastProvider";
 import { useRealtimeSchedule } from "@/hooks/useRealtimeSchedule";
+import type { ScheduleRecord, Dispatcher, Market, ShiftType } from "@/types/schedule";
+import {
+    DAY_NAMES,
+    DAY_NAMES_FULL,
+    MARKET_COLORS,
+    SHIFT_PRESETS,
+    formatHourFull,
+    formatShiftShort,
+    getShiftDuration,
+    getWeekStart,
+    addDays,
+    isOvernightShift,
+} from "@/types/schedule";
 import "./mobile-scheduler.css";
 
-// Types
-interface Dispatcher {
-    id: string;
-    name: string | null;
-    email: string | null;
-}
-
-interface ScheduleData {
-    id: string;
-    userId: string;
-    shiftStart: Date;
-    shiftEnd: Date;
-    isPublished: boolean;
-    user: { id: string; name: string | null };
-}
+// ============ Types ============
 
 interface ShiftBlock {
     id: string;
     dispatcherId: string;
     dispatcherName: string;
-    day: number;
+    dayIndex: number; // 0=Mon, 6=Sun
     startHour: number;
+    endHour: number;
     duration: number;
+    market: Market | null;
+    shiftType: ShiftType;
     isPublished: boolean;
     color: string;
+    isOvernight: boolean;
 }
 
-// Constants
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const DAY_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const COMPANY_TIMEZONE = "America/Chicago";
+// ============ Constants ============
+
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
-// Color palette
 const COLORS = [
     "#00f0ff", "#f472b6", "#a78bfa", "#34d399", "#fbbf24",
     "#fb7185", "#38bdf8", "#4ade80", "#f97316", "#e879f9",
 ];
 
+// ============ Helpers ============
+
+function getErrorMessage(errors?: { message: string }[] | string[]): string {
+    if (!errors || errors.length === 0) return "An error occurred";
+    const first = errors[0];
+    return typeof first === "string" ? first : first.message;
+}
+
 function getDispatcherColor(index: number): string {
     return COLORS[index % COLORS.length];
 }
 
-function formatHour(h: number): string {
-    if (h === 0) return "12 AM";
-    if (h < 12) return `${h} AM`;
-    if (h === 12) return "12 PM";
-    return `${h - 12} PM`;
-}
-
-function getWeekStart(date: Date): Date {
-    const d = new Date(date);
-    const day = d.getUTCDay();
-    d.setUTCDate(d.getUTCDate() - day);
-    d.setUTCHours(0, 0, 0, 0);
-    return d;
-}
-
-function getDateInTimezone(date: Date): { year: number; month: number; day: number; hour: number; dayOfWeek: number } {
-    const formatter = new Intl.DateTimeFormat("en-US", {
-        timeZone: COMPANY_TIMEZONE,
-        year: "numeric",
-        month: "numeric",
-        day: "numeric",
-        hour: "numeric",
-        hour12: false,
-        weekday: "short",
-    });
-    const parts = formatter.formatToParts(date);
-    const dayOfWeekStr = parts.find(p => p.type === "weekday")?.value || "Sun";
-    const dayOfWeekMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-    return {
-        year: parseInt(parts.find(p => p.type === "year")?.value || "0"),
-        month: parseInt(parts.find(p => p.type === "month")?.value || "0") - 1,
-        day: parseInt(parts.find(p => p.type === "day")?.value || "0"),
-        hour: parseInt(parts.find(p => p.type === "hour")?.value || "0"),
-        dayOfWeek: dayOfWeekMap[dayOfWeekStr] ?? 0,
-    };
-}
-
-function createDateInTimezone(year: number, month: number, day: number, hour: number): Date {
-    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}T${String(hour).padStart(2, "0")}:00:00`;
-    const tempDate = new Date(dateStr + "Z");
-    const formatter = new Intl.DateTimeFormat("en-US", {
-        timeZone: COMPANY_TIMEZONE,
-        hour: "numeric",
-        hour12: false,
-    });
-
-    for (let offset = -12; offset <= 14; offset++) {
-        const testDate = new Date(tempDate.getTime() + offset * 60 * 60 * 1000);
-        const testHour = parseInt(formatter.format(testDate));
-        if (testHour === hour) {
-            const fullFormatter = new Intl.DateTimeFormat("en-US", {
-                timeZone: COMPANY_TIMEZONE,
-                year: "numeric",
-                month: "numeric",
-                day: "numeric",
-            });
-            const parts = fullFormatter.formatToParts(testDate);
-            const testDay = parseInt(parts.find(p => p.type === "day")?.value || "0");
-            if (testDay === day) {
-                return testDate;
-            }
-        }
+function getShiftColor(shift: { market: Market | null }, dispatcherIndex: number): string {
+    if (shift.market) {
+        return MARKET_COLORS[shift.market];
     }
-    return new Date(tempDate.getTime() + 6 * 60 * 60 * 1000);
+    return getDispatcherColor(dispatcherIndex);
 }
 
-function schedulesToBlocks(schedules: ScheduleData[], dispatchers: Dispatcher[]): ShiftBlock[] {
+function schedulesToBlocks(schedules: ScheduleRecord[], dispatchers: Dispatcher[], weekStart: Date): ShiftBlock[] {
     return schedules.map((schedule) => {
-        const shiftStart = new Date(schedule.shiftStart);
-        const shiftEnd = new Date(schedule.shiftEnd);
-        const startInTz = getDateInTimezone(shiftStart);
-        const duration = Math.ceil((shiftEnd.getTime() - shiftStart.getTime()) / (1000 * 60 * 60));
+        const schedDate = new Date(schedule.date);
+        const diffTime = schedDate.getTime() - weekStart.getTime();
+        const dayIndex = Math.floor(diffTime / (24 * 60 * 60 * 1000));
         const dispatcherIndex = dispatchers.findIndex((d) => d.id === schedule.userId);
+        const duration = getShiftDuration(schedule.startHour, schedule.endHour);
 
         return {
             id: schedule.id,
             dispatcherId: schedule.userId,
-            dispatcherName: schedule.user.name || "Unknown",
-            day: startInTz.dayOfWeek,
-            startHour: startInTz.hour,
+            dispatcherName: schedule.userName || "Unknown",
+            dayIndex: Math.max(0, Math.min(6, dayIndex)),
+            startHour: schedule.startHour,
+            endHour: schedule.endHour,
             duration,
+            market: schedule.market,
+            shiftType: schedule.shiftType,
             isPublished: schedule.isPublished,
-            color: dispatcherIndex >= 0 ? getDispatcherColor(dispatcherIndex) : COLORS[0],
+            color: getShiftColor(schedule, dispatcherIndex),
+            isOvernight: isOvernightShift(schedule.startHour, schedule.endHour),
         };
     });
 }
 
+// ============ Component ============
+
 interface Props {
     dispatchers: Dispatcher[];
-    initialSchedules: ScheduleData[];
+    initialSchedules: ScheduleRecord[];
     initialWeekStart: string;
 }
 
 export default function MobileSchedulerClient({ dispatchers, initialSchedules, initialWeekStart }: Props) {
     const { addToast } = useToastContext();
-    const [weekStart, setWeekStart] = useState<Date>(new Date(initialWeekStart));
+    const [weekStart, setWeekStart] = useState<Date>(() => new Date(initialWeekStart));
     const [selectedDay, setSelectedDay] = useState(() => {
-        const today = getDateInTimezone(new Date());
-        return today.dayOfWeek;
+        // Get today's day index (0=Mon, 6=Sun)
+        const today = new Date();
+        const day = today.getDay();
+        return day === 0 ? 6 : day - 1; // Convert Sun=0 to 6, Mon=1 to 0, etc.
     });
     const [shifts, setShifts] = useState<ShiftBlock[]>(() =>
-        schedulesToBlocks(initialSchedules, dispatchers)
+        schedulesToBlocks(initialSchedules, dispatchers, new Date(initialWeekStart))
     );
     const [isPublished, setIsPublished] = useState(() =>
         initialSchedules.some((s) => s.isPublished)
@@ -181,9 +136,12 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
     const [showAddSheet, setShowAddSheet] = useState(false);
     const [addShiftHour, setAddShiftHour] = useState<number | null>(null);
     const [selectedDispatcher, setSelectedDispatcher] = useState<string | null>(null);
-    const [shiftDuration, setShiftDuration] = useState(8);
+    const [selectedShiftType, setSelectedShiftType] = useState<ShiftType>("CUSTOM");
+    const [customDuration, setCustomDuration] = useState(8);
+    const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
     const [editingShift, setEditingShift] = useState<ShiftBlock | null>(null);
     const [deletingShiftId, setDeletingShiftId] = useState<string | null>(null);
+    const [copying, setCopying] = useState(false);
 
     const timelineRef = useRef<HTMLDivElement>(null);
     const touchStartX = useRef<number>(0);
@@ -191,22 +149,21 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
     const loadWeekSchedules = useCallback(async (newWeekStart: Date) => {
         setIsNavigating(true);
         try {
-            const schedules = await getWeekSchedules(newWeekStart);
-            const blocks = schedulesToBlocks(schedules, dispatchers);
+            const result = await getWeekSchedules(newWeekStart);
+            const blocks = schedulesToBlocks(result.schedules, dispatchers, newWeekStart);
             setShifts(blocks);
-            setIsPublished(schedules.some((s) => s.isPublished));
+            setIsPublished(result.isPublished);
         } finally {
             setIsNavigating(false);
         }
     }, [dispatchers]);
 
-    // Real-time schedule updates - reload when changes detected from other sessions
+    // Real-time schedule updates
     const handleRealtimeChange = useCallback(() => {
-        // Only reload without showing navigation spinner for realtime updates
-        getWeekSchedules(weekStart).then((schedules) => {
-            const blocks = schedulesToBlocks(schedules, dispatchers);
+        getWeekSchedules(weekStart).then((result) => {
+            const blocks = schedulesToBlocks(result.schedules, dispatchers, weekStart);
             setShifts(blocks);
-            setIsPublished(schedules.some((s) => s.isPublished));
+            setIsPublished(result.isPublished);
         });
     }, [weekStart, dispatchers]);
 
@@ -217,15 +174,13 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
     });
 
     const goToPrevWeek = async () => {
-        const newWeek = new Date(weekStart);
-        newWeek.setUTCDate(newWeek.getUTCDate() - 7);
+        const newWeek = getWeekStart(addDays(weekStart, -7));
         setWeekStart(newWeek);
         await loadWeekSchedules(newWeek);
     };
 
     const goToNextWeek = async () => {
-        const newWeek = new Date(weekStart);
-        newWeek.setUTCDate(newWeek.getUTCDate() + 7);
+        const newWeek = getWeekStart(addDays(weekStart, 7));
         setWeekStart(newWeek);
         await loadWeekSchedules(newWeek);
     };
@@ -248,9 +203,7 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
     };
 
     const getDateForDay = (dayIndex: number): Date => {
-        const date = new Date(weekStart);
-        date.setUTCDate(date.getUTCDate() + dayIndex);
-        return date;
+        return addDays(weekStart, dayIndex);
     };
 
     const formatDateHeader = (dayIndex: number): string => {
@@ -258,12 +211,11 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
         return date.toLocaleDateString(undefined, {
             month: "short",
             day: "numeric",
-            timeZone: COMPANY_TIMEZONE,
         });
     };
 
     const dayShifts = useMemo(() => {
-        return shifts.filter((s) => s.day === selectedDay).sort((a, b) => a.startHour - b.startHour);
+        return shifts.filter((s) => s.dayIndex === selectedDay).sort((a, b) => a.startHour - b.startHour);
     }, [shifts, selectedDay]);
 
     const handleHourTap = (hour: number) => {
@@ -277,37 +229,54 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
         setIsLoading(true);
         try {
             const date = getDateForDay(selectedDay);
-            const dateInTz = getDateInTimezone(date);
-            const shiftStart = createDateInTimezone(dateInTz.year, dateInTz.month, dateInTz.day, addShiftHour);
-            const shiftEnd = new Date(shiftStart.getTime() + shiftDuration * 60 * 60 * 1000);
+            let startHour: number;
+            let endHour: number;
 
-            const result = await createScheduleBlock({
+            if (selectedShiftType === "CUSTOM") {
+                startHour = addShiftHour;
+                endHour = (addShiftHour + customDuration) % 24;
+            } else {
+                const preset = SHIFT_PRESETS[selectedShiftType];
+                startHour = preset.startHour;
+                endHour = preset.endHour;
+            }
+
+            const result = await createSchedule({
                 userId: selectedDispatcher,
-                shiftStart,
-                shiftEnd,
+                date,
+                startHour,
+                endHour,
+                market: selectedMarket,
+                shiftType: selectedShiftType,
             });
 
             if (result.success && result.schedule) {
                 const dispatcher = dispatchers.find((d) => d.id === selectedDispatcher);
                 const dispatcherIndex = dispatchers.findIndex((d) => d.id === selectedDispatcher);
+                const duration = getShiftDuration(startHour, endHour);
+
                 setShifts((prev) => [
                     ...prev,
                     {
                         id: result.schedule!.id,
                         dispatcherId: selectedDispatcher,
                         dispatcherName: dispatcher?.name || "Unknown",
-                        day: selectedDay,
-                        startHour: addShiftHour,
-                        duration: shiftDuration,
+                        dayIndex: selectedDay,
+                        startHour,
+                        endHour,
+                        duration,
+                        market: selectedMarket,
+                        shiftType: selectedShiftType,
                         isPublished: false,
-                        color: getDispatcherColor(dispatcherIndex),
+                        color: selectedMarket ? MARKET_COLORS[selectedMarket] : getDispatcherColor(dispatcherIndex),
+                        isOvernight: isOvernightShift(startHour, endHour),
                     },
                 ]);
                 addToast("Shift created", "success");
                 setShowAddSheet(false);
                 setSelectedDispatcher(null);
             } else {
-                addToast(result.error || "Failed to create shift", "error");
+                addToast(getErrorMessage(result.errors), "error");
             }
         } finally {
             setIsLoading(false);
@@ -317,7 +286,7 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
     const handleDeleteShift = async (shiftId: string) => {
         setDeletingShiftId(shiftId);
         try {
-            const result = await deleteScheduleBlock(shiftId);
+            const result = await deleteSchedule(shiftId);
             if (result.success) {
                 setShifts((prev) => prev.filter((s) => s.id !== shiftId));
                 setEditingShift(null);
@@ -333,7 +302,7 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
     const handlePublish = async () => {
         setIsLoading(true);
         try {
-            const result = await publishWeekSchedules(weekStart);
+            const result = await publishWeek(weekStart);
             if (result.success) {
                 setShifts((prev) => prev.map((s) => ({ ...s, isPublished: true })));
                 setIsPublished(true);
@@ -349,7 +318,7 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
     const handleUnpublish = async () => {
         setIsLoading(true);
         try {
-            const result = await unpublishWeekSchedules(weekStart);
+            const result = await unpublishWeek(weekStart);
             if (result.success) {
                 setShifts((prev) => prev.map((s) => ({ ...s, isPublished: false })));
                 setIsPublished(false);
@@ -362,8 +331,6 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
         }
     };
 
-    const [copying, setCopying] = useState(false);
-
     const handleCopyPreviousWeek = async () => {
         if (shifts.length > 0) {
             const confirmed = window.confirm(
@@ -371,21 +338,22 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
             );
             if (!confirmed) return;
 
-            for (const shift of shifts) {
-                await deleteScheduleBlock(shift.id);
+            const clearResult = await clearWeekSchedules(weekStart);
+            if (!clearResult.success) {
+                addToast("Failed to clear schedules", "error");
+                return;
             }
             setShifts([]);
         }
 
         setCopying(true);
         try {
-            const result = await copyPreviousWeekSchedules(weekStart);
-            if (result.success && result.schedules) {
-                const newBlocks = schedulesToBlocks(result.schedules, dispatchers);
-                setShifts(newBlocks);
-                addToast(result.message, "success");
+            const result = await copyPreviousWeek(weekStart);
+            if (result.success && result.copied > 0) {
+                await loadWeekSchedules(weekStart);
+                addToast(`Copied ${result.copied} shifts`, "success");
             } else {
-                addToast(result.message, "error");
+                addToast(getErrorMessage(result.errors) || "No shifts to copy", "warning");
             }
         } finally {
             setCopying(false);
@@ -393,6 +361,15 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
     };
 
     const totalHours = shifts.reduce((sum, s) => sum + s.duration, 0);
+
+    // Check if hour is covered by a shift (accounting for overnight)
+    const isHourCovered = (shift: ShiftBlock, hour: number): boolean => {
+        if (shift.isOvernight) {
+            // Overnight: e.g., 22-6 covers 22,23,0,1,2,3,4,5
+            return hour >= shift.startHour || hour < shift.endHour;
+        }
+        return hour >= shift.startHour && hour < shift.endHour;
+    };
 
     return (
         <div className="m-scheduler">
@@ -418,10 +395,10 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
                         ) : (
                             <>
                                 <span className="m-week-display__month">
-                                    {weekStart.toLocaleDateString(undefined, { month: "short", timeZone: COMPANY_TIMEZONE })}
+                                    {weekStart.toLocaleDateString(undefined, { month: "short" })}
                                 </span>
                                 <span className="m-week-display__range">
-                                    {weekStart.getUTCDate()} - {new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000).getUTCDate()}
+                                    {weekStart.getDate()} - {addDays(weekStart, 6).getDate()}
                                 </span>
                             </>
                         )}
@@ -431,7 +408,7 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
                     </button>
                 </div>
 
-                {/* Day Selector */}
+                {/* Day Selector - Monday first */}
                 <div className="m-day-selector">
                     {DAY_NAMES.map((day, i) => (
                         <button
@@ -440,7 +417,7 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
                             onClick={() => setSelectedDay(i)}
                         >
                             <span className="m-day-btn__name">{day}</span>
-                            <span className="m-day-btn__date">{getDateForDay(i).getUTCDate()}</span>
+                            <span className="m-day-btn__date">{getDateForDay(i).getDate()}</span>
                         </button>
                     ))}
                 </div>
@@ -454,7 +431,7 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
                 onTouchEnd={handleTouchEnd}
             >
                 <div className="m-timeline__header">
-                    <h2>{DAY_FULL[selectedDay]}, {formatDateHeader(selectedDay)}</h2>
+                    <h2>{DAY_NAMES_FULL[selectedDay]}, {formatDateHeader(selectedDay)}</h2>
                     <span className="m-timeline__shift-count">
                         {dayShifts.length} shift{dayShifts.length !== 1 ? "s" : ""}
                     </span>
@@ -462,20 +439,20 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
 
                 <div className="m-timeline__grid">
                     {HOURS.map((hour) => {
-                        const shiftsAtHour = dayShifts.filter(
-                            (s) => hour >= s.startHour && hour < s.startHour + s.duration
-                        );
+                        const shiftsAtHour = dayShifts.filter((s) => isHourCovered(s, hour));
 
                         return (
                             <div key={hour} className="m-hour-row">
-                                <div className="m-hour-label">{formatHour(hour)}</div>
+                                <div className="m-hour-label">{formatHourFull(hour)}</div>
                                 <div
                                     className="m-hour-content"
                                     onClick={() => shiftsAtHour.length === 0 && handleHourTap(hour)}
                                 >
                                     {shiftsAtHour.map((shift) => {
                                         const isStart = hour === shift.startHour;
-                                        const isEnd = hour === shift.startHour + shift.duration - 1;
+                                        const isEnd = shift.isOvernight
+                                            ? hour === (shift.endHour - 1 + 24) % 24
+                                            : hour === shift.endHour - 1;
                                         const isDeleting = deletingShiftId === shift.id;
 
                                         return (
@@ -492,7 +469,8 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
                                                     <div className="m-shift-block__info">
                                                         <span className="m-shift-block__name">{shift.dispatcherName}</span>
                                                         <span className="m-shift-block__time">
-                                                            {formatHour(shift.startHour)} - {formatHour(shift.startHour + shift.duration)}
+                                                            {formatShiftShort(shift.startHour, shift.endHour)}
+                                                            {shift.market && ` · ${shift.market}`}
                                                         </span>
                                                     </div>
                                                 )}
@@ -551,7 +529,7 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
                         <div className="m-sheet__handle" />
                         <div className="m-sheet__header">
                             <h3>Add Shift</h3>
-                            <span>{DAY_FULL[selectedDay]} at {addShiftHour !== null ? formatHour(addShiftHour) : ""}</span>
+                            <span>{DAY_NAMES_FULL[selectedDay]} at {addShiftHour !== null ? formatHourFull(addShiftHour) : ""}</span>
                         </div>
 
                         <div className="m-sheet__content">
@@ -562,7 +540,7 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
                                         <button
                                             key={d.id}
                                             className={`m-dispatcher-option ${selectedDispatcher === d.id ? "m-dispatcher-option--selected" : ""}`}
-                                            style={{ "--d-color": getDispatcherColor(i) } as React.CSSProperties}
+                                            style={{ "--d-color": selectedMarket ? MARKET_COLORS[selectedMarket] : getDispatcherColor(i) } as React.CSSProperties}
                                             onClick={() => setSelectedDispatcher(d.id)}
                                         >
                                             <div className="m-dispatcher-option__avatar">
@@ -575,15 +553,57 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
                             </div>
 
                             <div className="m-form-group">
-                                <label>Duration</label>
-                                <div className="m-duration-picker">
-                                    {[4, 6, 8, 10, 12].map((h) => (
+                                <label>Shift Type</label>
+                                <div className="m-shift-types">
+                                    {(["MORNING", "AFTERNOON", "NIGHT", "CUSTOM"] as const).map((type) => (
                                         <button
-                                            key={h}
-                                            className={`m-duration-btn ${shiftDuration === h ? "m-duration-btn--selected" : ""}`}
-                                            onClick={() => setShiftDuration(h)}
+                                            key={type}
+                                            className={`m-shift-type-btn ${selectedShiftType === type ? "m-shift-type-btn--selected" : ""}`}
+                                            onClick={() => setSelectedShiftType(type)}
                                         >
-                                            {h}h
+                                            {type === "MORNING" && "6A-2P"}
+                                            {type === "AFTERNOON" && "2P-10P"}
+                                            {type === "NIGHT" && "10P-6A"}
+                                            {type === "CUSTOM" && "Custom"}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {selectedShiftType === "CUSTOM" && (
+                                <div className="m-form-group">
+                                    <label>Duration</label>
+                                    <div className="m-duration-picker">
+                                        {[4, 6, 8, 10, 12].map((h) => (
+                                            <button
+                                                key={h}
+                                                className={`m-duration-btn ${customDuration === h ? "m-duration-btn--selected" : ""}`}
+                                                onClick={() => setCustomDuration(h)}
+                                            >
+                                                {h}h
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="m-form-group">
+                                <label>Market (optional)</label>
+                                <div className="m-market-picker">
+                                    <button
+                                        className={`m-market-btn ${selectedMarket === null ? "m-market-btn--selected" : ""}`}
+                                        onClick={() => setSelectedMarket(null)}
+                                    >
+                                        None
+                                    </button>
+                                    {(["DFW", "AUS", "SAT"] as Market[]).map((m) => (
+                                        <button
+                                            key={m}
+                                            className={`m-market-btn ${selectedMarket === m ? "m-market-btn--selected" : ""}`}
+                                            style={{ "--market-color": MARKET_COLORS[m] } as React.CSSProperties}
+                                            onClick={() => setSelectedMarket(m)}
+                                        >
+                                            {m}
                                         </button>
                                     ))}
                                 </div>
@@ -609,8 +629,9 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
                         <div className="m-sheet__header">
                             <h3>{editingShift.dispatcherName}</h3>
                             <span>
-                                {formatHour(editingShift.startHour)} - {formatHour(editingShift.startHour + editingShift.duration)}
-                                ({editingShift.duration}h)
+                                {formatShiftShort(editingShift.startHour, editingShift.endHour)}
+                                {" "}({editingShift.duration}h)
+                                {editingShift.market && ` · ${editingShift.market}`}
                             </span>
                         </div>
 

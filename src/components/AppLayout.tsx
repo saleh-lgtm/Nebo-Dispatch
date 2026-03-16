@@ -3,30 +3,11 @@
 import { useSession } from "next-auth/react";
 import dynamic from "next/dynamic";
 
-// Dynamic imports for layout components
-// Sidebar: SSR enabled to prevent layout shift and ensure immediate functionality
-const Navbar = dynamic(() => import("./Navbar"), {
-    loading: () => <NavbarSkeleton />,
-    ssr: false,
-});
-
+// Dynamic import for Sidebar with SSR to prevent layout shift
 const Sidebar = dynamic(() => import("./Sidebar"), {
     loading: () => <SidebarSkeleton />,
-    ssr: true, // Enable SSR to prevent layout shift
+    ssr: true,
 });
-
-function NavbarSkeleton() {
-    return (
-        <nav className="navbar-skeleton">
-            <div className="skeleton" style={{ width: "32px", height: "32px", borderRadius: "8px" }} />
-            <div style={{ display: "flex", gap: "0.5rem", marginLeft: "auto" }}>
-                {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="skeleton" style={{ width: "70px", height: "32px", borderRadius: "6px" }} />
-                ))}
-            </div>
-        </nav>
-    );
-}
 
 function SidebarSkeleton() {
     return (
@@ -73,15 +54,12 @@ export default function AppLayout({ children }: Props) {
         return <LoadingSpinner />;
     }
 
-    // Not logged in - show minimal layout
+    // Not logged in - show minimal layout (no navigation)
     if (!session) {
         return (
-            <>
-                <Navbar />
-                <main className="container animate-fade-in" style={{ padding: "2rem 0", flex: 1 }}>
-                    {children}
-                </main>
-            </>
+            <main className="container animate-fade-in" style={{ padding: "2rem 0", flex: 1 }}>
+                {children}
+            </main>
         );
     }
 

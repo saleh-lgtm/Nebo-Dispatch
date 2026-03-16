@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
+import type { ScheduleRecord, Dispatcher } from "@/types/schedule";
 
 // Lazy load components for optimal code splitting
 const CommandSchedulerClient = dynamic(() => import("./CommandSchedulerClient"), {
@@ -12,24 +13,9 @@ const MobileSchedulerClient = dynamic(() => import("./MobileSchedulerClient"), {
     ssr: false,
 });
 
-interface ScheduleData {
-    id: string;
-    userId: string;
-    shiftStart: Date;
-    shiftEnd: Date;
-    isPublished: boolean;
-    user: { id: string; name: string | null };
-}
-
-interface Dispatcher {
-    id: string;
-    name: string | null;
-    email: string | null;
-}
-
 interface Props {
     dispatchers: Dispatcher[];
-    initialSchedules: ScheduleData[];
+    initialSchedules: ScheduleRecord[];
     initialWeekStart: string;
 }
 

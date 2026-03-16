@@ -29,8 +29,9 @@ import styles from "./schedule.module.css";
 
 interface Schedule {
     id: string;
-    shiftStart: Date;
-    shiftEnd: Date;
+    date: Date;
+    startHour: number;
+    endHour: number;
     isPublished: boolean;
     userId: string;
     user?: { id: string; name: string | null };
@@ -203,18 +204,19 @@ export default function ScheduleClient({
         }
     };
 
+    // Format hour integer to display time (e.g., 6 -> "6:00 AM", 14 -> "2:00 PM")
+    const formatHour = (hour: number) => {
+        if (hour === 0) return "12:00 AM";
+        if (hour < 12) return `${hour}:00 AM`;
+        if (hour === 12) return "12:00 PM";
+        return `${hour - 12}:00 PM`;
+    };
+
     const formatDate = (date: Date) => {
         return new Date(date).toLocaleDateString(undefined, {
             weekday: "short",
             month: "short",
             day: "numeric",
-        });
-    };
-
-    const formatTime = (date: Date) => {
-        return new Date(date).toLocaleTimeString(undefined, {
-            hour: "2-digit",
-            minute: "2-digit",
         });
     };
 
@@ -227,16 +229,20 @@ export default function ScheduleClient({
         });
     };
 
-    const getShiftDuration = (start: Date, end: Date) => {
-        const diff = new Date(end).getTime() - new Date(start).getTime();
-        const hours = Math.floor(diff / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+    // Get shift duration accounting for overnight shifts
+    const getShiftDuration = (startHour: number, endHour: number) => {
+        const hours = endHour > startHour
+            ? endHour - startHour
+            : (24 - startHour) + endHour;
+        return `${hours}h`;
     };
 
-    const getTimeUntil = (date: Date) => {
+    // Get time until shift starts
+    const getTimeUntil = (date: Date, startHour: number) => {
         const now = new Date();
-        const diff = new Date(date).getTime() - now.getTime();
+        const shiftDate = new Date(date);
+        shiftDate.setHours(startHour, 0, 0, 0);
+        const diff = shiftDate.getTime() - now.getTime();
         if (diff < 0) return "Started";
         const hours = Math.floor(diff / (1000 * 60 * 60));
         const days = Math.floor(hours / 24);
@@ -322,15 +328,15 @@ export default function ScheduleClient({
                         <div className="mobile-next-shift__content">
                             <div>
                                 <div className="mobile-next-shift__date">
-                                    {formatDate(upcomingShifts[0].shiftStart)}
+                                    {formatDate(upcomingShifts[0].date)}
                                 </div>
                                 <div className="mobile-next-shift__time">
-                                    {formatTime(upcomingShifts[0].shiftStart)} - {formatTime(upcomingShifts[0].shiftEnd)}
+                                    {formatHour(upcomingShifts[0].startHour)} - {formatHour(upcomingShifts[0].endHour)}
                                 </div>
                             </div>
                             <div className="mobile-next-shift__countdown">
                                 <Clock size={12} />
-                                <span>{getTimeUntil(upcomingShifts[0].shiftStart)}</span>
+                                <span>{getTimeUntil(upcomingShifts[0].date, upcomingShifts[0].startHour)}</span>
                             </div>
                         </div>
                     </div>
@@ -367,29 +373,29 @@ export default function ScheduleClient({
                                             className={`shift-item ${selectedShift?.id === shift.id ? "selected" : ""} ${shiftFilter === "past" ? "past" : ""}`}
                                         >
                                             <div className="shift-date">
-                                                <span className="date-day">{new Date(shift.shiftStart).getDate()}</span>
+                                                <span className="date-day">{new Date(shift.date).getDate()}</span>
                                                 <span className="date-month">
-                                                    {new Date(shift.shiftStart).toLocaleDateString(undefined, { month: "short" })}
+                                                    {new Date(shift.date).toLocaleDateString(undefined, { month: "short" })}
                                                 </span>
                                             </div>
                                             <div className="shift-details">
                                                 <div className="shift-time">
-                                                    {formatTime(shift.shiftStart)} - {formatTime(shift.shiftEnd)}
+                                                    {formatHour(shift.startHour)} - {formatHour(shift.endHour)}
                                                 </div>
                                                 <div className="shift-meta">
-                                                    {new Date(shift.shiftStart).toLocaleDateString(undefined, { weekday: "long" })}
+                                                    {new Date(shift.date).toLocaleDateString(undefined, { weekday: "long" })}
                                                     <span className="dot">•</span>
-                                                    {getShiftDuration(shift.shiftStart, shift.shiftEnd)}
+                                                    {getShiftDuration(shift.startHour, shift.endHour)}
                                                 </div>
                                             </div>
                                             {shiftFilter === "upcoming" && (
                                                 <div className="shift-status">
-                                                    {isToday(shift.shiftStart) ? (
+                                                    {isToday(shift.date) ? (
                                                         <span className="status-today">Today</span>
-                                                    ) : isTomorrow(shift.shiftStart) ? (
+                                                    ) : isTomorrow(shift.date) ? (
                                                         <span className="status-tomorrow">Tomorrow</span>
                                                     ) : (
-                                                        <span className="status-upcoming">{getTimeUntil(shift.shiftStart)}</span>
+                                                        <span className="status-upcoming">{getTimeUntil(shift.date, shift.startHour)}</span>
                                                     )}
                                                 </div>
                                             )}
@@ -490,14 +496,14 @@ export default function ScheduleClient({
                             <span>Next Shift</span>
                         </div>
                         <div className="next-shift-date">
-                            {formatFullDate(upcomingShifts[0].shiftStart)}
+                            {formatFullDate(upcomingShifts[0].date)}
                         </div>
                         <div className="next-shift-time">
-                            {formatTime(upcomingShifts[0].shiftStart)} - {formatTime(upcomingShifts[0].shiftEnd)}
+                            {formatHour(upcomingShifts[0].startHour)} - {formatHour(upcomingShifts[0].endHour)}
                         </div>
                         <div className="next-shift-countdown">
                             <Clock size={14} />
-                            <span>{getTimeUntil(upcomingShifts[0].shiftStart)}</span>
+                            <span>{getTimeUntil(upcomingShifts[0].date, upcomingShifts[0].startHour)}</span>
                         </div>
                     </div>
                 )}
@@ -511,15 +517,15 @@ export default function ScheduleClient({
                         </div>
                         <div className="detail-row">
                             <span className="detail-label">Date</span>
-                            <span className="detail-value">{formatFullDate(selectedShift.shiftStart)}</span>
+                            <span className="detail-value">{formatFullDate(selectedShift.date)}</span>
                         </div>
                         <div className="detail-row">
                             <span className="detail-label">Time</span>
-                            <span className="detail-value">{formatTime(selectedShift.shiftStart)} - {formatTime(selectedShift.shiftEnd)}</span>
+                            <span className="detail-value">{formatHour(selectedShift.startHour)} - {formatHour(selectedShift.endHour)}</span>
                         </div>
                         <div className="detail-row">
                             <span className="detail-label">Duration</span>
-                            <span className="detail-value">{getShiftDuration(selectedShift.shiftStart, selectedShift.shiftEnd)}</span>
+                            <span className="detail-value">{getShiftDuration(selectedShift.startHour, selectedShift.endHour)}</span>
                         </div>
                         <div className="detail-row">
                             <span className="detail-label">Status</span>
@@ -694,7 +700,7 @@ export default function ScheduleClient({
                                         <option value="">Select a shift...</option>
                                         {allShifts.map((shift) => (
                                             <option key={shift.id} value={shift.id}>
-                                                {formatDate(shift.shiftStart)} {formatTime(shift.shiftStart)} - {formatTime(shift.shiftEnd)}
+                                                {formatDate(shift.date)} {formatHour(shift.startHour)} - {formatHour(shift.endHour)}
                                             </option>
                                         ))}
                                     </select>

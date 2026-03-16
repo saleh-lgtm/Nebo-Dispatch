@@ -5,87 +5,156 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
-    LayoutDashboard,
-    CalendarClock,
-    Calendar,
-    FileEdit,
-    Users,
-    UserCog,
-    UserPlus,
-    Clock,
-    Phone,
-    CheckSquare,
-    StickyNote,
-    MessageSquare,
-    Car,
-    Network,
-    BookOpen,
-    Globe,
-    FileText,
-    BarChart3,
-    Calculator,
-    DollarSign,
-    History,
-    Settings,
-    LogOut,
     ChevronLeft,
     ChevronRight,
-    ClipboardList,
+    ChevronDown,
     Menu,
     X,
     ShieldCheck,
     Shield,
+    Calculator,
     Briefcase,
-    Contact,
-    Gauge,
-    Tags,
-    Cog,
-    FileSearch,
+    LogOut,
+    Settings,
 } from "lucide-react";
 import NotificationBell from "./NotificationBell";
 import ClockButton from "./ClockButton";
+import {
+    getNavForRole,
+    filterItemsByRole,
+    type NavItem as NavItemType,
+    type NavGroup as NavGroupType,
+    type BadgeCounts,
+    type Role,
+} from "@/config/navigation";
+import { getNavBadgeCounts } from "@/lib/navCountsActions";
 import styles from "./Sidebar.module.css";
 
+// ============================================
+// Role Badge Config
+// ============================================
+
+const ROLE_CONFIG: Record<string, { label: string; icon: typeof ShieldCheck; color: string }> = {
+    SUPER_ADMIN: { label: "Super Admin", icon: ShieldCheck, color: "#ef4444" },
+    ADMIN: { label: "Admin", icon: Shield, color: "#f59e0b" },
+    ACCOUNTING: { label: "Accounting", icon: Calculator, color: "#3b82f6" },
+    DISPATCHER: { label: "Dispatcher", icon: Briefcase, color: "#22c55e" },
+};
+
+// ============================================
+// Nav Item Component
+// ============================================
+
 interface NavItemProps {
-    href: string;
-    icon: React.ReactNode;
-    label: string;
+    item: NavItemType;
     collapsed: boolean;
+    badgeCount?: number;
     onClick?: () => void;
 }
 
-function NavItem({ href, icon, label, collapsed, onClick }: NavItemProps) {
+function NavItem({ item, collapsed, badgeCount, onClick }: NavItemProps) {
     const pathname = usePathname();
-    const isActive = pathname === href || pathname.startsWith(href + "/");
+    const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+    const Icon = item.icon;
+
+    // Handle ClockButton component
+    if (item.isComponent && item.id === "clock") {
+        return (
+            <div className={styles.clockWrapper}>
+                <ClockButton />
+            </div>
+        );
+    }
 
     return (
         <Link
-            href={href}
+            href={item.href}
             className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
-            title={collapsed ? label : undefined}
+            title={collapsed ? item.label : undefined}
             onClick={onClick}
         >
-            <span className={styles.navIcon}>{icon}</span>
-            <span className={styles.navLabel}>{label}</span>
+            <span className={styles.navIcon}>
+                <Icon size={18} />
+            </span>
+            <span className={styles.navLabel}>{item.label}</span>
+            {badgeCount !== undefined && badgeCount > 0 && (
+                <span className={styles.navBadge}>
+                    {badgeCount > 99 ? "99+" : badgeCount}
+                </span>
+            )}
         </Link>
     );
 }
 
+// ============================================
+// Nav Group Component
+// ============================================
+
 interface NavGroupProps {
-    title: string;
-    children: React.ReactNode;
+    group: NavGroupType;
     collapsed: boolean;
+    userRole: Role;
+    badgeCounts: BadgeCounts;
+    isExpanded: boolean;
+    onToggleExpand: () => void;
+    onItemClick?: () => void;
 }
 
-function NavGroup({ title, children, collapsed }: NavGroupProps) {
+function NavGroup({
+    group,
+    collapsed,
+    userRole,
+    badgeCounts,
+    isExpanded,
+    onToggleExpand,
+    onItemClick,
+}: NavGroupProps) {
+    const filteredItems = filterItemsByRole(group.items, userRole);
+
+    if (filteredItems.length === 0) return null;
+
+    const isCollapsible = group.collapsedByDefault !== undefined;
+    const showItems = !isCollapsible || isExpanded;
+
     return (
         <div className={styles.navGroup}>
-            {!collapsed && <span className={styles.navGroupTitle}>{title}</span>}
+            {!collapsed && (
+                <div
+                    className={`${styles.navGroupTitle} ${isCollapsible ? styles.navGroupTitleClickable : ""}`}
+                    onClick={isCollapsible ? onToggleExpand : undefined}
+                    role={isCollapsible ? "button" : undefined}
+                    aria-expanded={isCollapsible ? isExpanded : undefined}
+                >
+                    <span>{group.title}</span>
+                    {isCollapsible && (
+                        <ChevronDown
+                            size={14}
+                            className={isExpanded ? styles.chevronExpanded : styles.chevronCollapsed}
+                        />
+                    )}
+                </div>
+            )}
             {collapsed && <div className={styles.navGroupDivider} />}
-            <div className={styles.navGroupItems}>{children}</div>
+            {showItems && (
+                <div className={styles.navGroupItems}>
+                    {filteredItems.map((item) => (
+                        <NavItem
+                            key={item.id}
+                            item={item}
+                            collapsed={collapsed}
+                            badgeCount={item.badgeKey ? badgeCounts[item.badgeKey] : undefined}
+                            onClick={onItemClick}
+                        />
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
+
+// ============================================
+// Main Sidebar Component
+// ============================================
 
 interface Props {
     user: {
@@ -95,27 +164,39 @@ interface Props {
     };
 }
 
-const ROLE_CONFIG: Record<string, { label: string; icon: typeof ShieldCheck; color: string }> = {
-    SUPER_ADMIN: { label: "Super Admin", icon: ShieldCheck, color: "#ef4444" },
-    ADMIN: { label: "Admin", icon: Shield, color: "#f59e0b" },
-    ACCOUNTING: { label: "Accounting", icon: Calculator, color: "#3b82f6" },
-    DISPATCHER: { label: "Dispatcher", icon: Briefcase, color: "#22c55e" },
-};
-
 export default function Sidebar({ user }: Props) {
-    const role = user.role || "DISPATCHER";
-    const isSuperAdmin = role === "SUPER_ADMIN";
-    const isAccounting = role === "ACCOUNTING";
-    const isAdmin = role === "ADMIN" || isSuperAdmin;
-    const isDispatcher = role === "DISPATCHER";
-    const hasAccountingAccess = isAccounting || isAdmin;
+    const role = (user.role || "DISPATCHER") as Role;
     const roleConfig = ROLE_CONFIG[role] || ROLE_CONFIG.DISPATCHER;
     const RoleIcon = roleConfig.icon;
+    const navGroups = getNavForRole(role);
 
+    // UI State
     const [collapsed, setCollapsed] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
 
+    // Track which collapsible groups are expanded (by group id)
+    const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
+        // Start with collapsedByDefault groups collapsed
+        const initialExpanded = new Set<string>();
+        navGroups.forEach((group) => {
+            if (!group.collapsedByDefault) {
+                initialExpanded.add(group.id);
+            }
+        });
+        return initialExpanded;
+    });
+
+    // Badge counts for admin users
+    const [badgeCounts, setBadgeCounts] = useState<BadgeCounts>({
+        pendingConfirmations: 0,
+        unreadSms: 0,
+        pendingRequests: 0,
+        pendingTasks: 0,
+        newTbrTrips: 0,
+    });
+
+    // Check mobile viewport
     useEffect(() => {
         const checkMobile = () => {
             const mobile = window.innerWidth < 1024;
@@ -138,6 +219,29 @@ export default function Sidebar({ user }: Props) {
         }
     }, [isMobile]);
 
+    // Fetch badge counts for admin users (with polling)
+    useEffect(() => {
+        if (role !== "ADMIN" && role !== "SUPER_ADMIN") {
+            return;
+        }
+
+        const fetchCounts = async () => {
+            try {
+                const counts = await getNavBadgeCounts();
+                setBadgeCounts(counts);
+            } catch (error) {
+                console.error("Failed to fetch badge counts:", error);
+            }
+        };
+
+        // Initial fetch
+        fetchCounts();
+
+        // Poll every 60 seconds
+        const interval = setInterval(fetchCounts, 60000);
+        return () => clearInterval(interval);
+    }, [role]);
+
     const toggleCollapsed = useCallback(() => {
         const newState = !collapsed;
         setCollapsed(newState);
@@ -145,6 +249,18 @@ export default function Sidebar({ user }: Props) {
             localStorage.setItem("sidebar-collapsed", String(newState));
         }
     }, [collapsed, isMobile]);
+
+    const toggleGroupExpanded = useCallback((groupId: string) => {
+        setExpandedGroups((prev) => {
+            const next = new Set(prev);
+            if (next.has(groupId)) {
+                next.delete(groupId);
+            } else {
+                next.add(groupId);
+            }
+            return next;
+        });
+    }, []);
 
     const closeMobileMenu = () => setMobileOpen(false);
 
@@ -189,289 +305,31 @@ export default function Sidebar({ user }: Props) {
 
             {/* Navigation */}
             <nav className={styles.nav}>
-                {/* Dashboard - Always visible */}
-                <NavGroup title="Dashboard" collapsed={collapsed}>
-                    <NavItem
-                        href="/dashboard"
-                        icon={<LayoutDashboard size={18} />}
-                        label="Overview"
+                {navGroups.map((group) => (
+                    <NavGroup
+                        key={group.id}
+                        group={group}
                         collapsed={collapsed}
-                        onClick={isMobile ? closeMobileMenu : undefined}
+                        userRole={role}
+                        badgeCounts={badgeCounts}
+                        isExpanded={expandedGroups.has(group.id)}
+                        onToggleExpand={() => toggleGroupExpanded(group.id)}
+                        onItemClick={isMobile ? closeMobileMenu : undefined}
                     />
-                    {isAdmin && (
-                        <NavItem
-                            href="/admin"
-                            icon={<Gauge size={18} />}
-                            label="Admin Dashboard"
-                            collapsed={collapsed}
-                            onClick={isMobile ? closeMobileMenu : undefined}
-                        />
-                    )}
-                </NavGroup>
-
-                {/* My Shift - Dispatchers only */}
-                {isDispatcher && (
-                    <NavGroup title="My Shift" collapsed={collapsed}>
-                        <NavItem
-                            href="/schedule"
-                            icon={<Calendar size={18} />}
-                            label="My Schedule"
-                            collapsed={collapsed}
-                            onClick={isMobile ? closeMobileMenu : undefined}
-                        />
-                        <div className={styles.clockWrapper}>
-                            <ClockButton />
-                        </div>
-                        <NavItem
-                            href="/reports/shift"
-                            icon={<ClipboardList size={18} />}
-                            label="Shift Report"
-                            collapsed={collapsed}
-                            onClick={isMobile ? closeMobileMenu : undefined}
-                        />
-                    </NavGroup>
-                )}
-
-                {/* Scheduling - Admin only */}
-                {isAdmin && (
-                    <NavGroup title="Scheduling" collapsed={collapsed}>
-                        <NavItem
-                            href="/admin/scheduler"
-                            icon={<CalendarClock size={18} />}
-                            label="Schedule Builder"
-                            collapsed={collapsed}
-                            onClick={isMobile ? closeMobileMenu : undefined}
-                        />
-                        <NavItem
-                            href="/admin/requests"
-                            icon={<FileEdit size={18} />}
-                            label="Time Off & Swaps"
-                            collapsed={collapsed}
-                            onClick={isMobile ? closeMobileMenu : undefined}
-                        />
-                    </NavGroup>
-                )}
-
-                {/* Team Management - Admin only */}
-                {isAdmin && (
-                    <NavGroup title="Team" collapsed={collapsed}>
-                        {isSuperAdmin && (
-                            <NavItem
-                                href="/admin/users"
-                                icon={<UserCog size={18} />}
-                                label="User Management"
-                                collapsed={collapsed}
-                                onClick={isMobile ? closeMobileMenu : undefined}
-                            />
-                        )}
-                        <NavItem
-                            href="/admin/dispatchers"
-                            icon={<Users size={18} />}
-                            label="Dispatchers"
-                            collapsed={collapsed}
-                            onClick={isMobile ? closeMobileMenu : undefined}
-                        />
-                        <NavItem
-                            href="/admin/approvals"
-                            icon={<UserPlus size={18} />}
-                            label="Approvals"
-                            collapsed={collapsed}
-                            onClick={isMobile ? closeMobileMenu : undefined}
-                        />
-                        <NavItem
-                            href="/admin/hours"
-                            icon={<Clock size={18} />}
-                            label="Hours Tracking"
-                            collapsed={collapsed}
-                            onClick={isMobile ? closeMobileMenu : undefined}
-                        />
-                        <NavItem
-                            href="/admin/confirmations"
-                            icon={<Phone size={18} />}
-                            label="Confirmations"
-                            collapsed={collapsed}
-                            onClick={isMobile ? closeMobileMenu : undefined}
-                        />
-                        <NavItem
-                            href="/admin/tasks"
-                            icon={<CheckSquare size={18} />}
-                            label="Admin Tasks"
-                            collapsed={collapsed}
-                            onClick={isMobile ? closeMobileMenu : undefined}
-                        />
-                        <NavItem
-                            href="/admin/notes"
-                            icon={<StickyNote size={18} />}
-                            label="Global Notes"
-                            collapsed={collapsed}
-                            onClick={isMobile ? closeMobileMenu : undefined}
-                        />
-                    </NavGroup>
-                )}
-
-                {/* Communications */}
-                <NavGroup title="Communications" collapsed={collapsed}>
-                    <NavItem
-                        href="/sms"
-                        icon={<MessageSquare size={18} />}
-                        label="SMS Center"
-                        collapsed={collapsed}
-                        onClick={isMobile ? closeMobileMenu : undefined}
-                    />
-                    {isAdmin && (
-                        <>
-                            <NavItem
-                                href="/admin/sms"
-                                icon={<MessageSquare size={18} />}
-                                label="SMS Dashboard"
-                                collapsed={collapsed}
-                                onClick={isMobile ? closeMobileMenu : undefined}
-                            />
-                            <NavItem
-                                href="/admin/contacts"
-                                icon={<Tags size={18} />}
-                                label="Contacts & Tags"
-                                collapsed={collapsed}
-                                onClick={isMobile ? closeMobileMenu : undefined}
-                            />
-                        </>
-                    )}
-                </NavGroup>
-
-                {/* Operations */}
-                <NavGroup title="Operations" collapsed={collapsed}>
-                    <NavItem
-                        href="/fleet"
-                        icon={<Car size={18} />}
-                        label="Fleet"
-                        collapsed={collapsed}
-                        onClick={isMobile ? closeMobileMenu : undefined}
-                    />
-                    <NavItem
-                        href="/network"
-                        icon={<Network size={18} />}
-                        label="Network"
-                        collapsed={collapsed}
-                        onClick={isMobile ? closeMobileMenu : undefined}
-                    />
-                    <NavItem
-                        href="/affiliates"
-                        icon={<Users size={18} />}
-                        label="Affiliates"
-                        collapsed={collapsed}
-                        onClick={isMobile ? closeMobileMenu : undefined}
-                    />
-                    <NavItem
-                        href="/portals"
-                        icon={<Globe size={18} />}
-                        label="Portals"
-                        collapsed={collapsed}
-                        onClick={isMobile ? closeMobileMenu : undefined}
-                    />
-                    <NavItem
-                        href="/dispatcher/directory"
-                        icon={<Contact size={18} />}
-                        label="Directory"
-                        collapsed={collapsed}
-                        onClick={isMobile ? closeMobileMenu : undefined}
-                    />
-                    <NavItem
-                        href="/tbr-trips"
-                        icon={<Globe size={18} />}
-                        label="TBR Global"
-                        collapsed={collapsed}
-                        onClick={isMobile ? closeMobileMenu : undefined}
-                    />
-                    {isAdmin && (
-                        <NavItem
-                            href="/admin/tbr-settings"
-                            icon={<Cog size={18} />}
-                            label="TBR Settings"
-                            collapsed={collapsed}
-                            onClick={isMobile ? closeMobileMenu : undefined}
-                        />
-                    )}
-                    <NavItem
-                        href={isAdmin ? "/admin/sops" : "/sops"}
-                        icon={<BookOpen size={18} />}
-                        label="SOPs"
-                        collapsed={collapsed}
-                        onClick={isMobile ? closeMobileMenu : undefined}
-                    />
-                    {isAdmin && (
-                        <NavItem
-                            href="/admin/pricing"
-                            icon={<DollarSign size={18} />}
-                            label="Route Pricing"
-                            collapsed={collapsed}
-                            onClick={isMobile ? closeMobileMenu : undefined}
-                        />
-                    )}
-                </NavGroup>
-
-                {/* Reports & Analytics */}
-                {(isAdmin || hasAccountingAccess) && (
-                    <NavGroup title="Reports" collapsed={collapsed}>
-                        {isAdmin && (
-                            <>
-                                <NavItem
-                                    href="/admin/reports"
-                                    icon={<FileText size={18} />}
-                                    label="Shift Reports"
-                                    collapsed={collapsed}
-                                    onClick={isMobile ? closeMobileMenu : undefined}
-                                />
-                                <NavItem
-                                    href="/admin/analytics"
-                                    icon={<BarChart3 size={18} />}
-                                    label="Analytics"
-                                    collapsed={collapsed}
-                                    onClick={isMobile ? closeMobileMenu : undefined}
-                                />
-                                <NavItem
-                                    href="/admin/affiliate-audit"
-                                    icon={<FileSearch size={18} />}
-                                    label="Affiliate Audit"
-                                    collapsed={collapsed}
-                                    onClick={isMobile ? closeMobileMenu : undefined}
-                                />
-                            </>
-                        )}
-                        {hasAccountingAccess && (
-                            <NavItem
-                                href="/accounting"
-                                icon={<Calculator size={18} />}
-                                label="Accounting"
-                                collapsed={collapsed}
-                                onClick={isMobile ? closeMobileMenu : undefined}
-                            />
-                        )}
-                    </NavGroup>
-                )}
-
-                {/* System */}
-                <NavGroup title="System" collapsed={collapsed}>
-                    {isSuperAdmin && (
-                        <NavItem
-                            href="/admin/audit"
-                            icon={<History size={18} />}
-                            label="Audit Log"
-                            collapsed={collapsed}
-                            onClick={isMobile ? closeMobileMenu : undefined}
-                        />
-                    )}
-                    <NavItem
-                        href="/settings"
-                        icon={<Settings size={18} />}
-                        label="Settings"
-                        collapsed={collapsed}
-                        onClick={isMobile ? closeMobileMenu : undefined}
-                    />
-                </NavGroup>
+                ))}
             </nav>
 
             {/* Footer */}
             <div className={styles.footer}>
+                <Link
+                    href="/settings"
+                    className={styles.footerLink}
+                    title={collapsed ? "Settings" : undefined}
+                    onClick={isMobile ? closeMobileMenu : undefined}
+                >
+                    <Settings size={18} />
+                    <span>Settings</span>
+                </Link>
                 <button
                     onClick={handleLogout}
                     className={styles.logoutBtn}

@@ -9,7 +9,6 @@
 
 // Core widgets
 export { default as ClockButton } from "../ClockButton";
-export { default as Navbar } from "../Navbar";
 export { default as Sidebar } from "../Sidebar";
 export { default as SuperAdminSidebar } from "../SuperAdminSidebar";
 

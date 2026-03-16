@@ -11,6 +11,12 @@ interface HoursSummary {
     overtime: number;
 }
 
+// Calculate shift duration from integer hours
+function getShiftDuration(startHour: number, endHour: number): number {
+    if (endHour > startHour) return endHour - startHour;
+    return 24 - startHour + endHour; // Overnight shift
+}
+
 // Get hours summary for all dispatchers in a date range (ADMIN/SUPER_ADMIN only)
 export async function getDispatcherHours(
     startDate: Date,
@@ -21,8 +27,7 @@ export async function getDispatcherHours(
     // Get all schedules in date range
     const schedules = await prisma.schedule.findMany({
         where: {
-            shiftStart: { gte: startDate },
-            shiftEnd: { lte: endDate },
+            date: { gte: startDate, lte: endDate },
         },
         include: { user: { select: { id: true, name: true } } },
     });
@@ -41,7 +46,7 @@ export async function getDispatcherHours(
 
     // Calculate scheduled hours
     for (const schedule of schedules) {
-        const hours = (new Date(schedule.shiftEnd).getTime() - new Date(schedule.shiftStart).getTime()) / (1000 * 60 * 60);
+        const hours = getShiftDuration(schedule.startHour, schedule.endHour);
         const existing = userMap.get(schedule.userId) || {
             userId: schedule.userId,
             userName: schedule.user.name || "Unknown",
@@ -99,13 +104,12 @@ export async function getWeeklyHoursTrend(userId: string, weeks: number = 4) {
         const schedules = await prisma.schedule.findMany({
             where: {
                 userId,
-                shiftStart: { gte: weekStart },
-                shiftEnd: { lte: weekEnd },
+                date: { gte: weekStart, lte: weekEnd },
             },
         });
 
         const hours = schedules.reduce((sum, s) => {
-            return sum + (new Date(s.shiftEnd).getTime() - new Date(s.shiftStart).getTime()) / (1000 * 60 * 60);
+            return sum + getShiftDuration(s.startHour, s.endHour);
         }, 0);
 
         results.unshift({

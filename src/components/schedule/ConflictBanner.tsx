@@ -1,12 +1,11 @@
 "use client";
 
-import React from "react";
 import { AlertTriangle, AlertCircle, X } from "lucide-react";
-import type { ScheduleConflict } from "@/lib/scheduleConflicts";
+import type { ValidationError } from "@/types/schedule";
 import styles from "./conflict-banner.module.css";
 
 interface ConflictBannerProps {
-    conflicts: ScheduleConflict[];
+    conflicts: ValidationError[];
     onDismiss?: () => void;
     onProceedAnyway?: () => void;
     showProceed?: boolean;
@@ -72,7 +71,7 @@ export function ConflictBanner({
 }
 
 // Compact inline version for shift forms
-export function ConflictInline({ conflicts }: { conflicts: ScheduleConflict[] }) {
+export function ConflictInline({ conflicts }: { conflicts: ValidationError[] }) {
     if (conflicts.length === 0) return null;
 
     const hasErrors = conflicts.some((c) => c.severity === "error");

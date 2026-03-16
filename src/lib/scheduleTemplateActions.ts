@@ -3,7 +3,9 @@
 import prisma from "./prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "./auth";
-import { revalidateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
+import type { Market, ShiftType } from "@/types/schedule";
+import { getWeekStart, addDays, formatHour, DAY_NAMES_FULL } from "@/types/schedule";
 
 // Helper to require admin role
 async function requireAdmin() {
@@ -17,11 +19,13 @@ async function requireAdmin() {
     return session.user.id;
 }
 
-// Types
+// Types - using Int hours (0-23), NOT Float
 export interface TemplateShiftInput {
-    dayOfWeek: number; // 0-6 (Sunday-Saturday)
-    startHour: number; // 0-24 (decimal hours, e.g., 8.5 = 8:30 AM)
-    durationHours: number;
+    dayOfWeek: number; // 0-6 (Monday-Sunday, NOT Sunday-Saturday)
+    startHour: number; // 0-23 integer
+    endHour: number; // 0-23 integer (replaces durationHours)
+    market?: Market;
+    shiftType?: ShiftType;
     dispatcherId?: string;
     order?: number;
 }
@@ -35,9 +39,11 @@ export interface ScheduleTemplateWithShifts {
     createdBy: { name: string | null };
     shifts: {
         id: string;
-        dayOfWeek: number;
-        startHour: number;
-        durationHours: number;
+        dayOfWeek: number; // 0=Mon, 6=Sun
+        startHour: number; // 0-23
+        endHour: number; // 0-23
+        market: Market | null;
+        shiftType: ShiftType;
         dispatcherId: string | null;
         order: number;
     }[];
@@ -98,11 +104,11 @@ export async function createScheduleTemplate(
             if (shift.dayOfWeek < 0 || shift.dayOfWeek > 6) {
                 return { success: false, error: `Invalid day of week: ${shift.dayOfWeek}` };
             }
-            if (shift.startHour < 0 || shift.startHour >= 24) {
+            if (shift.startHour < 0 || shift.startHour > 23) {
                 return { success: false, error: `Invalid start hour: ${shift.startHour}` };
             }
-            if (shift.durationHours <= 0 || shift.durationHours > 24) {
-                return { success: false, error: `Invalid duration: ${shift.durationHours}` };
+            if (shift.endHour < 0 || shift.endHour > 23) {
+                return { success: false, error: `Invalid end hour: ${shift.endHour}` };
             }
         }
 
@@ -115,7 +121,9 @@ export async function createScheduleTemplate(
                     create: shifts.map((shift, idx) => ({
                         dayOfWeek: shift.dayOfWeek,
                         startHour: shift.startHour,
-                        durationHours: shift.durationHours,
+                        endHour: shift.endHour,
+                        market: shift.market || null,
+                        shiftType: shift.shiftType || "CUSTOM",
                         dispatcherId: shift.dispatcherId || null,
                         order: shift.order ?? idx,
                     })),
@@ -123,7 +131,7 @@ export async function createScheduleTemplate(
             },
         });
 
-        revalidateTag("schedule-templates", "max");
+        revalidatePath("/admin/scheduler");
         return { success: true, templateId: template.id };
     } catch (error) {
         console.error("Error creating template:", error);
@@ -169,14 +177,16 @@ export async function updateScheduleTemplate(
                     templateId,
                     dayOfWeek: shift.dayOfWeek,
                     startHour: shift.startHour,
-                    durationHours: shift.durationHours,
+                    endHour: shift.endHour,
+                    market: shift.market || null,
+                    shiftType: shift.shiftType || "CUSTOM",
                     dispatcherId: shift.dispatcherId || null,
                     order: shift.order ?? idx,
                 })),
             });
         }
 
-        revalidateTag("schedule-templates", "max");
+        revalidatePath("/admin/scheduler");
         return { success: true };
     } catch (error) {
         console.error("Error updating template:", error);
@@ -205,7 +215,7 @@ export async function deleteScheduleTemplate(
             });
         }
 
-        revalidateTag("schedule-templates", "max");
+        revalidatePath("/admin/scheduler");
         return { success: true };
     } catch (error) {
         console.error("Error deleting template:", error);
@@ -215,7 +225,9 @@ export async function deleteScheduleTemplate(
 
 /**
  * Apply a template to a specific week
- * Creates schedule blocks for each shift in the template
+ * Creates schedule entries for each shift in the template
+ *
+ * NO TIMEZONE CONVERSION - hours are just integers (6 = 6 AM, 14 = 2 PM, etc.)
  */
 export async function applyTemplateToWeek(
     templateId: string,
@@ -251,17 +263,17 @@ export async function applyTemplateToWeek(
             return { success: false, created: 0, skipped: 0, errors: ["Template not found"] };
         }
 
-        // Ensure weekStart is at the start of the week (Sunday 00:00 UTC)
-        const normalizedWeekStart = new Date(weekStart);
-        normalizedWeekStart.setUTCHours(0, 0, 0, 0);
-        const day = normalizedWeekStart.getUTCDay();
-        normalizedWeekStart.setUTCDate(normalizedWeekStart.getUTCDate() - day);
+        // Normalize weekStart to Monday
+        const normalized = getWeekStart(weekStart);
 
         // Create schedules for each template shift
         const scheduleData: {
             userId: string;
-            shiftStart: Date;
-            shiftEnd: Date;
+            date: Date;
+            startHour: number;
+            endHour: number;
+            market: Market | null;
+            shiftType: ShiftType;
             weekStart: Date;
             isPublished: boolean;
         }[] = [];
@@ -274,44 +286,39 @@ export async function applyTemplateToWeek(
 
             if (!dispatcherId) {
                 result.skipped++;
-                result.errors.push(`Shift ${i + 1} (${getDayName(shift.dayOfWeek)} ${formatHour(shift.startHour)}) has no dispatcher assigned`);
+                result.errors.push(
+                    `Shift ${i + 1} (${DAY_NAMES_FULL[shift.dayOfWeek]} ${formatHour(shift.startHour)}) has no dispatcher assigned`
+                );
                 continue;
             }
 
-            // Calculate shift start time
-            const shiftStart = new Date(normalizedWeekStart);
-            shiftStart.setUTCDate(shiftStart.getUTCDate() + shift.dayOfWeek);
-
-            // Set hours (handle decimal hours)
-            const hours = Math.floor(shift.startHour);
-            const minutes = Math.round((shift.startHour - hours) * 60);
-            shiftStart.setUTCHours(hours, minutes, 0, 0);
-
-            // Calculate shift end time
-            const shiftEnd = new Date(shiftStart.getTime() + shift.durationHours * 60 * 60 * 1000);
+            // Calculate the date for this shift (dayOfWeek: 0=Mon, 6=Sun)
+            const shiftDate = addDays(normalized, shift.dayOfWeek);
 
             // Check for existing schedule at this time for this dispatcher
             const existing = await prisma.schedule.findFirst({
                 where: {
                     userId: dispatcherId,
-                    shiftStart: { lte: shiftEnd },
-                    shiftEnd: { gte: shiftStart },
+                    date: shiftDate,
                 },
             });
 
             if (existing) {
                 result.skipped++;
                 result.errors.push(
-                    `Skipped: Existing shift for ${getDayName(shift.dayOfWeek)} ${formatHour(shift.startHour)}`
+                    `Skipped: Existing shift for ${DAY_NAMES_FULL[shift.dayOfWeek]} ${formatHour(shift.startHour)}`
                 );
                 continue;
             }
 
             scheduleData.push({
                 userId: dispatcherId,
-                shiftStart,
-                shiftEnd,
-                weekStart: normalizedWeekStart,
+                date: shiftDate,
+                startHour: shift.startHour,
+                endHour: shift.endHour,
+                market: shift.market,
+                shiftType: shift.shiftType,
+                weekStart: normalized,
                 isPublished: false,
             });
         }
@@ -322,7 +329,7 @@ export async function applyTemplateToWeek(
             result.created = scheduleData.length;
         }
 
-        revalidateTag("schedules", "max");
+        revalidatePath("/admin/scheduler");
         return result;
     } catch (error) {
         console.error("Error applying template:", error);
@@ -332,6 +339,8 @@ export async function applyTemplateToWeek(
 
 /**
  * Create a template from an existing week's schedule
+ *
+ * NO TIMEZONE CONVERSION - reads date/startHour/endHour directly
  */
 export async function createTemplateFromWeek(
     weekStart: Date,
@@ -342,20 +351,15 @@ export async function createTemplateFromWeek(
     const userId = await requireAdmin();
 
     try {
-        // Normalize weekStart
-        const normalizedWeekStart = new Date(weekStart);
-        normalizedWeekStart.setUTCHours(0, 0, 0, 0);
-        const day = normalizedWeekStart.getUTCDay();
-        normalizedWeekStart.setUTCDate(normalizedWeekStart.getUTCDate() - day);
-
-        const weekEnd = new Date(normalizedWeekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+        // Normalize weekStart to Monday
+        const normalized = getWeekStart(weekStart);
 
         // Get all schedules for this week
         const schedules = await prisma.schedule.findMany({
             where: {
-                shiftStart: { gte: normalizedWeekStart, lt: weekEnd },
+                weekStart: normalized,
             },
-            orderBy: { shiftStart: "asc" },
+            orderBy: [{ date: "asc" }, { startHour: "asc" }],
         });
 
         if (schedules.length === 0) {
@@ -363,16 +367,20 @@ export async function createTemplateFromWeek(
         }
 
         // Convert schedules to template shifts
+        // dayOfWeek is calculated from the date (0=Mon, 6=Sun)
         const shifts: TemplateShiftInput[] = schedules.map((schedule, idx) => {
-            const dayOfWeek = schedule.shiftStart.getUTCDay();
-            const startHour = schedule.shiftStart.getUTCHours() + schedule.shiftStart.getUTCMinutes() / 60;
-            const durationMs = schedule.shiftEnd.getTime() - schedule.shiftStart.getTime();
-            const durationHours = durationMs / (1000 * 60 * 60);
+            // Get day index: difference between schedule date and weekStart
+            const dayDiff = Math.floor(
+                (schedule.date.getTime() - normalized.getTime()) / (24 * 60 * 60 * 1000)
+            );
+            const dayOfWeek = Math.max(0, Math.min(6, dayDiff)); // Clamp to 0-6
 
             return {
                 dayOfWeek,
-                startHour,
-                durationHours,
+                startHour: schedule.startHour,
+                endHour: schedule.endHour,
+                market: schedule.market as Market | undefined,
+                shiftType: schedule.shiftType as ShiftType,
                 dispatcherId: includeDispatchers ? schedule.userId : undefined,
                 order: idx,
             };
@@ -388,7 +396,9 @@ export async function createTemplateFromWeek(
                     create: shifts.map((shift) => ({
                         dayOfWeek: shift.dayOfWeek,
                         startHour: shift.startHour,
-                        durationHours: shift.durationHours,
+                        endHour: shift.endHour,
+                        market: shift.market || null,
+                        shiftType: shift.shiftType || "CUSTOM",
                         dispatcherId: shift.dispatcherId || null,
                         order: shift.order ?? 0,
                     })),
@@ -396,24 +406,10 @@ export async function createTemplateFromWeek(
             },
         });
 
-        revalidateTag("schedule-templates", "max");
+        revalidatePath("/admin/scheduler");
         return { success: true, templateId: template.id };
     } catch (error) {
         console.error("Error creating template from week:", error);
         return { success: false, error: "Failed to create template from week" };
     }
-}
-
-// Helper functions
-function getDayName(dayIndex: number): string {
-    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    return days[dayIndex];
-}
-
-function formatHour(hour: number): string {
-    const h = Math.floor(hour);
-    const m = Math.round((hour - h) * 60);
-    const period = h >= 12 ? "PM" : "AM";
-    const displayHour = h > 12 ? h - 12 : h === 0 ? 12 : h;
-    return m === 0 ? `${displayHour}${period}` : `${displayHour}:${m.toString().padStart(2, "0")}${period}`;
 }
