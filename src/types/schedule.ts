@@ -207,62 +207,66 @@ export function isOvernightShift(startHour: number, endHour: number): boolean {
 }
 
 /**
- * Get Monday of the week containing a date
+ * Get Monday of the week containing a date (UTC-based)
+ * Uses UTC methods to match database UTC midnight dates
  */
 export function getWeekStart(date: Date): Date {
   const d = new Date(date);
-  const day = d.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  const day = d.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat
   const diff = day === 0 ? -6 : 1 - day; // Adjust to Monday
-  d.setDate(d.getDate() + diff);
-  d.setHours(0, 0, 0, 0);
+  d.setUTCDate(d.getUTCDate() + diff);
+  d.setUTCHours(0, 0, 0, 0);
   return d;
 }
 
 /**
- * Get array of dates for a week (Mon-Sun)
+ * Get array of dates for a week (Mon-Sun) - UTC-based
  */
 export function getWeekDates(weekStart: Date): Date[] {
   const dates: Date[] = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(weekStart);
-    d.setDate(d.getDate() + i);
+    d.setUTCDate(d.getUTCDate() + i);
     dates.push(d);
   }
   return dates;
 }
 
 /**
- * Format week range (e.g., "Mar 11 - 17, 2024")
+ * Format week range (e.g., "Mar 11 - 17, 2024") - UTC-based
  */
 export function formatWeekLabel(weekStart: Date): string {
   const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekEnd.getDate() + 6);
+  weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
 
-  const startMonth = weekStart.toLocaleDateString("en-US", { month: "short" });
-  const endMonth = weekEnd.toLocaleDateString("en-US", { month: "short" });
-  const year = weekStart.getFullYear();
+  // Use UTC dates for consistent display
+  const startMonth = new Date(weekStart).toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
+  const endMonth = new Date(weekEnd).toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
+  const year = weekStart.getUTCFullYear();
 
   if (startMonth === endMonth) {
-    return `${startMonth} ${weekStart.getDate()} - ${weekEnd.getDate()}, ${year}`;
+    return `${startMonth} ${weekStart.getUTCDate()} - ${weekEnd.getUTCDate()}, ${year}`;
   }
-  return `${startMonth} ${weekStart.getDate()} - ${endMonth} ${weekEnd.getDate()}, ${year}`;
+  return `${startMonth} ${weekStart.getUTCDate()} - ${endMonth} ${weekEnd.getUTCDate()}, ${year}`;
 }
 
 /**
  * Get day index (0=Mon, 6=Sun) from a date relative to week start
+ * Uses Math.round to handle any sub-day rounding from timezone offsets
  */
 export function getDayIndex(date: Date, weekStart: Date): number {
   const diffTime = date.getTime() - weekStart.getTime();
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
   return Math.max(0, Math.min(6, diffDays));
 }
 
 /**
- * Add days to a date (pure date arithmetic, no timezone)
+ * Add days to a date (UTC-based arithmetic)
+ * Uses UTC methods to match database UTC midnight dates
  */
 export function addDays(date: Date, days: number): Date {
   const result = new Date(date);
-  result.setDate(result.getDate() + days);
+  result.setUTCDate(result.getUTCDate() + days);
   return result;
 }
 

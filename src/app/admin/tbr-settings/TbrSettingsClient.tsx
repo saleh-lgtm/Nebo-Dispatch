@@ -101,13 +101,17 @@ export default function TbrSettingsClient({ initialMappings }: Props) {
 
         setIsSubmitting(true);
         try {
-            await upsertVehicleMapping({
+            const result = await upsertVehicleMapping({
                 id: editingMapping?.id,
                 tbrVehicleType: tbrVehicleType.trim(),
                 laVehicleType: laVehicleType.trim(),
                 laVehicleId: laVehicleId.trim() || undefined,
                 notes: notes.trim() || undefined,
             });
+
+            if (!result.success) {
+                throw new Error(result.error || "Failed to save mapping");
+            }
 
             addToast(
                 editingMapping ? "Mapping updated successfully" : "Mapping created successfully",
@@ -131,7 +135,10 @@ export default function TbrSettingsClient({ initialMappings }: Props) {
 
         setIsSubmitting(true);
         try {
-            await deleteVehicleMapping(selectedMapping.id);
+            const result = await deleteVehicleMapping(selectedMapping.id);
+            if (!result.success) {
+                throw new Error(result.error || "Failed to delete mapping");
+            }
             setMappings(mappings.filter((m) => m.id !== selectedMapping.id));
             addToast("Mapping deleted", "success");
             setShowDeleteConfirm(false);
@@ -149,7 +156,10 @@ export default function TbrSettingsClient({ initialMappings }: Props) {
     const handleToggle = async (mapping: VehicleMapping) => {
         setTogglingId(mapping.id);
         try {
-            await toggleVehicleMapping(mapping.id, !mapping.isActive);
+            const result = await toggleVehicleMapping(mapping.id, !mapping.isActive);
+            if (!result.success) {
+                throw new Error(result.error || "Failed to toggle mapping");
+            }
             setMappings(
                 mappings.map((m) =>
                     m.id === mapping.id ? { ...m, isActive: !m.isActive } : m
@@ -173,8 +183,11 @@ export default function TbrSettingsClient({ initialMappings }: Props) {
         setIsSeeding(true);
         try {
             const result = await seedDefaultMappings();
+            if (!result.success || !result.data) {
+                throw new Error(result.error || "Failed to seed defaults");
+            }
             addToast(
-                `Created ${result.created} mappings, ${result.skipped} already existed`,
+                `Created ${result.data.created} mappings, ${result.data.skipped} already existed`,
                 "success"
             );
             router.refresh();

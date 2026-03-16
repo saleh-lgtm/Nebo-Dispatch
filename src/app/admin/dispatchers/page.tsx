@@ -26,15 +26,15 @@ export default async function DispatcherManagementPage() {
         redirect("/dashboard");
     }
 
-    const [dispatchers, analytics] = await Promise.all([
+    const [dispatchersResult, analyticsResult] = await Promise.all([
         getDispatcherAccessList(),
         getDispatcherAnalytics(),
     ]);
 
     return (
         <DispatcherManagementClient
-            dispatchers={dispatchers}
-            analytics={analytics}
+            dispatchers={dispatchersResult.data ?? []}
+            analytics={analyticsResult.data ?? []}
         />
     );
 }

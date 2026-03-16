@@ -119,9 +119,10 @@ function schedulesToBlocks(schedules: ScheduleRecord[], dispatchers: Dispatcher[
 
     for (const schedule of schedules) {
         // Get day index from date difference (0=Mon, 6=Sun)
+        // Use Math.round to handle any sub-day rounding from timezone offsets
         const schedDate = new Date(schedule.date);
         const diffTime = schedDate.getTime() - weekStart.getTime();
-        const dayIndex = Math.floor(diffTime / (24 * 60 * 60 * 1000));
+        const dayIndex = Math.round(diffTime / (24 * 60 * 60 * 1000));
 
         if (dayIndex < 0 || dayIndex > 6) continue;
 

@@ -5,6 +5,21 @@ import prisma from "@/lib/prisma";
 import { getDispatcherHours, getActiveShifts, getTeamTotals } from "@/lib/hoursActions";
 import dynamic from "next/dynamic";
 
+interface HoursSummary {
+    userId: string;
+    userName: string;
+    scheduledHours: number;
+    workedHours: number;
+    overtime: number;
+}
+
+interface ActiveShift {
+    id: string;
+    clockIn: Date;
+    currentHours: number;
+    user: { id: string; name: string | null; email: string | null };
+}
+
 const HoursClient = dynamic(() => import("./HoursClient"), {
     loading: () => (
         <div className="page-container">
@@ -40,7 +55,7 @@ export default async function AdminHoursPage() {
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
     // Get initial data
-    const [weeklyHours, monthlyHours, activeShifts, weeklyTotals, monthlyTotals, dispatchers] = await Promise.all([
+    const [weeklyHoursResult, monthlyHoursResult, activeShiftsResult, weeklyTotalsResult, monthlyTotalsResult, dispatchers] = await Promise.all([
         getDispatcherHours(startOfWeek, endOfWeek),
         getDispatcherHours(startOfMonth, endOfMonth),
         getActiveShifts(),
@@ -53,13 +68,15 @@ export default async function AdminHoursPage() {
         }),
     ]);
 
+    const defaultTotals = { totalHours: 0, totalShifts: 0, avgHoursPerShift: 0 };
+
     return (
         <HoursClient
-            weeklyHours={weeklyHours}
-            monthlyHours={monthlyHours}
-            activeShifts={activeShifts}
-            weeklyTotals={weeklyTotals}
-            monthlyTotals={monthlyTotals}
+            weeklyHours={(weeklyHoursResult.data ?? []) as HoursSummary[]}
+            monthlyHours={(monthlyHoursResult.data ?? []) as HoursSummary[]}
+            activeShifts={(activeShiftsResult.data ?? []) as ActiveShift[]}
+            weeklyTotals={weeklyTotalsResult.data ?? defaultTotals}
+            monthlyTotals={monthlyTotalsResult.data ?? defaultTotals}
             dispatchers={dispatchers}
         />
     );

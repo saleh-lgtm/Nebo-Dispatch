@@ -8,6 +8,29 @@ import {
 } from "@/lib/affiliateAuditActions";
 import dynamic from "next/dynamic";
 
+interface AuditConfig {
+    id: string;
+    affiliateId: string;
+    auditFrequency: string;
+    priority: number;
+    notes: string | null;
+    isActive: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+    affiliate: {
+        id: string;
+        name: string;
+        type: string;
+        isActive: boolean;
+    };
+}
+
+interface AvailableAffiliate {
+    id: string;
+    name: string;
+    type: string;
+}
+
 const AffiliateAuditClient = dynamic(() => import("./AffiliateAuditClient"), {
     loading: () => (
         <div className="page-container">
@@ -30,7 +53,7 @@ export default async function AffiliateAuditPage() {
         redirect("/dashboard");
     }
 
-    const [configs, availableAffiliates, stats] = await Promise.all([
+    const [configsResult, availableResult, statsResult] = await Promise.all([
         getAffiliateAuditConfigs(),
         getAvailableAffiliatesForAudit(),
         getAffiliateAuditStats(),
@@ -38,9 +61,9 @@ export default async function AffiliateAuditPage() {
 
     return (
         <AffiliateAuditClient
-            initialConfigs={configs}
-            availableAffiliates={availableAffiliates}
-            stats={stats}
+            initialConfigs={(configsResult.data as AuditConfig[]) ?? []}
+            availableAffiliates={(availableResult.data as AvailableAffiliate[]) ?? []}
+            stats={statsResult.data ?? { total: 0, byFrequency: {} }}
         />
     );
 }

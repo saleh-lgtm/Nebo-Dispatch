@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireAuth, requireAdmin } from "./auth-helpers";
 import { createAuditLog } from "./auditActions";
+import { dispatcherPreferencesSchema, blackoutDateSchema, idParamSchema } from "./schemas";
 
 // Types for dispatcher preferences
 export interface DispatcherPreferencesData {
@@ -22,125 +23,129 @@ export const VALID_SHIFTS = ["Morning", "Evening", "Night", "Overnight"];
 /**
  * Get the current user's dispatcher preferences
  */
-export async function getMyPreferences() {
-    const session = await requireAuth();
+export async function getMyPreferences(): Promise<{ success: boolean; data?: unknown; error?: string }> {
+    try {
+        const session = await requireAuth();
 
-    const preferences = await prisma.dispatcherPreferences.findUnique({
-        where: { userId: session.user.id },
-    });
+        const preferences = await prisma.dispatcherPreferences.findUnique({
+            where: { userId: session.user.id },
+        });
 
-    return preferences;
+        return { success: true, data: preferences };
+    } catch (error) {
+        console.error("getMyPreferences error:", error);
+        return { success: false, error: "Failed to get preferences" };
+    }
 }
 
 /**
  * Get dispatcher preferences by user ID (admin only)
  */
-export async function getDispatcherPreferences(userId: string) {
-    await requireAdmin();
+export async function getDispatcherPreferences(userId: string): Promise<{ success: boolean; data?: unknown; error?: string }> {
+    try {
+        await requireAdmin();
 
-    const preferences = await prisma.dispatcherPreferences.findUnique({
-        where: { userId },
-        include: {
-            user: {
-                select: { id: true, name: true, email: true },
+        // Validate input
+        const parseResult = idParamSchema.safeParse({ id: userId });
+        if (!parseResult.success) {
+            return { success: false, error: "Invalid user ID" };
+        }
+
+        const preferences = await prisma.dispatcherPreferences.findUnique({
+            where: { userId },
+            include: {
+                user: {
+                    select: { id: true, name: true, email: true },
+                },
             },
-        },
-    });
+        });
 
-    return preferences;
+        return { success: true, data: preferences };
+    } catch (error) {
+        console.error("getDispatcherPreferences error:", error);
+        return { success: false, error: "Failed to get dispatcher preferences" };
+    }
 }
 
 /**
  * Get all dispatchers with their preferences (admin only)
  */
-export async function getAllDispatcherPreferences() {
-    await requireAdmin();
+export async function getAllDispatcherPreferences(): Promise<{ success: boolean; data?: unknown; error?: string }> {
+    try {
+        await requireAdmin();
 
-    const dispatchers = await prisma.user.findMany({
-        where: { role: "DISPATCHER", isActive: true },
-        select: {
-            id: true,
-            name: true,
-            email: true,
-            dispatcherPreferences: true,
-        },
-        orderBy: { name: "asc" },
-    });
+        const dispatchers = await prisma.user.findMany({
+            where: { role: "DISPATCHER", isActive: true },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                dispatcherPreferences: true,
+            },
+            orderBy: { name: "asc" },
+        });
 
-    return dispatchers;
+        return { success: true, data: dispatchers };
+    } catch (error) {
+        console.error("getAllDispatcherPreferences error:", error);
+        return { success: false, error: "Failed to get all dispatcher preferences" };
+    }
 }
 
 /**
  * Create or update the current user's dispatcher preferences
  */
-export async function upsertMyPreferences(data: Partial<DispatcherPreferencesData>) {
-    const session = await requireAuth();
+export async function upsertMyPreferences(data: Partial<DispatcherPreferencesData>): Promise<{ success: boolean; data?: unknown; error?: string }> {
+    try {
+        const session = await requireAuth();
 
-    // Validate days
-    if (data.preferredDays) {
-        const invalidDays = data.preferredDays.filter(d => !VALID_DAYS.includes(d));
-        if (invalidDays.length > 0) {
-            throw new Error(`Invalid days: ${invalidDays.join(", ")}`);
+        // Validate input with Zod
+        const parseResult = dispatcherPreferencesSchema.safeParse(data);
+        if (!parseResult.success) {
+            return { success: false, error: parseResult.error.issues[0]?.message || "Invalid input" };
         }
-    }
 
-    // Validate shifts
-    if (data.preferredShifts) {
-        const invalidShifts = data.preferredShifts.filter(s => !VALID_SHIFTS.includes(s));
-        if (invalidShifts.length > 0) {
-            throw new Error(`Invalid shifts: ${invalidShifts.join(", ")}`);
+        // Additional validation for hour constraints
+        if (data.minHoursWeek && data.maxHoursWeek && data.minHoursWeek > data.maxHoursWeek) {
+            return { success: false, error: "Minimum hours cannot exceed maximum hours" };
         }
+
+        const preferences = await prisma.dispatcherPreferences.upsert({
+            where: { userId: session.user.id },
+            create: {
+                userId: session.user.id,
+                preferredDays: data.preferredDays || [],
+                preferredShifts: data.preferredShifts || [],
+                maxHoursWeek: data.maxHoursWeek ?? null,
+                minHoursWeek: data.minHoursWeek ?? null,
+                notes: data.notes ?? null,
+                blackoutDates: data.blackoutDates || [],
+            },
+            update: {
+                preferredDays: data.preferredDays,
+                preferredShifts: data.preferredShifts,
+                maxHoursWeek: data.maxHoursWeek,
+                minHoursWeek: data.minHoursWeek,
+                notes: data.notes,
+                blackoutDates: data.blackoutDates,
+            },
+        });
+
+        await createAuditLog(
+            session.user.id,
+            "UPDATE",
+            "DispatcherPreferences",
+            preferences.id,
+            data
+        );
+
+        revalidatePath("/schedule");
+
+        return { success: true, data: preferences };
+    } catch (error) {
+        console.error("upsertMyPreferences error:", error);
+        return { success: false, error: "Failed to update preferences" };
     }
-
-    // Validate hour constraints
-    if (data.minHoursWeek !== undefined && data.minHoursWeek !== null) {
-        if (data.minHoursWeek < 0 || data.minHoursWeek > 168) {
-            throw new Error("Minimum hours must be between 0 and 168");
-        }
-    }
-
-    if (data.maxHoursWeek !== undefined && data.maxHoursWeek !== null) {
-        if (data.maxHoursWeek < 0 || data.maxHoursWeek > 168) {
-            throw new Error("Maximum hours must be between 0 and 168");
-        }
-    }
-
-    if (data.minHoursWeek && data.maxHoursWeek && data.minHoursWeek > data.maxHoursWeek) {
-        throw new Error("Minimum hours cannot exceed maximum hours");
-    }
-
-    const preferences = await prisma.dispatcherPreferences.upsert({
-        where: { userId: session.user.id },
-        create: {
-            userId: session.user.id,
-            preferredDays: data.preferredDays || [],
-            preferredShifts: data.preferredShifts || [],
-            maxHoursWeek: data.maxHoursWeek ?? null,
-            minHoursWeek: data.minHoursWeek ?? null,
-            notes: data.notes ?? null,
-            blackoutDates: data.blackoutDates || [],
-        },
-        update: {
-            preferredDays: data.preferredDays,
-            preferredShifts: data.preferredShifts,
-            maxHoursWeek: data.maxHoursWeek,
-            minHoursWeek: data.minHoursWeek,
-            notes: data.notes,
-            blackoutDates: data.blackoutDates,
-        },
-    });
-
-    await createAuditLog(
-        session.user.id,
-        "UPDATE",
-        "DispatcherPreferences",
-        preferences.id,
-        data
-    );
-
-    revalidatePath("/schedule");
-
-    return { success: true, preferences };
 }
 
 /**
@@ -149,150 +154,188 @@ export async function upsertMyPreferences(data: Partial<DispatcherPreferencesDat
 export async function updateDispatcherPreferences(
     userId: string,
     data: Partial<DispatcherPreferencesData>
-) {
-    const session = await requireAdmin();
+): Promise<{ success: boolean; data?: unknown; error?: string }> {
+    try {
+        const session = await requireAdmin();
 
-    // Verify target user exists and is a dispatcher
-    const targetUser = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true, role: true },
-    });
+        // Validate userId
+        const userIdResult = idParamSchema.safeParse({ id: userId });
+        if (!userIdResult.success) {
+            return { success: false, error: "Invalid user ID" };
+        }
 
-    if (!targetUser) {
-        throw new Error("User not found");
+        // Validate data
+        const dataResult = dispatcherPreferencesSchema.safeParse(data);
+        if (!dataResult.success) {
+            return { success: false, error: dataResult.error.issues[0]?.message || "Invalid input" };
+        }
+
+        // Verify target user exists and is a dispatcher
+        const targetUser = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { id: true, role: true },
+        });
+
+        if (!targetUser) {
+            return { success: false, error: "User not found" };
+        }
+
+        if (targetUser.role !== "DISPATCHER") {
+            return { success: false, error: "Can only set preferences for dispatchers" };
+        }
+
+        const preferences = await prisma.dispatcherPreferences.upsert({
+            where: { userId },
+            create: {
+                userId,
+                preferredDays: data.preferredDays || [],
+                preferredShifts: data.preferredShifts || [],
+                maxHoursWeek: data.maxHoursWeek ?? null,
+                minHoursWeek: data.minHoursWeek ?? null,
+                notes: data.notes ?? null,
+                blackoutDates: data.blackoutDates || [],
+            },
+            update: {
+                preferredDays: data.preferredDays,
+                preferredShifts: data.preferredShifts,
+                maxHoursWeek: data.maxHoursWeek,
+                minHoursWeek: data.minHoursWeek,
+                notes: data.notes,
+                blackoutDates: data.blackoutDates,
+            },
+        });
+
+        await createAuditLog(
+            session.user.id,
+            "UPDATE",
+            "DispatcherPreferences",
+            preferences.id,
+            { targetUserId: userId, ...data }
+        );
+
+        revalidatePath("/schedule");
+        revalidatePath("/admin/scheduler");
+
+        return { success: true, data: preferences };
+    } catch (error) {
+        console.error("updateDispatcherPreferences error:", error);
+        return { success: false, error: "Failed to update dispatcher preferences" };
     }
-
-    if (targetUser.role !== "DISPATCHER") {
-        throw new Error("Can only set preferences for dispatchers");
-    }
-
-    const preferences = await prisma.dispatcherPreferences.upsert({
-        where: { userId },
-        create: {
-            userId,
-            preferredDays: data.preferredDays || [],
-            preferredShifts: data.preferredShifts || [],
-            maxHoursWeek: data.maxHoursWeek ?? null,
-            minHoursWeek: data.minHoursWeek ?? null,
-            notes: data.notes ?? null,
-            blackoutDates: data.blackoutDates || [],
-        },
-        update: {
-            preferredDays: data.preferredDays,
-            preferredShifts: data.preferredShifts,
-            maxHoursWeek: data.maxHoursWeek,
-            minHoursWeek: data.minHoursWeek,
-            notes: data.notes,
-            blackoutDates: data.blackoutDates,
-        },
-    });
-
-    await createAuditLog(
-        session.user.id,
-        "UPDATE",
-        "DispatcherPreferences",
-        preferences.id,
-        { targetUserId: userId, ...data }
-    );
-
-    revalidatePath("/schedule");
-    revalidatePath("/admin/scheduler");
-
-    return { success: true, preferences };
 }
 
 /**
  * Delete dispatcher preferences
  */
-export async function deleteMyPreferences() {
-    const session = await requireAuth();
+export async function deleteMyPreferences(): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+        const session = await requireAuth();
 
-    const existing = await prisma.dispatcherPreferences.findUnique({
-        where: { userId: session.user.id },
-    });
+        const existing = await prisma.dispatcherPreferences.findUnique({
+            where: { userId: session.user.id },
+        });
 
-    if (!existing) {
-        return { success: true, message: "No preferences to delete" };
+        if (!existing) {
+            return { success: true, message: "No preferences to delete" };
+        }
+
+        await prisma.dispatcherPreferences.delete({
+            where: { userId: session.user.id },
+        });
+
+        await createAuditLog(
+            session.user.id,
+            "DELETE",
+            "DispatcherPreferences",
+            existing.id
+        );
+
+        revalidatePath("/schedule");
+
+        return { success: true };
+    } catch (error) {
+        console.error("deleteMyPreferences error:", error);
+        return { success: false, error: "Failed to delete preferences" };
     }
-
-    await prisma.dispatcherPreferences.delete({
-        where: { userId: session.user.id },
-    });
-
-    await createAuditLog(
-        session.user.id,
-        "DELETE",
-        "DispatcherPreferences",
-        existing.id
-    );
-
-    revalidatePath("/schedule");
-
-    return { success: true };
 }
 
 /**
  * Add a blackout date to preferences
  */
-export async function addBlackoutDate(date: string) {
-    const session = await requireAuth();
+export async function addBlackoutDate(date: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+        const session = await requireAuth();
 
-    // Validate date format (ISO date string)
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(date)) {
-        throw new Error("Invalid date format. Use YYYY-MM-DD");
+        // Validate date format with Zod
+        const parseResult = blackoutDateSchema.safeParse({ date });
+        if (!parseResult.success) {
+            return { success: false, error: "Invalid date format. Use YYYY-MM-DD" };
+        }
+
+        const preferences = await prisma.dispatcherPreferences.findUnique({
+            where: { userId: session.user.id },
+        });
+
+        const currentDates = preferences?.blackoutDates || [];
+
+        if (currentDates.includes(date)) {
+            return { success: true, message: "Date already in blackout list" };
+        }
+
+        const updatedDates = [...currentDates, date].sort();
+
+        await prisma.dispatcherPreferences.upsert({
+            where: { userId: session.user.id },
+            create: {
+                userId: session.user.id,
+                blackoutDates: updatedDates,
+            },
+            update: {
+                blackoutDates: updatedDates,
+            },
+        });
+
+        revalidatePath("/schedule");
+
+        return { success: true };
+    } catch (error) {
+        console.error("addBlackoutDate error:", error);
+        return { success: false, error: "Failed to add blackout date" };
     }
-
-    const preferences = await prisma.dispatcherPreferences.findUnique({
-        where: { userId: session.user.id },
-    });
-
-    const currentDates = preferences?.blackoutDates || [];
-
-    if (currentDates.includes(date)) {
-        return { success: true, message: "Date already in blackout list" };
-    }
-
-    const updatedDates = [...currentDates, date].sort();
-
-    await prisma.dispatcherPreferences.upsert({
-        where: { userId: session.user.id },
-        create: {
-            userId: session.user.id,
-            blackoutDates: updatedDates,
-        },
-        update: {
-            blackoutDates: updatedDates,
-        },
-    });
-
-    revalidatePath("/schedule");
-
-    return { success: true };
 }
 
 /**
  * Remove a blackout date from preferences
  */
-export async function removeBlackoutDate(date: string) {
-    const session = await requireAuth();
+export async function removeBlackoutDate(date: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+        const session = await requireAuth();
 
-    const preferences = await prisma.dispatcherPreferences.findUnique({
-        where: { userId: session.user.id },
-    });
+        // Validate date format with Zod
+        const parseResult = blackoutDateSchema.safeParse({ date });
+        if (!parseResult.success) {
+            return { success: false, error: "Invalid date format. Use YYYY-MM-DD" };
+        }
 
-    if (!preferences) {
-        return { success: true, message: "No preferences found" };
+        const preferences = await prisma.dispatcherPreferences.findUnique({
+            where: { userId: session.user.id },
+        });
+
+        if (!preferences) {
+            return { success: true, message: "No preferences found" };
+        }
+
+        const updatedDates = preferences.blackoutDates.filter(d => d !== date);
+
+        await prisma.dispatcherPreferences.update({
+            where: { userId: session.user.id },
+            data: { blackoutDates: updatedDates },
+        });
+
+        revalidatePath("/schedule");
+
+        return { success: true };
+    } catch (error) {
+        console.error("removeBlackoutDate error:", error);
+        return { success: false, error: "Failed to remove blackout date" };
     }
-
-    const updatedDates = preferences.blackoutDates.filter(d => d !== date);
-
-    await prisma.dispatcherPreferences.update({
-        where: { userId: session.user.id },
-        data: { blackoutDates: updatedDates },
-    });
-
-    revalidatePath("/schedule");
-
-    return { success: true };
 }

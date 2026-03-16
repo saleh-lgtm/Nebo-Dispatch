@@ -81,11 +81,14 @@ export default function EnhancedBlastSMS() {
         setError("");
 
         try {
-            const data = await sendEnhancedBlastSMS({
+            const result = await sendEnhancedBlastSMS({
                 selectedIds,
                 message: message.trim(),
             });
-            setResult(data);
+            if (!result.success) {
+                throw new Error(result.error || "Failed to send blast");
+            }
+            setResult(result.data ?? null);
             // Reset form
             setSelectedIds([]);
             setMessage("");

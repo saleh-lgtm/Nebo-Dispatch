@@ -8,6 +8,7 @@ import {
     type DailyEngagement,
     type EngagementReport,
 } from "./engagementTypes";
+import { daysParamSchema, idParamSchema } from "./schemas";
 
 // Re-export types for consumers (types are allowed in "use server" files)
 export type { EngagementAction, DispatcherEngagement, DailyEngagement, EngagementReport } from "./engagementTypes";
@@ -17,13 +18,21 @@ export type { EngagementAction, DispatcherEngagement, DailyEngagement, Engagemen
  */
 export async function getEngagementReport(
     days: number = 7
-): Promise<EngagementReport> {
-    await requireAdmin();
+): Promise<{ success: boolean; data?: EngagementReport; error?: string }> {
+    try {
+        await requireAdmin();
 
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-    startDate.setHours(0, 0, 0, 0);
+        // Validate input
+        const parseResult = daysParamSchema.safeParse({ days });
+        if (!parseResult.success) {
+            return { success: false, error: "Invalid days parameter" };
+        }
+        const validDays = parseResult.data.days || 7;
+
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - validDays);
+        startDate.setHours(0, 0, 0, 0);
 
     // Get all active dispatchers
     const dispatchers = await prisma.user.findMany({
@@ -139,7 +148,7 @@ export async function getEngagementReport(
     // Generate daily trend data
     const dailyTrend: DailyEngagement[] = [];
 
-    for (let i = 0; i < days; i++) {
+    for (let i = 0; i < validDays; i++) {
         const dayStart = new Date(startDate);
         dayStart.setDate(dayStart.getDate() + i);
         const dayEnd = new Date(dayStart);
@@ -208,13 +217,20 @@ export async function getEngagementReport(
             rank: index + 1,
         }));
 
-    return {
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-        dispatchers: dispatcherEngagements,
-        dailyTrend,
-        topPerformers,
-    };
+        return {
+            success: true,
+            data: {
+                startDate: startDate.toISOString(),
+                endDate: endDate.toISOString(),
+                dispatchers: dispatcherEngagements,
+                dailyTrend,
+                topPerformers,
+            },
+        };
+    } catch (error) {
+        console.error("getEngagementReport error:", error);
+        return { success: false, error: "Failed to get engagement report" };
+    }
 }
 
 /**
@@ -222,12 +238,20 @@ export async function getEngagementReport(
  * More efficient query for Area Chart data
  */
 export async function getDailyEngagementTrend(days: number = 7) {
-    await requireAdmin();
+    try {
+        await requireAdmin();
 
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-    startDate.setHours(0, 0, 0, 0);
+        // Validate input
+        const parseResult = daysParamSchema.safeParse({ days });
+        if (!parseResult.success) {
+            return { success: false, error: "Invalid days parameter" };
+        }
+        const validDays = parseResult.data.days || 7;
+
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - validDays);
+        startDate.setHours(0, 0, 0, 0);
 
     // Get all active dispatchers
     const dispatchers = await prisma.user.findMany({
@@ -284,7 +308,7 @@ export async function getDailyEngagementTrend(days: number = 7) {
     > = {};
 
     // Initialize all days
-    for (let i = 0; i < days; i++) {
+    for (let i = 0; i < validDays; i++) {
         const day = new Date(startDate);
         day.setDate(day.getDate() + i);
         const dateStr = day.toISOString().split("T")[0];
@@ -336,10 +360,17 @@ export async function getDailyEngagementTrend(days: number = 7) {
         color: getDispatcherColor(dispatchers.indexOf(d)),
     }));
 
-    return {
-        chartData,
-        dispatchers: dispatcherInfo,
-    };
+        return {
+            success: true,
+            data: {
+                chartData,
+                dispatchers: dispatcherInfo,
+            },
+        };
+    } catch (error) {
+        console.error("getDailyEngagementTrend error:", error);
+        return { success: false, error: "Failed to get daily engagement trend" };
+    }
 }
 
 /**
@@ -368,21 +399,34 @@ export async function getDispatcherEngagement(
     userId: string,
     days: number = 30
 ) {
-    await requireAdmin();
+    try {
+        await requireAdmin();
 
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-    startDate.setHours(0, 0, 0, 0);
+        // Validate inputs
+        const userIdResult = idParamSchema.safeParse({ id: userId });
+        if (!userIdResult.success) {
+            return { success: false, error: "Invalid user ID" };
+        }
 
-    const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true, name: true },
-    });
+        const daysResult = daysParamSchema.safeParse({ days });
+        if (!daysResult.success) {
+            return { success: false, error: "Invalid days parameter" };
+        }
+        const validDays = daysResult.data.days || 30;
 
-    if (!user) {
-        throw new Error("User not found");
-    }
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - validDays);
+        startDate.setHours(0, 0, 0, 0);
+
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { id: true, name: true },
+        });
+
+        if (!user) {
+            return { success: false, error: "User not found" };
+        }
 
     const auditLogs = await prisma.auditLog.findMany({
         where: {
@@ -440,20 +484,27 @@ export async function getDispatcherEngagement(
         announcementsAcknowledged * ENGAGEMENT_POINTS.ANNOUNCEMENT_ACKNOWLEDGED +
         quoteFollowups * ENGAGEMENT_POINTS.QUOTE_FOLLOWUP;
 
-    return {
-        userId: user.id,
-        userName: user.name || "Unknown",
-        days,
-        totalPoints,
-        breakdown: {
-            quotesCreated,
-            tripsConfirmed,
-            smsSent,
-            tasksCompleted,
-            billingReviews,
-            announcementsAcknowledged,
-            quoteFollowups,
-        },
-        pointValues: ENGAGEMENT_POINTS,
-    };
+        return {
+            success: true,
+            data: {
+                userId: user.id,
+                userName: user.name || "Unknown",
+                days: validDays,
+                totalPoints,
+                breakdown: {
+                    quotesCreated,
+                    tripsConfirmed,
+                    smsSent,
+                    tasksCompleted,
+                    billingReviews,
+                    announcementsAcknowledged,
+                    quoteFollowups,
+                },
+                pointValues: ENGAGEMENT_POINTS,
+            },
+        };
+    } catch (error) {
+        console.error("getDispatcherEngagement error:", error);
+        return { success: false, error: "Failed to get dispatcher engagement" };
+    }
 }

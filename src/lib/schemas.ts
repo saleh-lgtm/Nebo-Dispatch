@@ -420,6 +420,201 @@ export const affiliateIdParamSchema = z.object({
     affiliateId: z.string().min(1, "Affiliate ID is required"),
 });
 
+// ===== SHARED PARAM SCHEMAS =====
+
+export const limitParamSchema = z.object({
+    limit: z.number().min(1).max(100).optional(),
+});
+
+export const daysParamSchema = z.object({
+    days: z.number().min(1).max(365).optional(),
+});
+
+export const weeksParamSchema = z.object({
+    weeks: z.number().min(1).max(52).optional(),
+});
+
+export const dateRangeSchema = z.object({
+    startDate: z.coerce.date(),
+    endDate: z.coerce.date(),
+});
+
+// ===== ADMIN DASHBOARD SCHEMAS =====
+
+export const featureAccessSchema = z.object({
+    userId: z.string().min(1, "User ID is required"),
+    feature: z.enum([
+        "QUOTES", "CONTACTS", "SMS", "FLEET", "SCHEDULER",
+        "REPORTS", "DIRECTORY", "CONFIRMATIONS", "TBR_TRIPS",
+        "NOTES", "TASKS", "ANALYTICS"
+    ]),
+    permission: z.enum(["NONE", "READ", "EDIT"]),
+});
+
+export const taskConfigSchema = z.object({
+    userId: z.string().min(1, "User ID is required"),
+    primaryTask: z.string().max(200).nullable(),
+    secondaryTask: z.string().max(200).nullable(),
+    notes: z.string().max(1000).nullable().optional(),
+});
+
+// ===== PORTAL SCHEMAS =====
+
+export const createPortalSchema = z.object({
+    name: z.string().min(2, "Name must be at least 2 characters").max(100),
+    url: z.string().url("Invalid URL format").max(500),
+    description: z.string().max(500).optional(),
+    category: z.string().max(50).optional(),
+    icon: z.string().max(50).optional(),
+    color: z.string().max(20).optional(),
+});
+
+export const updatePortalSchema = z.object({
+    name: z.string().min(2).max(100).optional(),
+    url: z.string().url().max(500).optional(),
+    description: z.string().max(500).optional(),
+    category: z.string().max(50).optional(),
+    icon: z.string().max(50).optional(),
+    color: z.string().max(20).optional(),
+    sortOrder: z.number().min(0).optional(),
+    isActive: z.boolean().optional(),
+});
+
+export const rejectPortalSchema = z.object({
+    id: z.string().min(1, "Portal ID is required"),
+    reason: z.string().max(500).optional(),
+});
+
+// ===== BLAST SMS SCHEMAS =====
+
+export const blastFilterSchema = z.object({
+    sources: z.array(z.enum(["contacts", "affiliates"])).optional(),
+    contactTagIds: z.array(z.string()).optional(),
+    affiliateTagIds: z.array(z.string()).optional(),
+    affiliateTypes: z.array(z.enum(["FARM_IN", "FARM_OUT", "IOS", "HOUSE_CHAUFFEUR"])).optional(),
+    searchQuery: z.string().max(200).optional(),
+    selectedRecipientIds: z.array(z.string()).optional(),
+});
+
+export const sendBlastSMSSchema = z.object({
+    selectedIds: z.array(z.string().min(1)).min(1, "At least one recipient required"),
+    message: z.string().min(1, "Message is required").max(1600, "Message too long"),
+    contactTagIds: z.array(z.string()).optional(),
+    affiliateTagIds: z.array(z.string()).optional(),
+});
+
+// ===== VEHICLE MAPPING SCHEMAS =====
+
+export const vehicleMappingSchema = z.object({
+    tbrVehicleType: z.string().min(1, "TBR vehicle type is required").max(100),
+    laVehicleType: z.string().min(1, "LA vehicle type is required").max(100),
+    laVehicleId: z.string().max(50).optional(),
+    notes: z.string().max(500).optional(),
+    isActive: z.boolean().optional(),
+});
+
+export const upsertVehicleMappingSchema = z.object({
+    id: z.string().optional(),
+    tbrVehicleType: z.string().min(1).max(100),
+    laVehicleType: z.string().min(1).max(100),
+    laVehicleId: z.string().max(50).optional(),
+    notes: z.string().max(500).optional(),
+    isActive: z.boolean().optional(),
+});
+
+export const toggleMappingSchema = z.object({
+    id: z.string().min(1, "Mapping ID is required"),
+    isActive: z.boolean(),
+});
+
+// ===== DISPATCHER PREFERENCES SCHEMAS =====
+
+export const dispatcherPreferencesSchema = z.object({
+    preferredDays: z.array(z.enum([
+        "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
+    ])).optional(),
+    preferredShifts: z.array(z.enum(["Morning", "Evening", "Night", "Overnight"])).optional(),
+    maxHoursWeek: z.number().min(0).max(168).nullable().optional(),
+    minHoursWeek: z.number().min(0).max(168).nullable().optional(),
+    notes: z.string().max(1000).nullable().optional(),
+    blackoutDates: z.array(z.string()).optional(),
+});
+
+export const blackoutDateSchema = z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format. Use YYYY-MM-DD"),
+});
+
+// ===== AFFILIATE AUDIT SCHEMAS =====
+
+export const auditConfigSchema = z.object({
+    affiliateId: z.string().min(1, "Affiliate ID is required"),
+    auditFrequency: z.enum(["EVERY_SHIFT", "DAILY", "WEEKLY"]).optional(),
+    priority: z.number().min(0).max(100).optional(),
+    notes: z.string().max(1000).optional(),
+});
+
+export const updateAuditConfigSchema = z.object({
+    auditFrequency: z.enum(["EVERY_SHIFT", "DAILY", "WEEKLY"]).optional(),
+    priority: z.number().min(0).max(100).optional(),
+    notes: z.string().max(1000).optional(),
+});
+
+// ===== TAG SCHEMAS =====
+
+export const createTagSchema = z.object({
+    name: z.string().min(1, "Tag name is required").max(50, "Tag name must be 50 characters or less"),
+    color: z.string().max(20).optional(),
+    description: z.string().max(200).optional(),
+});
+
+export const updateTagSchema = z.object({
+    name: z.string().min(1).max(50).optional(),
+    color: z.string().max(20).optional(),
+    description: z.string().max(200).optional(),
+});
+
+export const tagAssignmentSchema = z.object({
+    contactId: z.string().min(1, "Contact ID is required"),
+    tagIds: z.array(z.string()),
+});
+
+export const tagContactSchema = z.object({
+    contactId: z.string().min(1, "Contact ID is required"),
+    tagId: z.string().min(1, "Tag ID is required"),
+});
+
+export const tagIdsSchema = z.object({
+    tagIds: z.array(z.string()),
+});
+
+// ===== HOURS SCHEMAS =====
+
+export const shiftsFilterSchema = z.object({
+    startDate: z.coerce.date().optional(),
+    endDate: z.coerce.date().optional(),
+    userId: z.string().optional(),
+    limit: z.number().min(1).max(500).optional(),
+    offset: z.number().min(0).optional(),
+});
+
+// ===== STORAGE SCHEMAS =====
+
+export const uploadFileSchema = z.object({
+    bucket: z.enum(["fleet-documents", "avatars", "sop-files", "general"]),
+    folder: z.string().min(1).max(200),
+});
+
+export const deleteFileSchema = z.object({
+    bucket: z.enum(["fleet-documents", "avatars", "sop-files", "general"]),
+    fileUrl: z.string().url("Invalid file URL"),
+});
+
+export const signedUrlSchema = z.object({
+    bucket: z.enum(["fleet-documents", "avatars", "sop-files", "general"]),
+    filePath: z.string().min(1, "File path is required").max(500),
+    expiresIn: z.number().min(60).max(86400).optional(),
+});
+
 // ===== HELPER FUNCTIONS =====
 
 export type LoginInput = z.infer<typeof loginSchema>;

@@ -123,17 +123,17 @@ export default function AnalyticsClient({
             const end = new Date(endDate);
             end.setHours(23, 59, 59, 999);
 
-            const [newMetrics, newComparison, newTrend, newHours] = await Promise.all([
+            const [metricsResult, comparisonResult, trendResult, hoursResult] = await Promise.all([
                 getPerformanceMetrics(start, end),
                 getDispatcherComparison(start, end),
                 getDailyTrend(start, end),
                 getDispatcherHours(start, end),
             ]);
 
-            setMetrics(newMetrics);
-            setComparison(newComparison);
-            setDailyTrend(newTrend);
-            setHours(newHours);
+            if (metricsResult.data) setMetrics(metricsResult.data);
+            if (comparisonResult.data) setComparison(comparisonResult.data);
+            if (trendResult.data) setDailyTrend(trendResult.data);
+            if (hoursResult.data) setHours(hoursResult.data);
         } catch (error) {
             console.error("Failed to fetch analytics:", error);
         } finally {

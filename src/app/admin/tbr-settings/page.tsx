@@ -26,7 +26,7 @@ export default async function TbrSettingsPage() {
         redirect("/dashboard");
     }
 
-    const mappings = await getVehicleMappings();
+    const mappingsResult = await getVehicleMappings();
 
-    return <TbrSettingsClient initialMappings={mappings} />;
+    return <TbrSettingsClient initialMappings={mappingsResult.data ?? []} />;
 }

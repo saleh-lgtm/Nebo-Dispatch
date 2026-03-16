@@ -44,7 +44,7 @@ export default async function AnalyticsPage() {
     startDate.setHours(0, 0, 0, 0);
     endDate.setHours(23, 59, 59, 999);
 
-    const [metrics, comparison, dailyTrend, hours, confirmationStats] = await Promise.all([
+    const [metricsResult, comparisonResult, dailyTrendResult, hoursResult, confirmationStats] = await Promise.all([
         getPerformanceMetrics(startDate, endDate),
         getDispatcherComparison(startDate, endDate),
         getDailyTrend(startDate, endDate),
@@ -59,12 +59,14 @@ export default async function AnalyticsPage() {
         onTimeRate: confirmationStats.onTimeRate,
     };
 
+    const defaultMetrics = { totalCalls: 0, totalEmails: 0, totalQuotes: 0, totalReports: 0, averageCallsPerShift: 0 };
+
     return (
         <AnalyticsClient
-            initialMetrics={metrics}
-            initialComparison={comparison}
-            initialDailyTrend={dailyTrend}
-            initialHours={hours}
+            initialMetrics={metricsResult.data ?? defaultMetrics}
+            initialComparison={comparisonResult.data ?? []}
+            initialDailyTrend={dailyTrendResult.data ?? []}
+            initialHours={hoursResult.data ?? []}
             initialStartDate={startDate.toISOString().split("T")[0]}
             initialEndDate={endDate.toISOString().split("T")[0]}
             confirmationSummary={confirmationSummary}

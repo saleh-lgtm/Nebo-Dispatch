@@ -127,20 +127,28 @@ export default function AffiliateAuditClient({
         setIsSubmitting(true);
         try {
             if (editingConfig) {
-                const updated = await updateAffiliateAuditConfig(editingConfig.id, {
+                const result = await updateAffiliateAuditConfig(editingConfig.id, {
                     auditFrequency: auditFrequency as "EVERY_SHIFT" | "DAILY" | "WEEKLY",
                     priority,
                     notes: notes.trim() || undefined,
                 });
+                if (!result.success || !result.data) {
+                    throw new Error(result.error || "Failed to update configuration");
+                }
+                const updated = result.data as AuditConfig;
                 setConfigs(configs.map((c) => (c.id === updated.id ? updated : c)));
                 addToast("Configuration updated successfully", "success");
             } else {
-                const created = await addAffiliateToAuditList({
+                const result = await addAffiliateToAuditList({
                     affiliateId: selectedAffiliateId,
                     auditFrequency: auditFrequency as "EVERY_SHIFT" | "DAILY" | "WEEKLY",
                     priority,
                     notes: notes.trim() || undefined,
                 });
+                if (!result.success || !result.data) {
+                    throw new Error(result.error || "Failed to add affiliate");
+                }
+                const created = result.data as AuditConfig;
                 setConfigs([...configs, created]);
                 setAvailableAffiliates(availableAffiliates.filter((a) => a.id !== selectedAffiliateId));
                 addToast("Affiliate added to audit list", "success");

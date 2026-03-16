@@ -80,9 +80,11 @@ export default function RecipientSelector({
     useEffect(() => {
         async function loadTags() {
             try {
-                const tags = await getBlastTags();
-                setContactTags(tags.contactTags);
-                setAffiliateTags(tags.affiliateTags);
+                const result = await getBlastTags();
+                if (result.success && result.data) {
+                    setContactTags(result.data.contactTags);
+                    setAffiliateTags(result.data.affiliateTags);
+                }
             } catch (error) {
                 console.error("Failed to load tags:", error);
             }
@@ -103,7 +105,9 @@ export default function RecipientSelector({
                     affiliateTypes: affiliateTypes.length > 0 ? affiliateTypes : undefined,
                 };
                 const result = await getBlastRecipients(filter);
-                setRecipients(result.recipients);
+                if (result.success && result.data) {
+                    setRecipients(result.data.recipients);
+                }
             } catch (error) {
                 console.error("Failed to load recipients:", error);
             } finally {

@@ -1,7 +1,15 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getAdminDashboardStats, getDispatcherAccessList, getDispatcherAnalytics, getRecentActivity } from "@/lib/adminDashboardActions";
+import {
+    getAdminDashboardStats,
+    getDispatcherAccessList,
+    getDispatcherAnalytics,
+    getRecentActivity,
+    type AdminDashboardStats,
+    type DispatcherAccessConfig,
+    type DispatcherAnalytics,
+} from "@/lib/adminDashboardActions";
 import dynamic from "next/dynamic";
 
 const AdminDashboardClient = dynamic(() => import("./AdminDashboardClient"), {
@@ -26,19 +34,26 @@ export default async function AdminDashboardPage() {
         redirect("/dashboard");
     }
 
-    const [stats, dispatchers, analytics, activity] = await Promise.all([
+    const [statsResult, dispatchersResult, analyticsResult, activityResult] = await Promise.all([
         getAdminDashboardStats(),
         getDispatcherAccessList(),
         getDispatcherAnalytics(),
         getRecentActivity(10),
     ]);
 
+    // Check if data is available, redirect to error page if not
+    if (!statsResult.success || !statsResult.data) {
+        redirect("/dashboard?error=admin-data-unavailable");
+    }
+
+    const defaultActivity = { recentLogins: [], recentReports: [], recentQuotes: [] };
+
     return (
         <AdminDashboardClient
-            stats={stats}
-            dispatchers={dispatchers}
-            analytics={analytics}
-            activity={activity}
+            stats={statsResult.data as AdminDashboardStats}
+            dispatchers={(dispatchersResult.data ?? []) as DispatcherAccessConfig[]}
+            analytics={(analyticsResult.data ?? []) as DispatcherAnalytics[]}
+            activity={activityResult.data ?? defaultActivity}
             isSuperAdmin={session.user.role === "SUPER_ADMIN"}
         />
     );

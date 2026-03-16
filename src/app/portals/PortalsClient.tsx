@@ -122,8 +122,10 @@ export default function PortalsClient() {
     useEffect(() => {
         async function loadPortals() {
             try {
-                const data = await getPortals();
-                setPortals(data);
+                const result = await getPortals();
+                if (result.success && result.data) {
+                    setPortals(result.data);
+                }
             } catch (error) {
                 console.error("Failed to load portals:", error);
             } finally {
@@ -210,8 +212,10 @@ export default function PortalsClient() {
             } else {
                 await createPortal(formData);
             }
-            const data = await getPortals();
-            setPortals(data);
+            const result = await getPortals();
+            if (result.success && result.data) {
+                setPortals(result.data);
+            }
             setShowAddModal(false);
         } catch (error) {
             console.error("Failed to save portal:", error);
@@ -236,8 +240,10 @@ export default function PortalsClient() {
 
         try {
             await seedDefaultPortals();
-            const data = await getPortals();
-            setPortals(data);
+            const result = await getPortals();
+            if (result.success && result.data) {
+                setPortals(result.data);
+            }
         } catch (error) {
             console.error("Failed to seed portals:", error);
         }

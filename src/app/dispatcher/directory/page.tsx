@@ -24,7 +24,7 @@ export default async function DispatcherDirectoryPage() {
     const isAdmin = ["SUPER_ADMIN", "ADMIN"].includes(session.user.role || "");
 
     // Fetch data based on role
-    const [approvedContactsResult, myContactsResult, approvedPortals, myPortals] = await Promise.all([
+    const [approvedContactsResult, myContactsResult, approvedPortalsResult, myPortalsResult] = await Promise.all([
         getContacts(),
         getMyContacts(),
         getPortals(),
@@ -35,8 +35,8 @@ export default async function DispatcherDirectoryPage() {
         <DirectoryClient
             approvedContacts={approvedContactsResult.success ? approvedContactsResult.data : []}
             myContacts={myContactsResult.success ? myContactsResult.data : []}
-            approvedPortals={approvedPortals}
-            myPortals={myPortals}
+            approvedPortals={approvedPortalsResult.data ?? []}
+            myPortals={myPortalsResult.data ?? []}
             isAdmin={isAdmin}
             currentUserId={session.user.id}
         />

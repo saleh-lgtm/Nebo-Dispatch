@@ -86,8 +86,9 @@ function getShiftColor(shift: { market: Market | null }, dispatcherIndex: number
 function schedulesToBlocks(schedules: ScheduleRecord[], dispatchers: Dispatcher[], weekStart: Date): ShiftBlock[] {
     return schedules.map((schedule) => {
         const schedDate = new Date(schedule.date);
+        // Use Math.round to handle any sub-day rounding from timezone offsets
         const diffTime = schedDate.getTime() - weekStart.getTime();
-        const dayIndex = Math.floor(diffTime / (24 * 60 * 60 * 1000));
+        const dayIndex = Math.round(diffTime / (24 * 60 * 60 * 1000));
         const dispatcherIndex = dispatchers.findIndex((d) => d.id === schedule.userId);
         const duration = getShiftDuration(schedule.startHour, schedule.endHour);
 

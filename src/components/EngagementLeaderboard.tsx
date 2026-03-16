@@ -69,14 +69,18 @@ export default function EngagementLeaderboard({ initialDays = 7 }: Props) {
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            const [trendData, reportData] = await Promise.all([
+            const [trendResult, reportResult] = await Promise.all([
                 getDailyEngagementTrend(days),
                 getEngagementReport(days),
             ]);
 
-            setChartData(trendData.chartData);
-            setDispatchers(trendData.dispatchers);
-            setLeaderboard(reportData.dispatchers);
+            if (trendResult.success && trendResult.data) {
+                setChartData(trendResult.data.chartData);
+                setDispatchers(trendResult.data.dispatchers);
+            }
+            if (reportResult.success && reportResult.data) {
+                setLeaderboard(reportResult.data.dispatchers);
+            }
         } catch (error) {
             console.error("Failed to fetch engagement data:", error);
         } finally {

@@ -5,6 +5,14 @@ import { getAllContactsWithTags } from "@/lib/contactActions";
 import { getTags } from "@/lib/tagActions";
 import dynamic from "next/dynamic";
 
+interface TagData {
+    id: string;
+    name: string;
+    color: string;
+    description: string | null;
+    _count: { assignments: number };
+}
+
 const ContactsAdminClient = dynamic(() => import("./ContactsAdminClient"), {
     loading: () => (
         <div className="page-container">
@@ -27,7 +35,7 @@ export default async function AdminContactsPage() {
         redirect("/dashboard");
     }
 
-    const [contactsResult, tags] = await Promise.all([
+    const [contactsResult, tagsResult] = await Promise.all([
         getAllContactsWithTags(),
         getTags(),
     ]);
@@ -35,7 +43,7 @@ export default async function AdminContactsPage() {
     return (
         <ContactsAdminClient
             initialContacts={contactsResult.success ? contactsResult.data : []}
-            initialTags={tags}
+            initialTags={(tagsResult.data ?? []) as TagData[]}
         />
     );
 }

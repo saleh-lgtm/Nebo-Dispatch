@@ -56,7 +56,7 @@ export default async function ShiftReportPage() {
             },
         }),
         // Get affiliates configured for audit
-        getAffiliatesForShiftAudit().catch(() => []),
+        getAffiliatesForShiftAudit().catch(() => ({ success: false, data: [] })),
     ]);
 
     return (
@@ -68,7 +68,7 @@ export default async function ShiftReportPage() {
             initialDraft={serverDraft}
             notesCreated={notesCreatedCount}
             announcementsRead={announcementsReadCount}
-            initialAffiliateAudits={affiliateAudits}
+            initialAffiliateAudits={affiliateAudits.data ?? []}
         />
     );
 }

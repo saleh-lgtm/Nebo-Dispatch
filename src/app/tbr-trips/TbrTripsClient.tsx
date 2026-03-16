@@ -243,7 +243,8 @@ export default function TbrTripsClient({ initialTrips, totalTrips, stats: initia
         setPushError(null);
 
         // Get mapped vehicle type
-        const mappedVehicle = await getVehicleMapping(trip.vehicleType || "");
+        const mappingResult = await getVehicleMapping(trip.vehicleType || "");
+        const mappedVehicle = mappingResult.success && mappingResult.data ? mappingResult.data : (trip.vehicleType || "Sedan");
 
         setPushData({
             passengerName: trip.passengerName,
