@@ -10,23 +10,24 @@ Staff-only tool for dispatchers, admins, and accounting.
 
 **Working Features:**
 - Auth: NextAuth.js, 4 roles (SUPER_ADMIN, ADMIN, ACCOUNTING, DISPATCHER)
-- Dashboard, shift clock, quotes, scheduling (Phase 2-4 complete)
+- Dashboard, shift clock, quotes, scheduling (timezone-free redesign complete)
 - SMS via Twilio, Fleet management, TBR Global scraping via n8n
 - Confirmations, manifest ingestion via Cloudflare email worker
 - Accounting flags, billing review
-- **NEW:** Data-driven sidebar navigation with role-based groups and badge counts
-- 45 server action files, 71 Prisma models, 26 enums
+- Data-driven sidebar navigation with role-based groups and badge counts
+- 45 server action files (20 hardened), 71 Prisma models, 26 enums
 
 ## Recent Sessions (last 3)
 
+- **2026-03-16 ~4pm:** Server action hardening — 10 more files (73 functions) with Zod, try/catch, standard return shape (20/45 done)
 - **2026-03-16 Night:** Sidebar navigation reorganization — data-driven config, role-based groups, badge counts, ACCOUNTING pricing access
 - **2026-03-16 Late Evening:** Set up persistent session logging — SESSION-LOG.md, updated /session-end flow
-- **2026-03-16 Evening:** Server action hardening — Zod validation, try/catch, standard return shape for 10 files
 
 ## In Progress
 
 **Server Action Hardening:**
-- 10 of 45 server action files hardened — remaining 35 need review
+- 20 of 45 server action files hardened — remaining 25 need review
+- Files done: requestActions, taskActions, fleetActions, driverActions, affiliatePricingActions, adminDashboardActions, engagementActions, portalActions, blastSMSActions, vehicleMappingActions, dispatcherPreferencesActions, affiliateAuditActions, tagActions, hoursActions, analyticsActions + 5 others
 
 **Dispatcher Confirmations Page:**
 - Nav item added pointing to /confirmations — page needs to be created
@@ -48,8 +49,8 @@ Staff-only tool for dispatchers, admins, and accounting.
 
 ## Next Session
 
-1. Create dispatcher /confirmations page
-2. Continue server action hardening — remaining 35 files
+1. Continue server action hardening — remaining 25 files
+2. Create dispatcher /confirmations page
 3. Complete Twilio production setup per TODO-TWILIO-SETUP.md
 4. Add database indexes for TripConfirmation (status, dueAt)
 
@@ -65,3 +66,4 @@ Staff-only tool for dispatchers, admins, and accounting.
 - ACCOUNTING role can access /admin/pricing and /admin/affiliate-audit
 - SESSION-LOG.md is append-only (newest at top), PRIMER.md summarizes last 3
 - Run /session-end at end of each session
+- Scheduler: Timezone-free — date (pure date), startHour/endHour (0-23 integers), Monday-based weeks (0=Mon)
