@@ -2,72 +2,68 @@
 
 ## Current State
 
-Production app for Nebo Rides transportation company. Staff-only dispatch platform.
+Production dispatch platform for Nebo Rides (Dallas, Austin, San Antonio).
+Staff-only tool for dispatchers, admins, and accounting.
 
 **Stack:** Next.js 16.1.6 + React 19 + Prisma 7 + Supabase PostgreSQL
-**Deployment:** Vercel
-**Status:** Deployed and operational
+**Deployment:** Vercel — deployed and operational
 
-**Core Features (Working):**
-- Auth: NextAuth.js with 4 roles (SUPER_ADMIN, ADMIN, ACCOUNTING, DISPATCHER)
-- Dashboard with shift clock and quotes
-- Scheduling with real-time sync, templates, conflicts, suggestions (Phase 2-4 complete)
-- SMS/Communications via Twilio
-- Fleet management
-- TBR Global trip scraping via n8n
-- Confirmations and manifest ingestion via Cloudflare email worker
-- Accounting flags and billing review
-- 45 server action files, ~50 Prisma models
+**Working Features:**
+- Auth: NextAuth.js, 4 roles (SUPER_ADMIN, ADMIN, ACCOUNTING, DISPATCHER)
+- Dashboard, shift clock, quotes, scheduling (Phase 2-4 complete)
+- SMS via Twilio, Fleet management, TBR Global scraping via n8n
+- Confirmations, manifest ingestion via Cloudflare email worker
+- Accounting flags, billing review
+- 45 server action files, 71 Prisma models, 26 enums
 
 ## This Session
 
-Initial session — baseline snapshot created.
+Created comprehensive documentation suite in `docs/`.
 
 **Files Created:**
-- `.claude/commands/session-end.md` — /session-end slash command
-- `PRIMER.md` — this file
+- `docs/ARCHITECTURE.md` — system overview, data flow diagrams, deployment architecture
+- `docs/DATABASE.md` — 71 models, 26 enums, relationships, performance notes
+- `docs/API.md` — 13 API routes, auth methods, webhooks, cron endpoints
+- `docs/INTEGRATIONS.md` — 6 external services, setup checklist, environment config
 
-**Recent Commits (last 10):**
-- ff4a388 — project rules (components, server-actions, database, auth)
-- 1cec255 — slash commands (check, db-push, new-page, new-action, find-feature)
-- 236259f — expanded CLAUDE.md with feature map
-- 4a83a7d — removed unused code and legacy Zapier integration
-- 2dc2e0e — Scheduler Phase 2-4: real-time sync, templates, conflicts, suggestions
-- cb4b1fc — trigger redeploy
-- 609688a — favicon fix for Next.js 16
-- 94bf58d — switched to Google Apps Script for Sheet integration
-- 0969b7b — notification type icons
-- 7a7b80f — reusable components for shift-swap and confirmations
+**Commits:**
+- c3669b9 — docs: add ARCHITECTURE.md
+- 9ef7794 — docs: add DATABASE.md
+- e4564ce — docs: add API.md
+- f7cd301 — docs: add INTEGRATIONS.md
+
+**Pending Changes:**
+- CLEANUP-CHECKLIST.md deleted (staged)
+- .claude/settings.json untracked
 
 ## In Progress
 
-**Twilio SMS Real-time Setup (TODO-TWILIO-SETUP.md):**
-- [ ] Enable Supabase replication for SMSLog table
-- [ ] Add NEXT_PUBLIC_SUPABASE_ANON_KEY to .env
-- [ ] Production: remove TWILIO_SKIP_SIGNATURE_VALIDATION
-- [ ] A2P 10DLC registration for US compliance
-
-**Deleted this session:**
-- CLEANUP-CHECKLIST.md (removed, marked D in git)
+**Twilio SMS Real-time (TODO-TWILIO-SETUP.md):**
+- Enable Supabase replication for SMSLog table
+- Add NEXT_PUBLIC_SUPABASE_ANON_KEY to .env
+- Production: remove TWILIO_SKIP_SIGNATURE_VALIDATION
+- A2P 10DLC registration for US compliance
 
 ## Known Issues
 
-1. **SMS Real-time:** Not working until Supabase replication enabled
-2. **Route Pricing:** ~158K rows — needs careful pagination, no SELECT *
-3. **ShiftReportForm.tsx:** ~100KB file — prefer editing subcomponents in src/components/shift-report/
-4. **TripConfirmation queries:** Need status + dueAt index for performance
+1. SMS real-time not working until Supabase replication enabled
+2. Route Pricing ~158K rows — always paginate, no SELECT *
+3. ShiftReportForm.tsx ~100KB — edit subcomponents in src/components/shift-report/
+4. TripConfirmation queries need status + dueAt index
 
 ## Next Session
 
 1. Complete Twilio production setup per TODO-TWILIO-SETUP.md
 2. Add database indexes for TripConfirmation (status, dueAt)
-3. Review and optimize any slow queries on RoutePricing table
-4. Consider breaking down large components if performance issues arise
+3. Review/optimize slow queries on RoutePricing table
+4. Consider adding docs/FEATURES.md for feature-by-feature guide
+5. Stage and commit pending .claude/settings.json if needed
 
 ## Key Decisions
 
-- **No Tailwind** — CSS Modules only (co-located .module.css files)
-- **No API routes for CRUD** — server actions in src/lib/*Actions.ts
-- **No migrations** — use `npm run db:push` (Prisma push)
-- **Client components** — must use *Client.tsx suffix
-- **Session snapshots** — use /session-end command at end of each session
+- CSS Modules only — no Tailwind
+- Server actions for CRUD — API routes only for webhooks/external
+- `npm run db:push` — no migrations
+- Client components use *Client.tsx suffix
+- Documentation lives in docs/ — ARCHITECTURE, DATABASE, API, INTEGRATIONS
+- Run /session-end at end of each session to update this file
