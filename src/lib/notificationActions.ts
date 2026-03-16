@@ -408,9 +408,9 @@ export async function notifyTaskAssignedToAll(
 // Schedule Notifications
 export async function notifySchedulePublished(weekStart: Date) {
     try {
-        // Calculate week end
+        // Calculate week end (UTC-based to match database dates)
         const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekEnd.getDate() + 7);
+        weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
 
         // Get all users who have schedules for this week
         const schedules = await prisma.schedule.findMany({
@@ -431,9 +431,10 @@ export async function notifySchedulePublished(weekStart: Date) {
             return { success: true, data: { count: 0 } };
         }
 
-        const formattedDate = weekStart.toLocaleDateString(undefined, {
+        const formattedDate = weekStart.toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
+            timeZone: "UTC",
         });
 
         // Get shift counts per user for personalized message

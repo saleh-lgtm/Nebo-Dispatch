@@ -81,16 +81,20 @@ export function useClockTimer({
 
   useEffect(() => {
     if (!isClocked || !clockInTime) {
-      setElapsedMs(0);
-      return;
+      // Defer state reset to avoid synchronous setState in effect body
+      const timeout = setTimeout(() => setElapsedMs(0), 0);
+      return () => clearTimeout(timeout);
     }
 
-    // Initial calculation
-    refresh();
+    // Initial calculation (deferred to avoid synchronous setState in effect)
+    const initialTimeout = setTimeout(refresh, 0);
 
     // Set up interval for updates
     const interval = setInterval(refresh, intervalMs);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
   }, [isClocked, clockInTime, intervalMs, refresh]);
 
   return {

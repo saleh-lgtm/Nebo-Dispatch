@@ -355,10 +355,10 @@ function shiftsOverlap(
 }
 
 /**
- * Get day index (0=Mon, 6=Sun) from a Date
+ * Get day index (0=Mon, 6=Sun) from a Date - UTC-based
  */
 function getDayIndexFromDate(date: Date): number {
-  const jsDay = date.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  const jsDay = date.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat (UTC)
   return jsDay === 0 ? 6 : jsDay - 1; // Convert to 0=Mon, 6=Sun
 }
 

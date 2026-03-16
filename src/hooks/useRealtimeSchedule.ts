@@ -50,7 +50,7 @@ export function useRealtimeSchedule({
 
             const scheduleDate = new Date(dateStr);
             const weekEnd = new Date(weekStart);
-            weekEnd.setDate(weekEnd.getDate() + 7);
+            weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
 
             return scheduleDate >= weekStart && scheduleDate < weekEnd;
         },

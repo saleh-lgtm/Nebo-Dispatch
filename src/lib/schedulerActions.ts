@@ -598,12 +598,12 @@ export async function getWeekCoverageReport(weekStart: Date): Promise<{
     include: { user: { select: { id: true, name: true } } },
   });
 
-  // Group by day
+  // Group by day (use UTC date comparison)
   const byDay = [];
   for (let i = 0; i < 7; i++) {
     const dayDate = addDays(normalized, i);
     const daySchedules = schedules.filter(
-      (s) => s.date.toDateString() === dayDate.toDateString()
+      (s) => s.date.toISOString().slice(0, 10) === dayDate.toISOString().slice(0, 10)
     );
 
     const hours = daySchedules.reduce((sum, s) => sum + getShiftDuration(s.startHour, s.endHour), 0);
@@ -644,8 +644,9 @@ export async function getWeekCoverageReport(weekStart: Date): Promise<{
 export async function getUserNextShift(userId: string) {
   await requireAuth();
 
+  // Use UTC midnight to match database date format
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  today.setUTCHours(0, 0, 0, 0);
 
   return prisma.schedule.findFirst({
     where: {

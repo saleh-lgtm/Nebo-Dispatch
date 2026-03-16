@@ -28,6 +28,7 @@ function formatWeekDate(date: Date): string {
         month: "short",
         day: "numeric",
         year: "numeric",
+        timeZone: "UTC",
     });
 }
 
@@ -89,7 +90,7 @@ export function ApplyTemplateModal({
     };
 
     const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 6);
+    weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
 
     const assignedCount = Object.keys(assignments).length;
     const totalShifts = template.shifts.length;
