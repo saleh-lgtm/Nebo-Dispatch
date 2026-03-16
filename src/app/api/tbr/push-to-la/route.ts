@@ -1,6 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { geocodeTripAddresses } from "@/lib/geocoding";
+
+/**
+ * Zod schema for push-to-la request body
+ */
+const pushToLaSchema = z.object({
+    tbrTripId: z.string().min(1, "tbrTripId is required"),
+    neboTripId: z.string().optional(),
+    firstName: z.string().min(1, "firstName is required"),
+    lastName: z.string().min(1, "lastName is required"),
+    passengerPhone: z.string().optional(),
+    passengerEmail: z.string().email().optional().or(z.literal("")),
+    pickupDatetime: z.string().min(1, "pickupDatetime is required"),
+    pickupAddress: z.string().min(1, "pickupAddress is required"),
+    dropoffAddress: z.string().min(1, "dropoffAddress is required"),
+    vehicleType: z.string().optional(),
+    passengerCount: z.number().int().positive().optional().default(1),
+    flightNumber: z.string().optional(),
+    specialNotes: z.string().optional(),
+    fareAmount: z.union([z.string(), z.number()]).optional(),
+});
+
+type PushToLaInput = z.infer<typeof pushToLaSchema>;
 
 /**
  * Format phone number to E.164 format (+1XXXXXXXXXX)
@@ -26,10 +49,64 @@ function formatPhoneE164(phone: string | null | undefined): string {
  * POST /api/tbr/push-to-la
  *
  * Push TBR trips to Google Sheet via Apps Script
+ *
+ * Authentication:
+ * - Header: x-tbr-ingest-secret matching TBR_INGEST_SECRET env var
+ * - OR Basic Auth with username "tbr" and password matching TBR_INGEST_SECRET
  */
 export async function POST(request: NextRequest) {
+    // Authentication
+    const ingestSecret = process.env.TBR_INGEST_SECRET;
+
+    if (!ingestSecret) {
+        console.error("TBR_INGEST_SECRET not configured");
+        return NextResponse.json(
+            { error: "Server configuration error" },
+            { status: 500 }
+        );
+    }
+
+    // Check for header auth
+    const headerSecret = request.headers.get("x-tbr-ingest-secret");
+
+    // Check for Basic Auth
+    const authHeader = request.headers.get("authorization");
+    let basicAuthValid = false;
+    if (authHeader?.startsWith("Basic ")) {
+        try {
+            const base64Credentials = authHeader.slice(6);
+            const credentials = Buffer.from(base64Credentials, "base64").toString("utf-8");
+            const [username, password] = credentials.split(":");
+            basicAuthValid = username === "tbr" && password === ingestSecret;
+        } catch {
+            // Invalid base64
+        }
+    }
+
+    // Validate authentication
+    if (headerSecret !== ingestSecret && !basicAuthValid) {
+        return NextResponse.json(
+            { error: "Unauthorized" },
+            { status: 401 }
+        );
+    }
+
     try {
-        const body = await request.json();
+        const rawBody = await request.json();
+
+        // Validate request body with Zod
+        const parseResult = pushToLaSchema.safeParse(rawBody);
+        if (!parseResult.success) {
+            return NextResponse.json(
+                {
+                    error: "Invalid request body",
+                    details: parseResult.error.flatten().fieldErrors,
+                },
+                { status: 400 }
+            );
+        }
+
+        const body: PushToLaInput = parseResult.data;
 
         // Format phone number to E.164
         const formattedPhone = formatPhoneE164(body.passengerPhone);
