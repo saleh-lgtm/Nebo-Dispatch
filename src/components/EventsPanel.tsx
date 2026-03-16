@@ -72,7 +72,7 @@ function AddEventModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
 
         setLoading(true);
         try {
-            const event = await createEvent({
+            const result = await createEvent({
                 title: form.title,
                 description: form.description || undefined,
                 eventDate: new Date(form.eventDate),
@@ -82,7 +82,9 @@ function AddEventModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
                 expectedVolume: form.expectedVolume || undefined,
                 staffingNotes: form.staffingNotes || undefined,
             });
-            onSuccess(event as Event);
+            if (result.success && result.data) {
+                onSuccess(result.data as Event);
+            }
             onClose();
         } catch (e) {
             console.error(e);

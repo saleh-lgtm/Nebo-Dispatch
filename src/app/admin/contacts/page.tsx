@@ -27,14 +27,14 @@ export default async function AdminContactsPage() {
         redirect("/dashboard");
     }
 
-    const [contacts, tags] = await Promise.all([
+    const [contactsResult, tags] = await Promise.all([
         getAllContactsWithTags(),
         getTags(),
     ]);
 
     return (
         <ContactsAdminClient
-            initialContacts={contacts}
+            initialContacts={contactsResult.success ? contactsResult.data : []}
             initialTags={tags}
         />
     );

@@ -27,7 +27,7 @@ export default async function AdminApprovalsPage() {
         redirect("/dashboard");
     }
 
-    const [pendingUsers, pendingPortals, pendingContacts] = await Promise.all([
+    const [pendingUsersResult, pendingPortals, pendingContactsResult] = await Promise.all([
         getPendingUsers(),
         getPendingPortals(),
         getPendingContacts(),
@@ -35,9 +35,9 @@ export default async function AdminApprovalsPage() {
 
     return (
         <ApprovalsClient
-            pendingUsers={pendingUsers}
+            pendingUsers={pendingUsersResult}
             pendingPortals={pendingPortals}
-            pendingContacts={pendingContacts}
+            pendingContacts={pendingContactsResult.success ? pendingContactsResult.data : []}
             currentUserId={session.user.id}
         />
     );

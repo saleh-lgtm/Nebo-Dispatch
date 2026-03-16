@@ -1,16 +1,13 @@
 "use server";
 
 import prisma from "./prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "./auth";
+import { requireAuth } from "./auth-helpers";
 import { revalidatePath } from "next/cache";
 import { NotificationType } from "@prisma/client";
+import { createNotificationSchema } from "./schemas";
+import { z } from "zod";
 
-async function requireAuth() {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) throw new Error("Unauthorized");
-    return session;
-}
+const idSchema = z.string().min(1, "ID is required");
 
 // ============================================
 // CREATE NOTIFICATIONS
@@ -27,17 +24,29 @@ interface CreateNotificationData {
 }
 
 export async function createNotification(data: CreateNotificationData) {
-    return prisma.notification.create({
-        data: {
-            userId: data.userId,
-            type: data.type,
-            title: data.title,
-            message: data.message,
-            entityType: data.entityType,
-            entityId: data.entityId,
-            actionUrl: data.actionUrl,
-        },
-    });
+    try {
+        const parseResult = createNotificationSchema.safeParse(data);
+        if (!parseResult.success) {
+            return { success: false, error: "Invalid notification data" };
+        }
+
+        const notification = await prisma.notification.create({
+            data: {
+                userId: data.userId,
+                type: data.type,
+                title: data.title,
+                message: data.message,
+                entityType: data.entityType,
+                entityId: data.entityId,
+                actionUrl: data.actionUrl,
+            },
+        });
+
+        return { success: true, data: notification };
+    } catch (error) {
+        console.error("createNotification error:", error);
+        return { success: false, error: "Failed to create notification" };
+    }
 }
 
 // Create notification for multiple users
@@ -45,17 +54,28 @@ export async function createNotificationsForUsers(
     userIds: string[],
     data: Omit<CreateNotificationData, "userId">
 ) {
-    return prisma.notification.createMany({
-        data: userIds.map((userId) => ({
-            userId,
-            type: data.type,
-            title: data.title,
-            message: data.message,
-            entityType: data.entityType,
-            entityId: data.entityId,
-            actionUrl: data.actionUrl,
-        })),
-    });
+    try {
+        if (!userIds.length) {
+            return { success: true, data: { count: 0 } };
+        }
+
+        const result = await prisma.notification.createMany({
+            data: userIds.map((userId) => ({
+                userId,
+                type: data.type,
+                title: data.title,
+                message: data.message,
+                entityType: data.entityType,
+                entityId: data.entityId,
+                actionUrl: data.actionUrl,
+            })),
+        });
+
+        return { success: true, data: result };
+    } catch (error) {
+        console.error("createNotificationsForUsers error:", error);
+        return { success: false, error: "Failed to create notifications" };
+    }
 }
 
 // ============================================
@@ -66,27 +86,41 @@ export async function getMyNotifications(options?: {
     unreadOnly?: boolean;
     limit?: number;
 }) {
-    const session = await requireAuth();
+    try {
+        const session = await requireAuth();
 
-    return prisma.notification.findMany({
-        where: {
-            userId: session.user.id,
-            ...(options?.unreadOnly ? { isRead: false } : {}),
-        },
-        orderBy: { createdAt: "desc" },
-        take: options?.limit || 50,
-    });
+        const notifications = await prisma.notification.findMany({
+            where: {
+                userId: session.user.id,
+                ...(options?.unreadOnly ? { isRead: false } : {}),
+            },
+            orderBy: { createdAt: "desc" },
+            take: options?.limit || 50,
+        });
+
+        return { success: true, data: notifications };
+    } catch (error) {
+        console.error("getMyNotifications error:", error);
+        return { success: false, error: "Failed to get notifications", data: [] };
+    }
 }
 
 export async function getUnreadNotificationCount() {
-    const session = await requireAuth();
+    try {
+        const session = await requireAuth();
 
-    return prisma.notification.count({
-        where: {
-            userId: session.user.id,
-            isRead: false,
-        },
-    });
+        const count = await prisma.notification.count({
+            where: {
+                userId: session.user.id,
+                isRead: false,
+            },
+        });
+
+        return { success: true, data: count };
+    } catch (error) {
+        console.error("getUnreadNotificationCount error:", error);
+        return { success: false, error: "Failed to get count", data: 0 };
+    }
 }
 
 // ============================================
@@ -94,74 +128,107 @@ export async function getUnreadNotificationCount() {
 // ============================================
 
 export async function markNotificationAsRead(notificationId: string) {
-    const session = await requireAuth();
+    try {
+        const session = await requireAuth();
 
-    const notification = await prisma.notification.findUnique({
-        where: { id: notificationId },
-    });
+        const idResult = idSchema.safeParse(notificationId);
+        if (!idResult.success) {
+            return { success: false, error: "Invalid notification ID" };
+        }
 
-    if (!notification || notification.userId !== session.user.id) {
-        throw new Error("Notification not found");
+        const notification = await prisma.notification.findUnique({
+            where: { id: notificationId },
+        });
+
+        if (!notification || notification.userId !== session.user.id) {
+            return { success: false, error: "Notification not found" };
+        }
+
+        const updated = await prisma.notification.update({
+            where: { id: notificationId },
+            data: {
+                isRead: true,
+                readAt: new Date(),
+            },
+        });
+
+        revalidatePath("/dashboard");
+        return { success: true, data: updated };
+    } catch (error) {
+        console.error("markNotificationAsRead error:", error);
+        return { success: false, error: "Failed to mark notification as read" };
     }
-
-    const updated = await prisma.notification.update({
-        where: { id: notificationId },
-        data: {
-            isRead: true,
-            readAt: new Date(),
-        },
-    });
-
-    revalidatePath("/dashboard");
-    return updated;
 }
 
 export async function markAllNotificationsAsRead() {
-    const session = await requireAuth();
+    try {
+        const session = await requireAuth();
 
-    await prisma.notification.updateMany({
-        where: {
-            userId: session.user.id,
-            isRead: false,
-        },
-        data: {
-            isRead: true,
-            readAt: new Date(),
-        },
-    });
+        await prisma.notification.updateMany({
+            where: {
+                userId: session.user.id,
+                isRead: false,
+            },
+            data: {
+                isRead: true,
+                readAt: new Date(),
+            },
+        });
 
-    revalidatePath("/dashboard");
+        revalidatePath("/dashboard");
+        return { success: true };
+    } catch (error) {
+        console.error("markAllNotificationsAsRead error:", error);
+        return { success: false, error: "Failed to mark notifications as read" };
+    }
 }
 
 export async function deleteNotification(notificationId: string) {
-    const session = await requireAuth();
+    try {
+        const session = await requireAuth();
 
-    const notification = await prisma.notification.findUnique({
-        where: { id: notificationId },
-    });
+        const idResult = idSchema.safeParse(notificationId);
+        if (!idResult.success) {
+            return { success: false, error: "Invalid notification ID" };
+        }
 
-    if (!notification || notification.userId !== session.user.id) {
-        throw new Error("Notification not found");
+        const notification = await prisma.notification.findUnique({
+            where: { id: notificationId },
+        });
+
+        if (!notification || notification.userId !== session.user.id) {
+            return { success: false, error: "Notification not found" };
+        }
+
+        await prisma.notification.delete({
+            where: { id: notificationId },
+        });
+
+        revalidatePath("/dashboard");
+        return { success: true };
+    } catch (error) {
+        console.error("deleteNotification error:", error);
+        return { success: false, error: "Failed to delete notification" };
     }
-
-    await prisma.notification.delete({
-        where: { id: notificationId },
-    });
-
-    revalidatePath("/dashboard");
 }
 
 export async function deleteAllReadNotifications() {
-    const session = await requireAuth();
+    try {
+        const session = await requireAuth();
 
-    await prisma.notification.deleteMany({
-        where: {
-            userId: session.user.id,
-            isRead: true,
-        },
-    });
+        await prisma.notification.deleteMany({
+            where: {
+                userId: session.user.id,
+                isRead: true,
+            },
+        });
 
-    revalidatePath("/dashboard");
+        revalidatePath("/dashboard");
+        return { success: true };
+    } catch (error) {
+        console.error("deleteAllReadNotifications error:", error);
+        return { success: false, error: "Failed to delete notifications" };
+    }
 }
 
 // ============================================
@@ -183,17 +250,22 @@ export async function notifyShiftSwapRequest(
     requesterId: string,
     swapRequestId: string
 ) {
-    const requesterName = await getUserName(requesterId);
+    try {
+        const requesterName = await getUserName(requesterId);
 
-    return createNotification({
-        userId: targetUserId,
-        type: "SHIFT_SWAP_REQUEST",
-        title: "Shift Swap Request",
-        message: `${requesterName} wants to swap shifts with you.`,
-        entityType: "ShiftSwapRequest",
-        entityId: swapRequestId,
-        actionUrl: "/dashboard",
-    });
+        return createNotification({
+            userId: targetUserId,
+            type: "SHIFT_SWAP_REQUEST",
+            title: "Shift Swap Request",
+            message: `${requesterName} wants to swap shifts with you.`,
+            entityType: "ShiftSwapRequest",
+            entityId: swapRequestId,
+            actionUrl: "/dashboard",
+        });
+    } catch (error) {
+        console.error("notifyShiftSwapRequest error:", error);
+        return { success: false, error: "Failed to send notification" };
+    }
 }
 
 export async function notifyShiftSwapResponse(
@@ -202,17 +274,22 @@ export async function notifyShiftSwapResponse(
     swapRequestId: string,
     accepted: boolean
 ) {
-    const targetName = await getUserName(targetUserId);
+    try {
+        const targetName = await getUserName(targetUserId);
 
-    return createNotification({
-        userId: requesterId,
-        type: "SHIFT_SWAP_RESPONSE",
-        title: accepted ? "Swap Request Accepted" : "Swap Request Declined",
-        message: `${targetName} ${accepted ? "accepted" : "declined"} your shift swap request.`,
-        entityType: "ShiftSwapRequest",
-        entityId: swapRequestId,
-        actionUrl: "/dashboard",
-    });
+        return createNotification({
+            userId: requesterId,
+            type: "SHIFT_SWAP_RESPONSE",
+            title: accepted ? "Swap Request Accepted" : "Swap Request Declined",
+            message: `${targetName} ${accepted ? "accepted" : "declined"} your shift swap request.`,
+            entityType: "ShiftSwapRequest",
+            entityId: swapRequestId,
+            actionUrl: "/dashboard",
+        });
+    } catch (error) {
+        console.error("notifyShiftSwapResponse error:", error);
+        return { success: false, error: "Failed to send notification" };
+    }
 }
 
 export async function notifyShiftSwapAdminDecision(
@@ -221,21 +298,26 @@ export async function notifyShiftSwapAdminDecision(
     swapRequestId: string,
     approved: boolean
 ) {
-    const type = approved ? "SHIFT_SWAP_APPROVED" : "SHIFT_SWAP_REJECTED";
-    const title = approved ? "Shift Swap Approved" : "Shift Swap Rejected";
-    const message = approved
-        ? "Your shift swap has been approved by admin."
-        : "Your shift swap has been rejected by admin.";
+    try {
+        const type = approved ? "SHIFT_SWAP_APPROVED" : "SHIFT_SWAP_REJECTED";
+        const title = approved ? "Shift Swap Approved" : "Shift Swap Rejected";
+        const message = approved
+            ? "Your shift swap has been approved by admin."
+            : "Your shift swap has been rejected by admin.";
 
-    // Notify both users
-    return createNotificationsForUsers([requesterId, targetUserId], {
-        type,
-        title,
-        message,
-        entityType: "ShiftSwapRequest",
-        entityId: swapRequestId,
-        actionUrl: "/dashboard",
-    });
+        // Notify both users
+        return createNotificationsForUsers([requesterId, targetUserId], {
+            type,
+            title,
+            message,
+            entityType: "ShiftSwapRequest",
+            entityId: swapRequestId,
+            actionUrl: "/dashboard",
+        });
+    } catch (error) {
+        console.error("notifyShiftSwapAdminDecision error:", error);
+        return { success: false, error: "Failed to send notifications" };
+    }
 }
 
 // Time Off Notifications
@@ -245,25 +327,30 @@ export async function notifyTimeOffDecision(
     approved: boolean,
     adminNotes?: string
 ) {
-    const type = approved ? "TIME_OFF_APPROVED" : "TIME_OFF_REJECTED";
-    const title = approved ? "Time Off Approved" : "Time Off Rejected";
-    let message = approved
-        ? "Your time off request has been approved."
-        : "Your time off request has been rejected.";
+    try {
+        const type = approved ? "TIME_OFF_APPROVED" : "TIME_OFF_REJECTED";
+        const title = approved ? "Time Off Approved" : "Time Off Rejected";
+        let message = approved
+            ? "Your time off request has been approved."
+            : "Your time off request has been rejected.";
 
-    if (adminNotes) {
-        message += ` Notes: ${adminNotes}`;
+        if (adminNotes) {
+            message += ` Notes: ${adminNotes}`;
+        }
+
+        return createNotification({
+            userId,
+            type,
+            title,
+            message,
+            entityType: "TimeOffRequest",
+            entityId: timeOffRequestId,
+            actionUrl: "/dashboard",
+        });
+    } catch (error) {
+        console.error("notifyTimeOffDecision error:", error);
+        return { success: false, error: "Failed to send notification" };
     }
-
-    return createNotification({
-        userId,
-        type,
-        title,
-        message,
-        entityType: "TimeOffRequest",
-        entityId: timeOffRequestId,
-        actionUrl: "/dashboard",
-    });
 }
 
 // Task Notifications
@@ -272,106 +359,121 @@ export async function notifyTaskAssigned(
     taskId: string,
     taskTitle: string
 ) {
-    return createNotification({
-        userId,
-        type: "TASK_ASSIGNED",
-        title: "New Task Assigned",
-        message: `You have been assigned a new task: ${taskTitle}`,
-        entityType: "AdminTask",
-        entityId: taskId,
-        actionUrl: "/dashboard",
-    });
+    try {
+        return createNotification({
+            userId,
+            type: "TASK_ASSIGNED",
+            title: "New Task Assigned",
+            message: `You have been assigned a new task: ${taskTitle}`,
+            entityType: "AdminTask",
+            entityId: taskId,
+            actionUrl: "/dashboard",
+        });
+    } catch (error) {
+        console.error("notifyTaskAssigned error:", error);
+        return { success: false, error: "Failed to send notification" };
+    }
 }
 
 export async function notifyTaskAssignedToAll(
     taskId: string,
     taskTitle: string
 ) {
-    // Get all active dispatchers
-    const dispatchers = await prisma.user.findMany({
-        where: {
-            role: "DISPATCHER",
-            isActive: true,
-        },
-        select: { id: true },
-    });
+    try {
+        // Get all active dispatchers
+        const dispatchers = await prisma.user.findMany({
+            where: {
+                role: "DISPATCHER",
+                isActive: true,
+            },
+            select: { id: true },
+        });
 
-    const userIds = dispatchers.map((d) => d.id);
+        const userIds = dispatchers.map((d) => d.id);
 
-    return createNotificationsForUsers(userIds, {
-        type: "TASK_ASSIGNED",
-        title: "New Task Assigned",
-        message: `You have been assigned a new task: ${taskTitle}`,
-        entityType: "AdminTask",
-        entityId: taskId,
-        actionUrl: "/dashboard",
-    });
+        return createNotificationsForUsers(userIds, {
+            type: "TASK_ASSIGNED",
+            title: "New Task Assigned",
+            message: `You have been assigned a new task: ${taskTitle}`,
+            entityType: "AdminTask",
+            entityId: taskId,
+            actionUrl: "/dashboard",
+        });
+    } catch (error) {
+        console.error("notifyTaskAssignedToAll error:", error);
+        return { success: false, error: "Failed to send notifications" };
+    }
 }
 
 // Schedule Notifications
 export async function notifySchedulePublished(weekStart: Date) {
-    // Calculate week end
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 7);
+    try {
+        // Calculate week end
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 7);
 
-    // Get all users who have schedules for this week
-    const schedules = await prisma.schedule.findMany({
-        where: {
-            shiftStart: {
-                gte: weekStart,
-                lt: weekEnd,
+        // Get all users who have schedules for this week
+        const schedules = await prisma.schedule.findMany({
+            where: {
+                shiftStart: {
+                    gte: weekStart,
+                    lt: weekEnd,
+                },
+                isPublished: true,
             },
-            isPublished: true,
-        },
-        select: { userId: true },
-        distinct: ["userId"],
-    });
+            select: { userId: true },
+            distinct: ["userId"],
+        });
 
-    const userIds = schedules.map((s) => s.userId);
+        const userIds = schedules.map((s) => s.userId);
 
-    if (userIds.length === 0) {
-        return { count: 0 };
+        if (userIds.length === 0) {
+            return { success: true, data: { count: 0 } };
+        }
+
+        const formattedDate = weekStart.toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+        });
+
+        // Get shift counts per user for personalized message
+        const shiftCounts = await prisma.schedule.groupBy({
+            by: ["userId"],
+            where: {
+                shiftStart: {
+                    gte: weekStart,
+                    lt: weekEnd,
+                },
+                isPublished: true,
+            },
+            _count: { id: true },
+        });
+
+        const countMap = new Map(shiftCounts.map((s) => [s.userId, s._count.id]));
+
+        // Create personalized notifications for each user
+        const notifications = userIds.map((userId) => {
+            const shiftCount = countMap.get(userId) || 0;
+            const shiftText = shiftCount === 1 ? "1 shift" : `${shiftCount} shifts`;
+            return {
+                userId,
+                type: "SCHEDULE_PUBLISHED" as const,
+                title: "New Schedule Published",
+                message: `Your schedule for the week of ${formattedDate} is ready. You have ${shiftText} scheduled.`,
+                actionUrl: "/schedule",
+            };
+        });
+
+        // Create all notifications
+        await prisma.notification.createMany({
+            data: notifications,
+        });
+
+        return { success: true, data: { count: userIds.length } };
+    } catch (error) {
+        console.error("notifySchedulePublished error:", error);
+        return { success: false, error: "Failed to send notifications" };
     }
-
-    const formattedDate = weekStart.toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-    });
-
-    // Get shift counts per user for personalized message
-    const shiftCounts = await prisma.schedule.groupBy({
-        by: ["userId"],
-        where: {
-            shiftStart: {
-                gte: weekStart,
-                lt: weekEnd,
-            },
-            isPublished: true,
-        },
-        _count: { id: true },
-    });
-
-    const countMap = new Map(shiftCounts.map((s) => [s.userId, s._count.id]));
-
-    // Create personalized notifications for each user
-    const notifications = userIds.map((userId) => {
-        const shiftCount = countMap.get(userId) || 0;
-        const shiftText = shiftCount === 1 ? "1 shift" : `${shiftCount} shifts`;
-        return {
-            userId,
-            type: "SCHEDULE_PUBLISHED" as const,
-            title: "New Schedule Published",
-            message: `Your schedule for the week of ${formattedDate} is ready. You have ${shiftText} scheduled.`,
-            actionUrl: "/schedule",
-        };
-    });
-
-    // Create all notifications
-    await prisma.notification.createMany({
-        data: notifications,
-    });
-
-    return { count: userIds.length };
 }
 
 // SOP Notifications
@@ -379,33 +481,38 @@ export async function notifySOPRequiresAck(
     sopId: string,
     sopTitle: string
 ) {
-    // Get all active users who haven't acknowledged
-    const users = await prisma.user.findMany({
-        where: {
-            isActive: true,
-            role: { in: ["DISPATCHER", "ADMIN", "SUPER_ADMIN"] },
-            NOT: {
-                sopReads: {
-                    some: {
-                        sopId,
-                        acknowledged: true,
+    try {
+        // Get all active users who haven't acknowledged
+        const users = await prisma.user.findMany({
+            where: {
+                isActive: true,
+                role: { in: ["DISPATCHER", "ADMIN", "SUPER_ADMIN"] },
+                NOT: {
+                    sopReads: {
+                        some: {
+                            sopId,
+                            acknowledged: true,
+                        },
                     },
                 },
             },
-        },
-        select: { id: true },
-    });
+            select: { id: true },
+        });
 
-    const userIds = users.map((u) => u.id);
+        const userIds = users.map((u) => u.id);
 
-    return createNotificationsForUsers(userIds, {
-        type: "SOP_REQUIRES_ACK",
-        title: "SOP Requires Acknowledgment",
-        message: `Please read and acknowledge: ${sopTitle}`,
-        entityType: "SOP",
-        entityId: sopId,
-        actionUrl: "/sops",
-    });
+        return createNotificationsForUsers(userIds, {
+            type: "SOP_REQUIRES_ACK",
+            title: "SOP Requires Acknowledgment",
+            message: `Please read and acknowledge: ${sopTitle}`,
+            entityType: "SOP",
+            entityId: sopId,
+            actionUrl: "/sops",
+        });
+    } catch (error) {
+        console.error("notifySOPRequiresAck error:", error);
+        return { success: false, error: "Failed to send notifications" };
+    }
 }
 
 // Admin notifications for pending requests
@@ -414,29 +521,34 @@ export async function notifyAdminsOfPendingRequest(
     requestId: string,
     requesterName: string
 ) {
-    // Get all admins
-    const admins = await prisma.user.findMany({
-        where: {
-            role: { in: ["ADMIN", "SUPER_ADMIN"] },
-            isActive: true,
-        },
-        select: { id: true },
-    });
+    try {
+        // Get all admins
+        const admins = await prisma.user.findMany({
+            where: {
+                role: { in: ["ADMIN", "SUPER_ADMIN"] },
+                isActive: true,
+            },
+            select: { id: true },
+        });
 
-    const userIds = admins.map((a) => a.id);
-    const title = requestType === "TIME_OFF"
-        ? "Time Off Request Pending"
-        : "Shift Swap Pending Approval";
-    const message = requestType === "TIME_OFF"
-        ? `${requesterName} submitted a time off request.`
-        : `${requesterName}'s shift swap is pending your approval.`;
+        const userIds = admins.map((a) => a.id);
+        const title = requestType === "TIME_OFF"
+            ? "Time Off Request Pending"
+            : "Shift Swap Pending Approval";
+        const message = requestType === "TIME_OFF"
+            ? `${requesterName} submitted a time off request.`
+            : `${requesterName}'s shift swap is pending your approval.`;
 
-    return createNotificationsForUsers(userIds, {
-        type: "GENERAL",
-        title,
-        message,
-        entityType: requestType === "TIME_OFF" ? "TimeOffRequest" : "ShiftSwapRequest",
-        entityId: requestId,
-        actionUrl: "/admin/requests",
-    });
+        return createNotificationsForUsers(userIds, {
+            type: "GENERAL",
+            title,
+            message,
+            entityType: requestType === "TIME_OFF" ? "TimeOffRequest" : "ShiftSwapRequest",
+            entityId: requestId,
+            actionUrl: "/admin/requests",
+        });
+    } catch (error) {
+        console.error("notifyAdminsOfPendingRequest error:", error);
+        return { success: false, error: "Failed to send notifications" };
+    }
 }

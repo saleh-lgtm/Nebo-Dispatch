@@ -133,6 +133,80 @@ export const updateNoteSchema = z.object({
     content: z.string().min(10, "Content must be at least 10 characters").optional(),
 });
 
+// ===== PRESENCE SCHEMAS =====
+
+export const updatePresenceSchema = z.object({
+    currentPage: z.string().max(200).optional(),
+});
+
+// ===== SMS CONTACT SCHEMAS =====
+
+export const updateSMSContactSchema = z.object({
+    name: z.string().max(100).optional(),
+    customLabel: z.string().max(100).optional(),
+    notes: z.string().max(1000).optional(),
+});
+
+export const linkContactSchema = z.object({
+    phoneNumber: z.string().min(10, "Invalid phone number"),
+    entityId: z.string().min(1, "Entity ID is required"),
+});
+
+export const searchQuerySchema = z.object({
+    query: z.string().min(1, "Search query is required").max(100),
+});
+
+// ===== CONTACT SCHEMAS =====
+
+export const createContactSchema = z.object({
+    name: z.string().min(2, "Name must be at least 2 characters").max(100),
+    email: z.string().email("Invalid email").optional().or(z.literal("")),
+    phone: z.string().max(20).optional(),
+    company: z.string().max(100).optional(),
+    notes: z.string().max(1000).optional(),
+});
+
+export const updateContactSchema = z.object({
+    name: z.string().min(2).max(100).optional(),
+    email: z.string().email().optional().or(z.literal("")),
+    phone: z.string().max(20).optional(),
+    company: z.string().max(100).optional(),
+    notes: z.string().max(1000).optional(),
+});
+
+// ===== NOTIFICATION SCHEMAS =====
+
+export const createNotificationSchema = z.object({
+    userId: z.string().min(1, "User ID is required"),
+    type: z.enum([
+        "GENERAL", "SHIFT_SWAP_REQUEST", "SHIFT_SWAP_RESPONSE",
+        "SHIFT_SWAP_APPROVED", "SHIFT_SWAP_REJECTED",
+        "TIME_OFF_APPROVED", "TIME_OFF_REJECTED",
+        "TASK_ASSIGNED", "SCHEDULE_PUBLISHED", "SOP_REQUIRES_ACK"
+    ]),
+    title: z.string().min(1).max(200),
+    message: z.string().min(1).max(1000),
+    entityType: z.string().max(50).optional(),
+    entityId: z.string().optional(),
+    actionUrl: z.string().max(500).optional(),
+});
+
+// ===== EVENT SCHEMAS =====
+
+export const createEventSchema = z.object({
+    title: z.string().min(2, "Title must be at least 2 characters").max(200),
+    description: z.string().max(2000).optional(),
+    eventDate: z.coerce.date(),
+    endDate: z.coerce.date().optional(),
+    eventType: z.enum(["GAME_DAY", "CONCERT", "CONFERENCE", "HOLIDAY", "PROMOTION", "GENERAL"]).optional(),
+    location: z.string().max(200).optional(),
+    notes: z.string().max(2000).optional(),
+    expectedVolume: z.string().max(100).optional(),
+    staffingNotes: z.string().max(1000).optional(),
+});
+
+export const updateEventSchema = createEventSchema.partial();
+
 // ===== HELPER FUNCTIONS =====
 
 export type LoginInput = z.infer<typeof loginSchema>;
@@ -145,6 +219,13 @@ export type CreateAffiliateInput = z.infer<typeof createAffiliateSchema>;
 export type ShiftReportInput = z.infer<typeof shiftReportSchema>;
 export type CreateNoteInput = z.infer<typeof createNoteSchema>;
 export type UpdateNoteInput = z.infer<typeof updateNoteSchema>;
+export type UpdatePresenceInput = z.infer<typeof updatePresenceSchema>;
+export type UpdateSMSContactInput = z.infer<typeof updateSMSContactSchema>;
+export type CreateContactInput = z.infer<typeof createContactSchema>;
+export type UpdateContactInput = z.infer<typeof updateContactSchema>;
+export type CreateNotificationInput = z.infer<typeof createNotificationSchema>;
+export type CreateEventInput = z.infer<typeof createEventSchema>;
+export type UpdateEventInput = z.infer<typeof updateEventSchema>;
 
 /**
  * Validate data against a schema and return typed result or errors

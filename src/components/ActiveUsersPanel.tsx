@@ -43,12 +43,12 @@ export default function ActiveUsersPanel({
         // Refresh user list every 30 seconds
         const refreshInterval = setInterval(async () => {
             try {
-                const [online, active] = await Promise.all([
+                const [onlineResult, activeResult] = await Promise.all([
                     getOnlineUsers(),
                     getActiveShiftUsers(),
                 ]);
-                setOnlineUsers(online);
-                setActiveShiftUsers(active);
+                if (onlineResult.success) setOnlineUsers(onlineResult.data);
+                if (activeResult.success) setActiveShiftUsers(activeResult.data);
                 setLastRefresh(new Date());
             } catch (e) {
                 console.error("Failed to refresh users:", e);
@@ -70,12 +70,12 @@ export default function ActiveUsersPanel({
 
     const handleRefresh = async () => {
         try {
-            const [online, active] = await Promise.all([
+            const [onlineResult, activeResult] = await Promise.all([
                 getOnlineUsers(),
                 getActiveShiftUsers(),
             ]);
-            setOnlineUsers(online);
-            setActiveShiftUsers(active);
+            if (onlineResult.success) setOnlineUsers(onlineResult.data);
+            if (activeResult.success) setActiveShiftUsers(activeResult.data);
             setLastRefresh(new Date());
         } catch (e) {
             console.error("Failed to refresh users:", e);

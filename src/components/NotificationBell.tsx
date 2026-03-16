@@ -47,12 +47,12 @@ export default function NotificationBell() {
     // Fetch notifications
     const fetchNotifications = async () => {
         try {
-            const [notifs, count] = await Promise.all([
+            const [notifsResult, countResult] = await Promise.all([
                 getMyNotifications({ limit: 20 }),
                 getUnreadNotificationCount(),
             ]);
-            setNotifications(notifs);
-            setUnreadCount(count);
+            if (notifsResult.success) setNotifications(notifsResult.data);
+            if (countResult.success) setUnreadCount(countResult.data);
         } catch (error) {
             console.error("Failed to fetch notifications:", error);
         }

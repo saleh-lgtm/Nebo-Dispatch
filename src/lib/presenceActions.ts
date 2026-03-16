@@ -2,131 +2,178 @@
 
 import prisma from "@/lib/prisma";
 import { requireAuth, requireAdmin } from "./auth-helpers";
+import { updatePresenceSchema } from "./schemas";
 
 const ONLINE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 
 export async function updatePresence(currentPage?: string) {
-    const session = await requireAuth();
+    try {
+        const session = await requireAuth();
 
-    await prisma.userPresence.upsert({
-        where: { userId: session.user.id },
-        update: {
-            isOnline: true,
-            lastSeenAt: new Date(),
-            currentPage,
-        },
-        create: {
-            userId: session.user.id,
-            isOnline: true,
-            lastSeenAt: new Date(),
-            currentPage,
-        },
-    });
+        // Validate input
+        const parseResult = updatePresenceSchema.safeParse({ currentPage });
+        if (!parseResult.success) {
+            return { success: false, error: "Invalid input" };
+        }
+
+        await prisma.userPresence.upsert({
+            where: { userId: session.user.id },
+            update: {
+                isOnline: true,
+                lastSeenAt: new Date(),
+                currentPage: parseResult.data.currentPage,
+            },
+            create: {
+                userId: session.user.id,
+                isOnline: true,
+                lastSeenAt: new Date(),
+                currentPage: parseResult.data.currentPage,
+            },
+        });
+
+        return { success: true };
+    } catch (error) {
+        console.error("updatePresence error:", error);
+        return { success: false, error: "Failed to update presence" };
+    }
 }
 
 export async function setOffline() {
-    const session = await requireAuth();
+    try {
+        const session = await requireAuth();
 
-    await prisma.userPresence.upsert({
-        where: { userId: session.user.id },
-        update: {
-            isOnline: false,
-            lastSeenAt: new Date(),
-        },
-        create: {
-            userId: session.user.id,
-            isOnline: false,
-            lastSeenAt: new Date(),
-        },
-    });
+        await prisma.userPresence.upsert({
+            where: { userId: session.user.id },
+            update: {
+                isOnline: false,
+                lastSeenAt: new Date(),
+            },
+            create: {
+                userId: session.user.id,
+                isOnline: false,
+                lastSeenAt: new Date(),
+            },
+        });
+
+        return { success: true };
+    } catch (error) {
+        console.error("setOffline error:", error);
+        return { success: false, error: "Failed to set offline" };
+    }
 }
 
 export async function getOnlineUsers() {
-    await requireAuth();
+    try {
+        await requireAuth();
 
-    const threshold = new Date(Date.now() - ONLINE_THRESHOLD_MS);
+        const threshold = new Date(Date.now() - ONLINE_THRESHOLD_MS);
 
-    const presences = await prisma.userPresence.findMany({
-        where: {
-            lastSeenAt: { gte: threshold },
-        },
-        include: {
-            user: {
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    role: true,
+        const presences = await prisma.userPresence.findMany({
+            where: {
+                lastSeenAt: { gte: threshold },
+            },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        role: true,
+                    },
                 },
             },
-        },
-        orderBy: { lastSeenAt: "desc" },
-    });
+            orderBy: { lastSeenAt: "desc" },
+        });
 
-    return presences.map((p) => ({
-        ...p.user,
-        currentPage: p.currentPage,
-        lastSeenAt: p.lastSeenAt,
-    }));
+        const data = presences.map((p) => ({
+            ...p.user,
+            currentPage: p.currentPage,
+            lastSeenAt: p.lastSeenAt,
+        }));
+
+        return { success: true, data };
+    } catch (error) {
+        console.error("getOnlineUsers error:", error);
+        return { success: false, error: "Failed to get online users", data: [] };
+    }
 }
 
 export async function getOnlineCount() {
-    await requireAuth();
+    try {
+        await requireAuth();
 
-    const threshold = new Date(Date.now() - ONLINE_THRESHOLD_MS);
+        const threshold = new Date(Date.now() - ONLINE_THRESHOLD_MS);
 
-    return prisma.userPresence.count({
-        where: {
-            lastSeenAt: { gte: threshold },
-        },
-    });
+        const count = await prisma.userPresence.count({
+            where: {
+                lastSeenAt: { gte: threshold },
+            },
+        });
+
+        return { success: true, data: count };
+    } catch (error) {
+        console.error("getOnlineCount error:", error);
+        return { success: false, error: "Failed to get online count", data: 0 };
+    }
 }
 
 export async function getActiveShiftUsers() {
-    await requireAuth();
+    try {
+        await requireAuth();
 
-    // Users with active shifts (clocked in, not clocked out)
-    const activeShifts = await prisma.shift.findMany({
-        where: {
-            clockOut: null,
-        },
-        include: {
-            user: {
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    role: true,
+        // Users with active shifts (clocked in, not clocked out)
+        const activeShifts = await prisma.shift.findMany({
+            where: {
+                clockOut: null,
+            },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        role: true,
+                    },
                 },
             },
-        },
-        orderBy: { clockIn: "desc" },
-    });
+            orderBy: { clockIn: "desc" },
+        });
 
-    return activeShifts.map((s) => ({
-        ...s.user,
-        clockIn: s.clockIn,
-        shiftId: s.id,
-    }));
+        const data = activeShifts.map((s) => ({
+            ...s.user,
+            clockIn: s.clockIn,
+            shiftId: s.id,
+        }));
+
+        return { success: true, data };
+    } catch (error) {
+        console.error("getActiveShiftUsers error:", error);
+        return { success: false, error: "Failed to get active shift users", data: [] };
+    }
 }
 
 // Admin function to get full presence info
 export async function getPresenceReport() {
-    await requireAdmin();
+    try {
+        await requireAdmin();
 
-    const threshold = new Date(Date.now() - ONLINE_THRESHOLD_MS);
+        const threshold = new Date(Date.now() - ONLINE_THRESHOLD_MS);
 
-    const [online, activeShifts, total] = await Promise.all([
-        prisma.userPresence.count({
-            where: { lastSeenAt: { gte: threshold } },
-        }),
-        prisma.shift.count({
-            where: { clockOut: null },
-        }),
-        prisma.user.count({
-            where: { isActive: true },
-        }),
-    ]);
+        const [online, activeShifts, total] = await Promise.all([
+            prisma.userPresence.count({
+                where: { lastSeenAt: { gte: threshold } },
+            }),
+            prisma.shift.count({
+                where: { clockOut: null },
+            }),
+            prisma.user.count({
+                where: { isActive: true },
+            }),
+        ]);
 
-    return { online, activeShifts, total };
+        return { success: true, data: { online, activeShifts, total } };
+    } catch (error) {
+        console.error("getPresenceReport error:", error);
+        return { success: false, error: "Failed to get presence report", data: { online: 0, activeShifts: 0, total: 0 } };
+    }
 }

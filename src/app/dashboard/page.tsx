@@ -141,10 +141,10 @@ export default async function DashboardPage() {
         safePromise(getPendingQuotes(), []),
 
         // Online users
-        safePromise(getOnlineUsers(), []),
+        safePromise(getOnlineUsers().then(r => r.success ? r.data : []), []),
 
         // Users with active shifts
-        safePromise(getActiveShiftUsers(), []),
+        safePromise(getActiveShiftUsers().then(r => r.success ? r.data : []), []),
 
         // Recent reports - for super admin show all, for dispatchers show their own
         safePromise(
@@ -161,7 +161,7 @@ export default async function DashboardPage() {
         ),
 
         // Upcoming events
-        safePromise(getUpcomingEvents(10), []),
+        safePromise(getUpcomingEvents(10).then(r => r.success ? r.data : []), []),
 
         // Next scheduled shift for non-super-admin
         safePromise(
