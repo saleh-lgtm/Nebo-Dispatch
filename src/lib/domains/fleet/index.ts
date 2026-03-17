@@ -86,11 +86,13 @@ export {
   getAvailableFleetVehicles,
   getVehicleChauffeurs,
 
-  // Constants
+} from "../../driverActions";
+
+export {
   VEHICLE_TYPES,
   SHIFT_OPTIONS,
   DAY_OPTIONS,
-} from "../../driverActions";
+} from "../../driverConstants";
 
 // ============================================
 // VEHICLE MAPPING ACTIONS (vehicleMappingActions.ts)

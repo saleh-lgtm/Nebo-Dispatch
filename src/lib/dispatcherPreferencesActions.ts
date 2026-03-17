@@ -16,10 +16,6 @@ export interface DispatcherPreferencesData {
     blackoutDates: string[];
 }
 
-// Valid day and shift options
-export const VALID_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-export const VALID_SHIFTS = ["Morning", "Evening", "Night", "Overnight"];
-
 /**
  * Get the current user's dispatcher preferences
  */

@@ -7,7 +7,7 @@ import { AccountingFlagStatus, BillingReviewReason } from "@prisma/client";
 import { createAuditLog } from "./auditActions";
 
 // Human-readable labels for billing review reasons
-export const BILLING_REVIEW_REASON_LABELS: Record<BillingReviewReason, string> = {
+const BILLING_REVIEW_REASON_LABELS: Record<BillingReviewReason, string> = {
     EXTRA_WAITING_TIME: "Extra Waiting Time",
     EXTRA_STOPS: "Additional Stops",
     ROUTE_CHANGE: "Route Change",
