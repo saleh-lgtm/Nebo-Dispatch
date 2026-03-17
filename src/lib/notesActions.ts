@@ -532,21 +532,43 @@ export async function getAllAnnouncementsWithStats() {
     try {
         await requireAdmin();
 
-        const announcements = await prisma.globalNote.findMany({
-            where: { isAnnouncement: true },
-            include: {
-                author: { select: { id: true, name: true } },
-                _count: {
-                    select: { reads: true },
+        const [announcements, totalUsers] = await Promise.all([
+            prisma.globalNote.findMany({
+                where: { isAnnouncement: true },
+                include: {
+                    author: { select: { id: true, name: true } },
+                    reads: {
+                        select: { acknowledged: true },
+                    },
                 },
-            },
-            orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
-        });
+                orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
+            }),
+            prisma.user.count({
+                where: {
+                    isActive: true,
+                    approvalStatus: "APPROVED",
+                    role: { in: ["DISPATCHER", "ADMIN", "SUPER_ADMIN"] },
+                },
+            }),
+        ]);
 
-        return { success: true, data: announcements };
+        const data = announcements.map((a) => ({
+            id: a.id,
+            title: a.title,
+            content: a.content,
+            createdAt: a.createdAt,
+            updatedAt: a.updatedAt,
+            author: a.author,
+            isAnnouncement: a.isAnnouncement,
+            isPinned: a.isPinned,
+            expiresAt: a.expiresAt,
+            acknowledgedCount: a.reads.filter((r) => r.acknowledged).length,
+        }));
+
+        return { success: true, data, totalUsers };
     } catch (error) {
         console.error("getAllAnnouncementsWithStats error:", error);
-        return { success: false, error: "Failed to get announcements", data: [] };
+        return { success: false, error: "Failed to get announcements", data: [], totalUsers: 0 };
     }
 }
 

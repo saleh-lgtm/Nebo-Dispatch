@@ -26,11 +26,12 @@ export default async function NotesPage() {
 
     const result = await getAllAnnouncementsWithStats();
     const announcements = result.success && result.data ? result.data : [];
+    const totalUsers = result.success ? (result.totalUsers ?? 0) : 0;
 
     return (
         <NotesClient
-            initialNotes={announcements as never}
-            currentUserId={session.user.id}
+            initialNotes={announcements}
+            totalUsers={totalUsers}
         />
     );
 }
