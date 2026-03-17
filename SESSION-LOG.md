@@ -4,6 +4,71 @@ Permanent session history. Newest entries at top.
 
 ---
 
+### Session — 2026-03-17 ~Afternoon
+**Focus:** Roll out ToggleGroup to MobileSchedulerClient (Batch 1 of shared UI rollout)
+**Changes:**
+- Modified: src/app/admin/scheduler/MobileSchedulerClient.tsx — replaced 3 manual toggle implementations (shift type, duration, market) with shared ToggleGroup component
+- Commits:
+  - 281e44e refactor: roll out ToggleGroup to MobileSchedulerClient
+**Decisions:** Duration picker (4h/6h/8h/10h/12h) uses ToggleGroup with string↔number conversion since ToggleGroup values are strings. Both scheduler views (desktop + mobile) now use identical shared components.
+**Issues Found:** CommandSchedulerClient already had ToggleGroup from previous session — only MobileSchedulerClient needed work. No PillSelector instances found in either scheduler file.
+
+---
+
+### Session — 2026-03-16 ~Late Night (5)
+**Focus:** Shared UI component library (3/3) + loading skeleton conversion + API route input validation
+**Changes:**
+- Created: src/styles/loading.module.css — shared skeleton animation styles (pulse/shimmer)
+- Modified: src/app/loading.tsx — converted from Tailwind to CSS Modules
+- Modified: src/app/dashboard/loading.tsx — converted from Tailwind to CSS Modules
+- Modified: src/app/tbr-trips/loading.tsx — converted from Tailwind to CSS Modules
+- Modified: src/app/accounting/loading.tsx — converted from Tailwind to CSS Modules
+- Modified: src/app/admin/loading.tsx — converted from Tailwind to CSS Modules
+- Modified: src/app/api/confirmations/debug/route.ts — added Zod query param validation (take, status)
+- Modified: src/app/api/presence/offline/route.ts — added Zod body validation, rejects unexpected fields
+- Modified: src/app/api/pricing/import/route.ts — added 10MB file size limit, MIME type allowlist, .csv support
+- Created: src/components/ui/ToggleGroup.tsx + ToggleGroup.module.css — shared toggle button group
+- Modified: src/app/admin/scheduler/CommandSchedulerClient.tsx — replaced shift type + market toggles with ToggleGroup
+- Created: src/components/ui/TabBar.tsx + TabBar.module.css — shared tab nav (pill + underline variants)
+- Modified: src/app/admin/confirmations/ConfirmationsClient.tsx — replaced 36-line tab nav with TabBar
+- Modified: src/app/admin/confirmations/Confirmations.module.css — removed 65 lines of old tab CSS
+- Created: src/components/ui/PillSelector.tsx + PillSelector.module.css — shared pill/chip selector
+- Modified: src/app/portals/PortalsClient.tsx — replaced category pills with PillSelector, removed inline styles
+- Modified: src/components/ui/index.ts — exported ToggleGroup, TabBar, PillSelector
+- Commits:
+  - 4ab620b fix: convert 5 loading skeletons from Tailwind to CSS Modules
+  - 6668a62 fix: add input validation to 3 API routes (confirmations/debug, presence/offline, pricing/import)
+  - 5f14bc0 feat: add shared ToggleGroup component, replace scheduler toggles
+  - 37b4ead feat: add shared TabBar component, replace confirmations tabs
+  - f75a968 feat: add shared PillSelector component, replace portals category pills
+**Decisions:**
+- Three shared UI components cover all toggle/tab/pill patterns: ToggleGroup (mutually exclusive buttons), TabBar (tab nav with pill/underline variants), PillSelector (filterable chip selectors with multi-select)
+- TabBar supports: count badges, danger badges, loading indicators, disabled state, icons
+- PillSelector supports: single/multi-select, custom colors via color-mix(), count badges, icons
+- ToggleGroup supports: custom colors via CSS variable, sm/md sizes, fullWidth
+- Scheduler shift type / market toggle CSS classes had no CSS definitions — were completely unstyled
+**Issues Found:**
+- CommandSchedulerClient shift type and market selector had CSS classes referenced but never defined in any CSS file
+- confirmations/debug Zod enum initially mismatched Prisma ConfirmationStatus — fixed by importing enum from @prisma/client
+
+---
+
+### Session — 2026-03-16 ~Late Night (4)
+**Focus:** Tailwind audit + RequestsClient CSS Modules conversion + push-to-la auth fix
+**Changes:**
+- Rewritten: src/app/admin/requests/RequestsClient.tsx — converted all Tailwind utility classes to CSS Modules
+- Created: src/app/admin/requests/Requests.module.css — full CSS Modules stylesheet for requests page
+- Modified: src/app/api/tbr/push-to-la/route.ts — added NextAuth session-based auth as third accepted method (alongside header secret and Basic Auth)
+- Commits:
+  - 85a9502 fix: convert RequestsClient from Tailwind to CSS Modules
+  - 4215692 fix: pass auth credentials when calling push-to-la endpoint
+**Decisions:** push-to-la endpoint accepts 3 auth methods: (1) NextAuth session cookie for browser calls, (2) x-tbr-ingest-secret header, (3) Basic Auth — browser fetch sends cookies automatically so no client-side changes needed.
+**Issues Found:**
+- Audit found 5 loading skeleton files still using Tailwind classes (loading.tsx in root, dashboard, tbr-trips, accounting, admin) — not yet converted
+- push-to-la was rejecting legitimate browser calls because recent auth addition didn't account for same-origin session-based callers
+
+---
+
 ### Session — 2026-03-16 ~Late Night (3)
 **Focus:** Fix broken edit/delete buttons on Company Announcements page + redesign cards
 **Changes:**
