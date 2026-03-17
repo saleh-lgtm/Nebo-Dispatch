@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { Phone, BarChart3, Users, ShieldAlert, ListFilter } from "lucide-react";
+import TabBar from "@/components/ui/TabBar";
 import { getAllConfirmations, completeConfirmation, getConfirmationTabData } from "@/lib/tripConfirmationActions";
 import { useRouter } from "next/navigation";
 import {
@@ -289,44 +290,16 @@ export default function ConfirmationsClient({
             </header>
 
             {/* Tab Navigation */}
-            <nav className={styles.tabNav}>
-                <button
-                    className={`${styles.tabBtn} ${selectedTab === "trips" ? styles.tabBtnActive : ""}`}
-                    onClick={() => handleTabSelect("trips")}
-                >
-                    <ListFilter size={16} />
-                    All Trips
-                    <span className={`${styles.tabCount} ${selectedTab !== "trips" ? styles.tabCountInactive : ""}`}>{totalCount}</span>
-                </button>
-                <button
-                    className={`${styles.tabBtn} ${selectedTab === "overview" ? styles.tabBtnActive : ""}`}
-                    onClick={() => handleTabSelect("overview")}
-                    disabled={tabLoading === "overview"}
-                >
-                    <BarChart3 size={16} />
-                    Analytics
-                    {tabLoading === "overview" && <span className={styles.tabLoading}>...</span>}
-                </button>
-                <button
-                    className={`${styles.tabBtn} ${selectedTab === "dispatchers" ? styles.tabBtnActive : ""}`}
-                    onClick={() => handleTabSelect("dispatchers")}
-                    disabled={tabLoading === "dispatchers"}
-                >
-                    <Users size={16} />
-                    Dispatchers
-                    {tabLoading === "dispatchers" && <span className={styles.tabLoading}>...</span>}
-                </button>
-                <button
-                    className={`${styles.tabBtn} ${selectedTab === "accountability" ? styles.tabBtnActive : ""}`}
-                    onClick={() => handleTabSelect("accountability")}
-                    disabled={tabLoading === "accountability"}
-                >
-                    <ShieldAlert size={16} />
-                    Accountability
-                    {tabLoading === "accountability" && <span className={styles.tabLoading}>...</span>}
-                    {totalMissed > 0 && !tabLoading && <span className={styles.missedBadge}>{totalMissed}</span>}
-                </button>
-            </nav>
+            <TabBar
+                tabs={[
+                    { value: "trips", label: "All Trips", icon: <ListFilter size={16} />, count: totalCount },
+                    { value: "overview", label: "Analytics", icon: <BarChart3 size={16} />, loading: tabLoading === "overview" },
+                    { value: "dispatchers", label: "Dispatchers", icon: <Users size={16} />, loading: tabLoading === "dispatchers" },
+                    { value: "accountability", label: "Accountability", icon: <ShieldAlert size={16} />, loading: tabLoading === "accountability", badge: totalMissed },
+                ]}
+                activeTab={selectedTab}
+                onChange={(v) => handleTabSelect(v as "trips" | "overview" | "dispatchers" | "accountability")}
+            />
 
             {/* ALL TRIPS TAB */}
             {selectedTab === "trips" && (

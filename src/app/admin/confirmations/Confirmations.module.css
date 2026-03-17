@@ -88,72 +88,6 @@
 .headerStatSuccess .statNumber { color: var(--success); }
 .headerStatWarning .statNumber { color: var(--warning); }
 
-/* ===== TAB NAVIGATION ===== */
-.tabNav {
-    display: flex;
-    gap: 0.25rem;
-    margin-bottom: 1.5rem;
-    padding: 0.25rem;
-    background: var(--bg-surface);
-    border-radius: 12px;
-    border: 1px solid var(--border);
-    width: fit-content;
-}
-
-.tabBtn {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.25rem;
-    background: transparent;
-    border: none;
-    border-radius: 8px;
-    color: var(--text-secondary);
-    font-size: 0.875rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.tabBtn:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-}
-
-.tabBtnActive {
-    background: var(--accent);
-    color: white;
-    box-shadow: 0 2px 8px var(--accent-glow);
-}
-
-.tabCount {
-    background: rgba(255,255,255,0.2);
-    padding: 0.125rem 0.5rem;
-    border-radius: 9999px;
-    font-size: 0.75rem;
-    font-weight: 700;
-}
-
-.tabCountInactive {
-    background: var(--bg-hover);
-    color: var(--text-muted);
-}
-
-.missedBadge {
-    background: var(--danger);
-    color: white;
-    padding: 0.125rem 0.5rem;
-    border-radius: 9999px;
-    font-size: 0.75rem;
-    font-weight: 700;
-}
-
-.tabLoading {
-    font-size: 0.75rem;
-    color: var(--accent-blue);
-    margin-left: 0.25rem;
-}
-
 /* ===== TRIPS TAB ===== */
 .tripsContent {
     display: flex;
@@ -177,16 +111,6 @@
         justify-content: space-between;
     }
 
-    .tabNav {
-        width: 100%;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    .tabBtn {
-        white-space: nowrap;
-        padding: 0.625rem 1rem;
-    }
 }
 
 @media (max-width: 480px) {

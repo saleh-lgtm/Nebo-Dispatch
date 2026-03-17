@@ -25,6 +25,7 @@ export { default as FileUpload } from "./FileUpload";
 
 // Interactive components
 export { default as ToggleGroup, type ToggleOption } from "./ToggleGroup";
+export { default as TabBar, type Tab as TabBarTab } from "./TabBar";
 
 // Feedback components
 export { default as Toast, type ToastType } from "./Toast";

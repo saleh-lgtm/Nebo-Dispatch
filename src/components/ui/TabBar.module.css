@@ -1,0 +1,165 @@
+/* ===========================================
+   TabBar — shared tab navigation component
+   =========================================== */
+
+/* ===========================================
+   Pill variant (default)
+   =========================================== */
+
+.pillNav {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background: var(--bg-surface, rgba(255, 255, 255, 0.04));
+  border-radius: 12px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  width: fit-content;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.pillNav::-webkit-scrollbar {
+  display: none;
+}
+
+.pillTab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  min-height: 44px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-secondary, #9ca3af);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pillTab:hover:not(.pillTabActive):not(:disabled) {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  color: var(--text-primary, #e5e7eb);
+}
+
+.pillTab:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pillTabActive {
+  background: var(--accent, #3b82f6);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 2px 8px var(--accent-glow, rgba(59, 130, 246, 0.3));
+}
+
+/* ===========================================
+   Underline variant
+   =========================================== */
+
+.underlineNav {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.underlineNav::-webkit-scrollbar {
+  display: none;
+}
+
+.underlineTab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  min-height: 44px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--text-secondary, #9ca3af);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.underlineTab:hover:not(.underlineTabActive):not(:disabled) {
+  color: var(--text-primary, #e5e7eb);
+  border-bottom-color: rgba(255, 255, 255, 0.15);
+}
+
+.underlineTab:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.underlineTabActive {
+  color: var(--accent, #3b82f6);
+  border-bottom-color: var(--accent, #3b82f6);
+  font-weight: 600;
+}
+
+/* ===========================================
+   Badges & Extras
+   =========================================== */
+
+.count {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.countInactive {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  color: var(--text-muted, #6b7280);
+}
+
+.badge {
+  background: var(--danger, #ef4444);
+  color: white;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.loading {
+  font-size: 0.75rem;
+  color: var(--accent-blue, #60a5fa);
+  margin-left: 0.25rem;
+}
+
+/* ===========================================
+   Responsive
+   =========================================== */
+
+@media (max-width: 640px) {
+  .pillNav {
+    width: 100%;
+  }
+
+  .pillTab {
+    padding: 0.625rem 1rem;
+  }
+
+  .underlineTab {
+    padding: 0.625rem 1rem;
+  }
+}
