@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, X, User, Mail, Clock, AlertCircle, Globe, Phone, Building2 } from "lucide-react";
+import TabBar from "@/components/ui/TabBar";
 import { approveUser, rejectUser } from "@/lib/signupActions";
 import { approvePortal, rejectPortal } from "@/lib/portalActions";
 import { approveContact, rejectContact } from "@/lib/contactActions";
@@ -176,36 +177,15 @@ export default function ApprovalsClient({
             )}
 
             {/* Tabs */}
-            <div className="flex gap-2 mb-4">
-                {tabs.map((tab) => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                            activeTab === tab.id
-                                ? "bg-primary text-white"
-                                : "bg-muted text-secondary hover:bg-muted-hover"
-                        }`}
-                        style={{
-                            background: activeTab === tab.id ? "var(--accent)" : "var(--bg-muted)",
-                            color: activeTab === tab.id ? "white" : "var(--text-secondary)",
-                        }}
-                    >
-                        {tab.label}
-                        {tab.count > 0 && (
-                            <span
-                                className="ml-2 px-2 py-0.5 rounded-full text-xs"
-                                style={{
-                                    background: activeTab === tab.id ? "rgba(255,255,255,0.2)" : "var(--accent)",
-                                    color: activeTab === tab.id ? "white" : "white",
-                                }}
-                            >
-                                {tab.count}
-                            </span>
-                        )}
-                    </button>
-                ))}
-            </div>
+            <TabBar
+                tabs={tabs.map((tab) => ({
+                    value: tab.id,
+                    label: tab.label,
+                    count: tab.count > 0 ? tab.count : undefined,
+                }))}
+                activeTab={activeTab}
+                onChange={(v) => setActiveTab(v as TabType)}
+            />
 
             {/* Users Tab */}
             {activeTab === "users" && (

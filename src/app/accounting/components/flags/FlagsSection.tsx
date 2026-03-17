@@ -8,6 +8,7 @@ import {
     resolveAccountingFlag,
     getFlaggedReservations,
 } from "@/lib/accountingActions";
+import TabBar from "@/components/ui/TabBar";
 import styles from "../../Accounting.module.css";
 import FlagsStats from "./FlagsStats";
 import FlagsList from "./FlagsList";
@@ -105,20 +106,16 @@ export default function FlagsSection({
 
             {/* Filters */}
             <div className={styles.filtersSection}>
-                <div className={styles.tabs}>
-                    {(["PENDING", "IN_REVIEW", "RESOLVED", "ALL"] as const).map((tab) => (
-                        <button
-                            key={tab}
-                            onClick={() => handleTabChange(tab)}
-                            className={`${styles.tab} ${activeTab === tab ? styles.tabActive : ""}`}
-                        >
-                            {tab === "IN_REVIEW" ? "In Review" : tab.charAt(0) + tab.slice(1).toLowerCase()}
-                            {tab === "PENDING" && stats.pending > 0 && (
-                                <span className={styles.tabBadge}>{stats.pending}</span>
-                            )}
-                        </button>
-                    ))}
-                </div>
+                <TabBar
+                    tabs={[
+                        { value: "PENDING", label: "Pending", badge: stats.pending > 0 ? stats.pending : undefined },
+                        { value: "IN_REVIEW", label: "In Review" },
+                        { value: "RESOLVED", label: "Resolved" },
+                        { value: "ALL", label: "All" },
+                    ]}
+                    activeTab={activeTab}
+                    onChange={(v) => handleTabChange(v as typeof activeTab)}
+                />
                 <div className={styles.searchBox}>
                     <Search size={16} />
                     <input

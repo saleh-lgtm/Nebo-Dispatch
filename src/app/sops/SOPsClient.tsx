@@ -14,6 +14,7 @@ import {
     Loader2,
 } from "lucide-react";
 import { searchSOPs, toggleSOPFavorite } from "@/lib/sopActions";
+import TabBar from "@/components/ui/TabBar";
 
 interface SOP {
     id: string;
@@ -241,34 +242,17 @@ export default function SOPsClient({
             </div>
 
             {/* Tabs */}
-            <div className="tabs">
-                <button
-                    className={`tab ${activeTab === "all" ? "active" : ""}`}
-                    onClick={() => setActiveTab("all")}
-                >
-                    All SOPs
-                </button>
-                <button
-                    className={`tab ${activeTab === "favorites" ? "active" : ""}`}
-                    onClick={() => setActiveTab("favorites")}
-                >
-                    <Star size={14} />
-                    Favorites
-                    {favorites.size > 0 && (
-                        <span className="tab-badge">{favorites.size}</span>
-                    )}
-                </button>
-                {unacknowledgedSOPs.length > 0 && (
-                    <button
-                        className={`tab warning ${activeTab === "unread" ? "active" : ""}`}
-                        onClick={() => setActiveTab("unread")}
-                    >
-                        <AlertCircle size={14} />
-                        Needs Review
-                        <span className="tab-badge warning">{unacknowledgedSOPs.length}</span>
-                    </button>
-                )}
-            </div>
+            <TabBar
+                tabs={[
+                    { value: "all", label: "All SOPs" },
+                    { value: "favorites", label: "Favorites", icon: <Star size={14} />, count: favorites.size > 0 ? favorites.size : undefined },
+                    ...(unacknowledgedSOPs.length > 0
+                        ? [{ value: "unread", label: "Needs Review", icon: <AlertCircle size={14} />, badge: unacknowledgedSOPs.length }]
+                        : []),
+                ]}
+                activeTab={activeTab}
+                onChange={(v) => setActiveTab(v as "all" | "favorites" | "unread")}
+            />
 
             {/* Search Results */}
             {searchResults !== null ? (
@@ -439,63 +423,6 @@ export default function SOPsClient({
                 @keyframes spin {
                     from { transform: rotate(0deg); }
                     to { transform: rotate(360deg); }
-                }
-
-                /* Tabs */
-                .tabs {
-                    display: flex;
-                    gap: 0.5rem;
-                    margin-bottom: 1.5rem;
-                    overflow-x: auto;
-                    padding-bottom: 0.25rem;
-                }
-
-                .tab {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.375rem;
-                    padding: 0.5rem 1rem;
-                    background: var(--bg-secondary);
-                    border: 1px solid var(--border);
-                    border-radius: var(--radius-md);
-                    font-size: 0.875rem;
-                    font-weight: 500;
-                    color: var(--text-secondary);
-                    cursor: pointer;
-                    transition: all 0.15s;
-                    white-space: nowrap;
-                }
-
-                .tab:hover {
-                    border-color: var(--border-hover);
-                    color: var(--text-primary);
-                }
-
-                .tab.active {
-                    background: var(--primary);
-                    border-color: var(--primary);
-                    color: white;
-                }
-
-                .tab.warning.active {
-                    background: var(--warning);
-                    border-color: var(--warning);
-                }
-
-                .tab-badge {
-                    padding: 0.125rem 0.5rem;
-                    background: rgba(255, 255, 255, 0.2);
-                    border-radius: 9999px;
-                    font-size: 0.75rem;
-                }
-
-                .tab:not(.active) .tab-badge {
-                    background: var(--bg-hover);
-                }
-
-                .tab-badge.warning {
-                    background: var(--danger);
-                    color: white;
                 }
 
                 /* Content Sections */

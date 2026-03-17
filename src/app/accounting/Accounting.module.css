@@ -174,48 +174,6 @@
     flex-wrap: wrap;
 }
 
-.tabs {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.tab {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.625rem 1rem;
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text-secondary);
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.tab:hover {
-    background: var(--bg-hover);
-}
-
-.tabActive {
-    background: var(--accent);
-    color: white;
-    border-color: var(--accent);
-}
-
-.tabBadge {
-    background: var(--danger);
-    color: white;
-    padding: 0.125rem 0.5rem;
-    border-radius: 9999px;
-    font-size: 0.7rem;
-    font-weight: 600;
-}
-
-.tabActive .tabBadge {
-    background: rgba(255, 255, 255, 0.3);
-    color: white;
-}
 
 .searchBox {
     display: flex;

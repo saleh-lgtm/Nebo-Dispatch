@@ -18,6 +18,7 @@ import {
     Award,
     BarChart3,
 } from "lucide-react";
+import TabBar from "@/components/ui/TabBar";
 import { getAllShiftReports, reviewShiftReport, getDispatcherPerformance } from "@/lib/shiftReportActions";
 
 interface QuoteData {
@@ -317,20 +318,14 @@ export default function ReportsClient({
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-2">
-                <button
-                    onClick={() => setActiveTab("reports")}
-                    className={`btn ${activeTab === "reports" ? "btn-primary" : "btn-outline"}`}
-                >
-                    <FileText size={16} /> Reports
-                </button>
-                <button
-                    onClick={() => setActiveTab("performance")}
-                    className={`btn ${activeTab === "performance" ? "btn-primary" : "btn-outline"}`}
-                >
-                    <BarChart3 size={16} /> Team Performance
-                </button>
-            </div>
+            <TabBar
+                tabs={[
+                    { value: "reports", label: "Reports", icon: <FileText size={16} /> },
+                    { value: "performance", label: "Team Performance", icon: <BarChart3 size={16} /> },
+                ]}
+                activeTab={activeTab}
+                onChange={(v) => setActiveTab(v as "reports" | "performance")}
+            />
 
             {activeTab === "reports" && (
                 <>

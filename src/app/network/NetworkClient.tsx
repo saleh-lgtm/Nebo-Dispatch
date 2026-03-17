@@ -40,6 +40,7 @@ import {
 } from "@/lib/networkActions";
 import { useToast } from "@/hooks/useToast";
 import Modal from "@/components/ui/Modal";
+import TabBar from "@/components/ui/TabBar";
 import {
     AffiliatePricingGrid,
     AffiliateAttachments,
@@ -569,55 +570,28 @@ export default function NetworkClient({ initialPartners, session, isAdmin, pendi
                 <>
                     {/* Type Tabs */}
                     <div className="flex flex-col gap-4">
-                        <div className="flex gap-2 flex-wrap">
-                            {PARTNER_TYPES.map(({ key, label, icon: Icon }) => (
-                                <button
-                                    key={key}
-                                    onClick={() => setTypeTab(key)}
-                                    className={`btn ${typeTab === key ? "btn-primary" : "btn-ghost"}`}
-                                    style={{ minWidth: "130px" }}
-                                >
-                                    <Icon size={16} />
-                                    {label}
-                                    {isAdmin && getPendingCount(key) > 0 && (
-                                        <span className="badge badge-warning" style={{ marginLeft: "0.5rem" }}>
-                                            {getPendingCount(key)}
-                                        </span>
-                                    )}
-                                </button>
-                            ))}
-                        </div>
+                        <TabBar
+                            tabs={PARTNER_TYPES.map(({ key, label, icon: Icon }) => ({
+                                value: key,
+                                label,
+                                icon: <Icon size={16} />,
+                                badge: isAdmin && getPendingCount(key) > 0 ? getPendingCount(key) : undefined,
+                            }))}
+                            activeTab={typeTab}
+                            onChange={(v) => setTypeTab(v as PartnerType)}
+                        />
 
                         {/* Status Tabs - Admin Only */}
                         {isAdmin && (
-                            <div className="flex gap-2 flex-wrap">
-                                <button
-                                    onClick={() => setStatusTab("pending")}
-                                    className={`btn btn-sm ${statusTab === "pending" ? "btn-primary" : "btn-ghost"}`}
-                                >
-                                    <Clock size={14} />
-                                    Pending
-                                    {currentPendingCount > 0 && (
-                                        <span className="badge badge-warning" style={{ marginLeft: "0.25rem", fontSize: "0.7rem" }}>
-                                            {currentPendingCount}
-                                        </span>
-                                    )}
-                                </button>
-                                <button
-                                    onClick={() => setStatusTab("approved")}
-                                    className={`btn btn-sm ${statusTab === "approved" ? "btn-primary" : "btn-ghost"}`}
-                                >
-                                    <ShieldCheck size={14} />
-                                    Approved
-                                </button>
-                                <button
-                                    onClick={() => setStatusTab("all")}
-                                    className={`btn btn-sm ${statusTab === "all" ? "btn-primary" : "btn-ghost"}`}
-                                >
-                                    <Globe size={14} />
-                                    All
-                                </button>
-                            </div>
+                            <TabBar
+                                tabs={[
+                                    { value: "pending", label: "Pending", icon: <Clock size={14} />, badge: currentPendingCount > 0 ? currentPendingCount : undefined },
+                                    { value: "approved", label: "Approved", icon: <ShieldCheck size={14} /> },
+                                    { value: "all", label: "All", icon: <Globe size={14} /> },
+                                ]}
+                                activeTab={statusTab}
+                                onChange={(v) => setStatusTab(v as "all" | "pending" | "approved")}
+                            />
                         )}
                     </div>
 

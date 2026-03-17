@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { createPortal, updatePortal, deletePortal } from "@/lib/portalActions";
 import { createContact, updateContact, deleteContact } from "@/lib/contactActions";
+import TabBar from "@/components/ui/TabBar";
 
 interface Portal {
     id: string;
@@ -276,22 +277,14 @@ export default function DirectoryClient({
             )}
 
             {/* Tabs */}
-            <div className="tabs">
-                <button
-                    className={`tab ${activeTab === "contacts" ? "active" : ""}`}
-                    onClick={() => setActiveTab("contacts")}
-                >
-                    <User size={16} />
-                    Contacts ({filteredContacts.length})
-                </button>
-                <button
-                    className={`tab ${activeTab === "portals" ? "active" : ""}`}
-                    onClick={() => setActiveTab("portals")}
-                >
-                    <Globe size={16} />
-                    Portals ({filteredPortals.length})
-                </button>
-            </div>
+            <TabBar
+                tabs={[
+                    { value: "contacts", label: "Contacts", icon: <User size={16} />, count: filteredContacts.length },
+                    { value: "portals", label: "Portals", icon: <Globe size={16} />, count: filteredPortals.length },
+                ]}
+                activeTab={activeTab}
+                onChange={(v) => setActiveTab(v as TabType)}
+            />
 
             {/* Search & Add */}
             <div className="toolbar">
@@ -665,37 +658,6 @@ export default function DirectoryClient({
                     color: var(--accent);
                     font-size: 0.875rem;
                     margin-bottom: 1rem;
-                }
-
-                .tabs {
-                    display: flex;
-                    gap: 0.5rem;
-                    margin-bottom: 1rem;
-                }
-
-                .tab {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                    padding: 0.75rem 1.25rem;
-                    background: var(--bg-surface);
-                    border: 1px solid var(--border);
-                    border-radius: var(--radius-md);
-                    color: var(--text-secondary);
-                    font-size: 0.875rem;
-                    font-weight: 500;
-                    cursor: pointer;
-                    transition: var(--transition-fast);
-                }
-
-                .tab:hover {
-                    background: var(--bg-hover);
-                }
-
-                .tab.active {
-                    background: var(--accent);
-                    border-color: var(--accent);
-                    color: white;
                 }
 
                 .toolbar {

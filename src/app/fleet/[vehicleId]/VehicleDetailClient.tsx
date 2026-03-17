@@ -17,6 +17,7 @@ import {
     X,
     Upload,
 } from "lucide-react";
+import TabBar from "@/components/ui/TabBar";
 import { VehicleType, VehicleStatus } from "@prisma/client";
 import {
     createPermit,
@@ -517,36 +518,17 @@ export default function VehicleDetailClient({ vehicle }: Props) {
 
             {/* Tabs */}
             <div className="tabs-container">
-                <div className="tabs">
-                    <button
-                        className={`tab ${activeTab === "permits" ? "active" : ""}`}
-                        onClick={() => setActiveTab("permits")}
-                    >
-                        <Shield size={18} />
-                        Permits ({vehicle.permits.length})
-                    </button>
-                    <button
-                        className={`tab ${activeTab === "insurance" ? "active" : ""}`}
-                        onClick={() => setActiveTab("insurance")}
-                    >
-                        <CreditCard size={18} />
-                        Insurance ({vehicle.insurance.length})
-                    </button>
-                    <button
-                        className={`tab ${activeTab === "registration" ? "active" : ""}`}
-                        onClick={() => setActiveTab("registration")}
-                    >
-                        <ClipboardList size={18} />
-                        Registration ({vehicle.registration.length})
-                    </button>
-                    <button
-                        className={`tab ${activeTab === "documents" ? "active" : ""}`}
-                        onClick={() => setActiveTab("documents")}
-                    >
-                        <FileText size={18} />
-                        Documents ({vehicle.documents.length})
-                    </button>
-                </div>
+                <TabBar
+                    tabs={[
+                        { value: "permits", label: "Permits", icon: <Shield size={18} />, count: vehicle.permits.length },
+                        { value: "insurance", label: "Insurance", icon: <CreditCard size={18} />, count: vehicle.insurance.length },
+                        { value: "registration", label: "Registration", icon: <ClipboardList size={18} />, count: vehicle.registration.length },
+                        { value: "documents", label: "Documents", icon: <FileText size={18} />, count: vehicle.documents.length },
+                    ]}
+                    activeTab={activeTab}
+                    onChange={(v) => setActiveTab(v as Tab)}
+                    variant="underline"
+                />
 
                 {/* Tab Content */}
                 <div className="tab-content glass-card">
@@ -1214,38 +1196,6 @@ export default function VehicleDetailClient({ vehicle }: Props) {
 
                 .tabs-container {
                     margin-top: 1.5rem;
-                }
-
-                .tabs {
-                    display: flex;
-                    gap: 0.25rem;
-                    margin-bottom: -1px;
-                    overflow-x: auto;
-                }
-
-                .tab {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                    padding: 0.75rem 1rem;
-                    background: transparent;
-                    border: none;
-                    border-bottom: 2px solid transparent;
-                    color: var(--text-secondary);
-                    font-size: 0.875rem;
-                    font-weight: 500;
-                    cursor: pointer;
-                    white-space: nowrap;
-                    transition: all 0.2s ease;
-                }
-
-                .tab:hover {
-                    color: var(--text-primary);
-                }
-
-                .tab.active {
-                    color: var(--primary);
-                    border-bottom-color: var(--primary);
                 }
 
                 .tab-content {

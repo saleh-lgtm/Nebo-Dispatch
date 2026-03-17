@@ -18,6 +18,7 @@ import {
     Trophy,
 } from "lucide-react";
 import EngagementLeaderboard from "@/components/EngagementLeaderboard";
+import TabBar from "@/components/ui/TabBar";
 import Link from "next/link";
 import {
     AreaChart,
@@ -292,59 +293,16 @@ export default function AnalyticsClient({
             </header>
 
             {/* Tabs */}
-            <div className="flex gap-4" style={{ borderBottom: "1px solid var(--glass-border)" }}>
-                <button
-                    onClick={() => setActiveTab("performance")}
-                    style={{
-                        padding: "0.75rem 1rem",
-                        background: "none",
-                        border: "none",
-                        borderBottom: activeTab === "performance" ? "2px solid var(--accent)" : "2px solid transparent",
-                        color: activeTab === "performance" ? "var(--accent)" : "var(--text-secondary)",
-                        fontWeight: activeTab === "performance" ? 600 : 400,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.5rem",
-                    }}
-                >
-                    <TrendingUp size={18} /> Performance
-                </button>
-                <button
-                    onClick={() => setActiveTab("hours")}
-                    style={{
-                        padding: "0.75rem 1rem",
-                        background: "none",
-                        border: "none",
-                        borderBottom: activeTab === "hours" ? "2px solid var(--accent)" : "2px solid transparent",
-                        color: activeTab === "hours" ? "var(--accent)" : "var(--text-secondary)",
-                        fontWeight: activeTab === "hours" ? 600 : 400,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.5rem",
-                    }}
-                >
-                    <Clock size={18} /> Hours Tracking
-                </button>
-                <button
-                    onClick={() => setActiveTab("engagement")}
-                    style={{
-                        padding: "0.75rem 1rem",
-                        background: "none",
-                        border: "none",
-                        borderBottom: activeTab === "engagement" ? "2px solid var(--accent)" : "2px solid transparent",
-                        color: activeTab === "engagement" ? "var(--accent)" : "var(--text-secondary)",
-                        fontWeight: activeTab === "engagement" ? 600 : 400,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.5rem",
-                    }}
-                >
-                    <Trophy size={18} /> Engagement
-                </button>
-            </div>
+            <TabBar
+                tabs={[
+                    { value: "performance", label: "Performance", icon: <TrendingUp size={18} /> },
+                    { value: "hours", label: "Hours Tracking", icon: <Clock size={18} /> },
+                    { value: "engagement", label: "Engagement", icon: <Trophy size={18} /> },
+                ]}
+                activeTab={activeTab}
+                onChange={(v) => setActiveTab(v as "performance" | "hours" | "engagement")}
+                variant="underline"
+            />
 
             {/* Performance Tab */}
             {activeTab === "performance" && (

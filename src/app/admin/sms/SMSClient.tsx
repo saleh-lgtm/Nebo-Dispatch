@@ -31,6 +31,7 @@ import {
 import ConversationList from "@/components/sms/ConversationList";
 import ChatView from "@/components/sms/ChatView";
 import EnhancedBlastSMS from "@/components/sms/EnhancedBlastSMS";
+import TabBar from "@/components/ui/TabBar";
 
 interface SMSLog {
     id: string;
@@ -291,29 +292,16 @@ export default function SMSClient({ initialLogs, totalLogs, initialStats }: Prop
             </header>
 
             {/* Tabs */}
-            <div className="tabs">
-                <button
-                    className={`tab ${activeTab === "dashboard" ? "active" : ""}`}
-                    onClick={() => setActiveTab("dashboard")}
-                >
-                    <BarChart3 size={16} />
-                    Dashboard
-                </button>
-                <button
-                    className={`tab ${activeTab === "conversations" ? "active" : ""}`}
-                    onClick={() => setActiveTab("conversations")}
-                >
-                    <MessageCircle size={16} />
-                    Conversations
-                </button>
-                <button
-                    className={`tab ${activeTab === "blast" ? "active" : ""}`}
-                    onClick={() => setActiveTab("blast")}
-                >
-                    <Users size={16} />
-                    Blast SMS
-                </button>
-            </div>
+            <TabBar
+                tabs={[
+                    { value: "dashboard", label: "Dashboard", icon: <BarChart3 size={16} /> },
+                    { value: "conversations", label: "Conversations", icon: <MessageCircle size={16} /> },
+                    { value: "blast", label: "Blast SMS", icon: <Users size={16} /> },
+                ]}
+                activeTab={activeTab}
+                onChange={(v) => setActiveTab(v as TabType)}
+                variant="underline"
+            />
 
             {activeTab === "dashboard" ? (
                 <>
@@ -652,39 +640,6 @@ export default function SMSClient({ initialLogs, totalLogs, initialStats }: Prop
                     cursor: not-allowed;
                 }
 
-                /* Tabs */
-                .tabs {
-                    display: flex;
-                    gap: 0.5rem;
-                    margin-bottom: 1.5rem;
-                    border-bottom: 1px solid var(--border);
-                    padding-bottom: 0;
-                }
-
-                .tab {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                    padding: 0.75rem 1.25rem;
-                    background: none;
-                    border: none;
-                    border-bottom: 2px solid transparent;
-                    color: var(--text-secondary);
-                    font-size: 0.875rem;
-                    font-weight: 500;
-                    cursor: pointer;
-                    transition: all 0.15s;
-                    margin-bottom: -1px;
-                }
-
-                .tab:hover {
-                    color: var(--text-primary);
-                }
-
-                .tab.active {
-                    color: var(--primary);
-                    border-bottom-color: var(--primary);
-                }
 
                 .stats-row {
                     display: grid;
