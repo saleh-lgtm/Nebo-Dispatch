@@ -22,6 +22,7 @@ import {
     clearWeekSchedules,
 } from "@/lib/schedulerActions";
 import { useToastContext } from "@/components/ui/ToastProvider";
+import ToggleGroup from "@/components/ui/ToggleGroup";
 import { useRealtimeSchedule } from "@/hooks/useRealtimeSchedule";
 import type { ScheduleRecord, Dispatcher, Market, ShiftType } from "@/types/schedule";
 import {
@@ -556,59 +557,53 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
 
                             <div className="m-form-group">
                                 <label>Shift Type</label>
-                                <div className="m-shift-types">
-                                    {(["MORNING", "AFTERNOON", "NIGHT", "CUSTOM"] as const).map((type) => (
-                                        <button
-                                            key={type}
-                                            className={`m-shift-type-btn ${selectedShiftType === type ? "m-shift-type-btn--selected" : ""}`}
-                                            onClick={() => setSelectedShiftType(type)}
-                                        >
-                                            {type === "MORNING" && "6A-2P"}
-                                            {type === "AFTERNOON" && "2P-10P"}
-                                            {type === "NIGHT" && "10P-6A"}
-                                            {type === "CUSTOM" && "Custom"}
-                                        </button>
-                                    ))}
-                                </div>
+                                <ToggleGroup
+                                    options={[
+                                        { value: "MORNING", label: "6A-2P" },
+                                        { value: "AFTERNOON", label: "2P-10P" },
+                                        { value: "NIGHT", label: "10P-6A" },
+                                        { value: "CUSTOM", label: "Custom" },
+                                    ]}
+                                    value={selectedShiftType}
+                                    onChange={(v) => setSelectedShiftType(v as ShiftType)}
+                                    size="sm"
+                                    fullWidth
+                                />
                             </div>
 
                             {selectedShiftType === "CUSTOM" && (
                                 <div className="m-form-group">
                                     <label>Duration</label>
-                                    <div className="m-duration-picker">
-                                        {[4, 6, 8, 10, 12].map((h) => (
-                                            <button
-                                                key={h}
-                                                className={`m-duration-btn ${customDuration === h ? "m-duration-btn--selected" : ""}`}
-                                                onClick={() => setCustomDuration(h)}
-                                            >
-                                                {h}h
-                                            </button>
-                                        ))}
-                                    </div>
+                                    <ToggleGroup
+                                        options={[
+                                            { value: "4", label: "4h" },
+                                            { value: "6", label: "6h" },
+                                            { value: "8", label: "8h" },
+                                            { value: "10", label: "10h" },
+                                            { value: "12", label: "12h" },
+                                        ]}
+                                        value={String(customDuration)}
+                                        onChange={(v) => setCustomDuration(Number(v))}
+                                        size="sm"
+                                        fullWidth
+                                    />
                                 </div>
                             )}
 
                             <div className="m-form-group">
                                 <label>Market (optional)</label>
-                                <div className="m-market-picker">
-                                    <button
-                                        className={`m-market-btn ${selectedMarket === null ? "m-market-btn--selected" : ""}`}
-                                        onClick={() => setSelectedMarket(null)}
-                                    >
-                                        None
-                                    </button>
-                                    {(["DFW", "AUS", "SAT"] as Market[]).map((m) => (
-                                        <button
-                                            key={m}
-                                            className={`m-market-btn ${selectedMarket === m ? "m-market-btn--selected" : ""}`}
-                                            style={{ "--market-color": MARKET_COLORS[m] } as React.CSSProperties}
-                                            onClick={() => setSelectedMarket(m)}
-                                        >
-                                            {m}
-                                        </button>
-                                    ))}
-                                </div>
+                                <ToggleGroup
+                                    options={[
+                                        { value: "", label: "None" },
+                                        { value: "DFW", label: "DFW", color: MARKET_COLORS.DFW },
+                                        { value: "AUS", label: "AUS", color: MARKET_COLORS.AUS },
+                                        { value: "SAT", label: "SAT", color: MARKET_COLORS.SAT },
+                                    ]}
+                                    value={selectedMarket ?? ""}
+                                    onChange={(v) => setSelectedMarket((v || null) as Market | null)}
+                                    size="sm"
+                                    fullWidth
+                                />
                             </div>
 
                             <button
