@@ -27,6 +27,7 @@ import {
     clearWeekSchedules,
 } from "@/lib/schedulerActions";
 import { useToastContext } from "@/components/ui/ToastProvider";
+import ToggleGroup from "@/components/ui/ToggleGroup";
 import { useRealtimeSchedule } from "@/hooks/useRealtimeSchedule";
 import type { ScheduleRecord, Dispatcher, Market, ShiftType } from "@/types/schedule";
 import {
@@ -776,20 +777,18 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                     {/* Shift Type Selection */}
                     <div className="cmd-sidebar__section">
                         <div className="cmd-section-title">Shift Type</div>
-                        <div className="cmd-shift-types">
-                            {(["MORNING", "AFTERNOON", "NIGHT", "CUSTOM"] as const).map((type) => (
-                                <button
-                                    key={type}
-                                    className={`cmd-shift-type ${selectedShiftType === type ? "cmd-shift-type--active" : ""}`}
-                                    onClick={() => setSelectedShiftType(type)}
-                                >
-                                    {type === "MORNING" && "6A-2P"}
-                                    {type === "AFTERNOON" && "2P-10P"}
-                                    {type === "NIGHT" && "10P-6A"}
-                                    {type === "CUSTOM" && "Custom"}
-                                </button>
-                            ))}
-                        </div>
+                        <ToggleGroup
+                            options={[
+                                { value: "MORNING", label: "6A-2P" },
+                                { value: "AFTERNOON", label: "2P-10P" },
+                                { value: "NIGHT", label: "10P-6A" },
+                                { value: "CUSTOM", label: "Custom" },
+                            ]}
+                            value={selectedShiftType}
+                            onChange={(v) => setSelectedShiftType(v as ShiftType)}
+                            size="sm"
+                            fullWidth
+                        />
                         {selectedShiftType === "CUSTOM" && (
                             <div className="cmd-duration">
                                 <button
@@ -815,24 +814,18 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                     {/* Market Selection */}
                     <div className="cmd-sidebar__section">
                         <div className="cmd-section-title">Market</div>
-                        <div className="cmd-markets">
-                            <button
-                                className={`cmd-market ${selectedMarket === null ? "cmd-market--active" : ""}`}
-                                onClick={() => setSelectedMarket(null)}
-                            >
-                                None
-                            </button>
-                            {(["DFW", "AUS", "SAT"] as Market[]).map((market) => (
-                                <button
-                                    key={market}
-                                    className={`cmd-market ${selectedMarket === market ? "cmd-market--active" : ""}`}
-                                    style={{ '--market-color': MARKET_COLORS[market] } as React.CSSProperties}
-                                    onClick={() => setSelectedMarket(market)}
-                                >
-                                    {market}
-                                </button>
-                            ))}
-                        </div>
+                        <ToggleGroup
+                            options={[
+                                { value: "", label: "None" },
+                                { value: "DFW", label: "DFW", color: MARKET_COLORS.DFW },
+                                { value: "AUS", label: "AUS", color: MARKET_COLORS.AUS },
+                                { value: "SAT", label: "SAT", color: MARKET_COLORS.SAT },
+                            ]}
+                            value={selectedMarket ?? ""}
+                            onChange={(v) => setSelectedMarket((v || null) as Market | null)}
+                            size="sm"
+                            fullWidth
+                        />
                     </div>
 
                     {/* Coverage Gauge */}

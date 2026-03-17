@@ -23,6 +23,9 @@ export { default as DataCard } from "./DataCard";
 export { FormInput, FormTextarea, FormSelect } from "./FormInput";
 export { default as FileUpload } from "./FileUpload";
 
+// Interactive components
+export { default as ToggleGroup, type ToggleOption } from "./ToggleGroup";
+
 // Feedback components
 export { default as Toast, type ToastType } from "./Toast";
 export { default as ToastProvider, useToastContext } from "./ToastProvider";
