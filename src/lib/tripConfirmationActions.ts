@@ -12,24 +12,26 @@ import { ConfirmationStatus } from "@prisma/client";
  * Confirmation call should be made 2 hours before pickup (dueAt)
  * Returns next N pending trips, prioritizing those due soonest
  */
-export async function getUpcomingConfirmations(limit: number = 6) {
+export async function getUpcomingConfirmations(limit: number = 10) {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
         throw new Error("Unauthorized");
     }
 
     const now = new Date();
+    const twentyFourHoursFromNow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
     const confirmations = await prisma.tripConfirmation.findMany({
         where: {
             status: "PENDING",
             archivedAt: null,
             pickupAt: {
-                gte: now, // Don't show past pickups
+                gte: now,
+                lte: twentyFourHoursFromNow,
             },
         },
         orderBy: {
-            dueAt: "asc", // Calls due soonest first (2 hours before pickup)
+            dueAt: "asc",
         },
         take: limit,
         include: {

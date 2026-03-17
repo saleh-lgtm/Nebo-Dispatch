@@ -175,8 +175,8 @@ export default async function DashboardPage() {
         // Task progress for admins
         safePromise(isAdmin ? getTaskProgress().then(r => r.success ? r.data : []) : Promise.resolve([]), []),
 
-        // Upcoming 2-hour confirmations (next 6 trips)
-        safePromise(getUpcomingConfirmations(6), []),
+        // Upcoming confirmations (next 10 trips within 24 hours)
+        safePromise(getUpcomingConfirmations(10), []),
     ]);
 
     const stats = {
