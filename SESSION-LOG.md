@@ -4,6 +4,25 @@ Permanent session history. Newest entries at top.
 
 ---
 
+### Session — 2026-03-17 ~Evening
+**Focus:** Add force-logout capability + 12-hour session expiry to prevent stale sessions
+**Changes:**
+- Modified: prisma/schema.prisma — added `tokenVersion Int @default(0)` to User model
+- Modified: src/lib/auth.ts — session maxAge 8h→12h, JWT callback stores tokenVersion on login, checks DB every 5 min for force-logout, hotfix for pre-existing sessions
+- Modified: src/lib/userManagementActions.ts — added `forceLogoutUser()` server action (increments tokenVersion + audit log)
+- Modified: src/app/admin/users/UsersClient.tsx — added Force Logout button in user dropdown menu (with LogOut icon)
+- Modified: src/lib/auditActions.ts — added `FORCE_LOGOUT` to AuditAction type
+- Modified: src/types/next-auth.d.ts — added `tokenVersion` + `tokenVersionCheckedAt` to JWT type
+- Commits:
+  - ed4c276 fix: add force logout + 12-hour session expiry — prevent stale sessions
+  - 65179b0 fix: handle pre-existing sessions without tokenVersion — treat undefined as 0
+**Decisions:** Token version check runs every 5 minutes (not every request) to balance security vs DB load. Invalidated tokens get `tokenVersion: -1` which the session callback detects and returns an empty session. 12-hour maxAge prevents multi-day stale sessions. Force logout is SUPER_ADMIN only and cannot target other SUPER_ADMINs. Pre-existing JWTs without tokenVersion are treated as version 0 (matching DB default).
+**Issues Found:**
+- `FORCE_LOGOUT` wasn't in the AuditAction union type — caused TypeScript error, fixed by adding it.
+- Pre-existing sessions had no `tokenVersion` in JWT (`undefined`), causing `0 !== undefined` to invalidate ALL active sessions. Fixed by defaulting missing tokenVersion to 0.
+
+---
+
 ### Session — 2026-03-17 ~Afternoon
 **Focus:** Roll out ToggleGroup to MobileSchedulerClient (Batch 1 of shared UI rollout)
 **Changes:**
