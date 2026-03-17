@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { approveRequest, rejectRequest } from "@/lib/adminRequestActions";
 import { adminApproveSwap } from "@/lib/shiftSwapActions";
+import styles from "./Requests.module.css";
 
 interface ScheduleData {
     id: string;
@@ -40,9 +41,7 @@ interface Request {
     updatedAt: Date;
     user: { id: string; name: string | null; email: string | null };
     schedule: ScheduleData | null;
-    // Time off fields
     timeOffType: string | null;
-    // Shift swap fields
     targetUser: { id: string; name: string | null; email: string | null } | null;
     targetSchedule: ScheduleData | null;
     targetAccepted: boolean | null;
@@ -101,7 +100,6 @@ export default function RequestsClient({ pendingRequests, allRequests, counts }:
         });
     };
 
-    // Format hour integer to display time
     const formatHour = (hour: number) => {
         if (hour === 0) return "12:00 AM";
         if (hour < 12) return `${hour}:00 AM`;
@@ -126,7 +124,6 @@ export default function RequestsClient({ pendingRequests, allRequests, counts }:
 
         try {
             if (actionModal.action === "approve") {
-                // Handle shift swap approval differently
                 if (actionModal.request.type === "SHIFT_SWAP") {
                     if (!actionModal.request.targetAccepted) {
                         alert("Cannot approve: Target user has not accepted the swap yet");
@@ -146,7 +143,6 @@ export default function RequestsClient({ pendingRequests, allRequests, counts }:
                 await rejectRequest(actionModal.request.id, adminNotes);
             }
 
-            // Update local state
             const newStatus = actionModal.action === "approve" ? "APPROVED" : "REJECTED";
             setRequests((prev) => prev.filter((r) => r.id !== actionModal.request.id));
             setAllReqs((prev) =>
@@ -172,19 +168,19 @@ export default function RequestsClient({ pendingRequests, allRequests, counts }:
         switch (status) {
             case "PENDING":
                 return (
-                    <span className="flex items-center gap-1" style={{ color: "var(--warning)" }}>
+                    <span className={`${styles.statusBadge} ${styles.statusPending}`}>
                         <Clock size={14} /> Pending
                     </span>
                 );
             case "APPROVED":
                 return (
-                    <span className="flex items-center gap-1" style={{ color: "var(--success)" }}>
+                    <span className={`${styles.statusBadge} ${styles.statusApproved}`}>
                         <CheckCircle size={14} /> Approved
                     </span>
                 );
             case "REJECTED":
                 return (
-                    <span className="flex items-center gap-1" style={{ color: "var(--danger)" }}>
+                    <span className={`${styles.statusBadge} ${styles.statusRejected}`}>
                         <XCircle size={14} /> Rejected
                     </span>
                 );
@@ -193,113 +189,83 @@ export default function RequestsClient({ pendingRequests, allRequests, counts }:
         }
     };
 
+    const closeModal = () => {
+        setActionModal(null);
+        setAdminNotes("");
+        setApplyChanges(false);
+    };
+
     return (
-        <div className="flex flex-col gap-6 animate-fade-in" style={{ padding: "1.5rem" }}>
+        <div className={styles.page}>
             {/* Header */}
-            <header className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <FileEdit size={28} className="text-accent" />
+            <header className={styles.header}>
+                <div className={styles.headerLeft}>
+                    <FileEdit size={28} className={styles.headerIcon} />
                     <div>
-                        <h1 className="font-display" style={{ fontSize: "1.75rem" }}>
-                            Schedule Requests
-                        </h1>
-                        <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>
+                        <h1 className={styles.headerTitle}>Schedule Requests</h1>
+                        <p className={styles.headerSubtitle}>
                             Review and manage dispatcher schedule change requests
                         </p>
                     </div>
                 </div>
 
-                {/* Stats */}
-                <div className="flex gap-4">
-                    <div className="glass-card" style={{ padding: "0.75rem 1.25rem", textAlign: "center" }}>
-                        <p style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--warning)" }}>
+                <div className={styles.stats}>
+                    <div className={styles.statCard}>
+                        <p className={`${styles.statValue} ${styles.statValuePending}`}>
                             {counts.pending}
                         </p>
-                        <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Pending</p>
+                        <p className={styles.statLabel}>Pending</p>
                     </div>
-                    <div className="glass-card" style={{ padding: "0.75rem 1.25rem", textAlign: "center" }}>
-                        <p style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--success)" }}>
+                    <div className={styles.statCard}>
+                        <p className={`${styles.statValue} ${styles.statValueApproved}`}>
                             {counts.approved}
                         </p>
-                        <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Approved</p>
+                        <p className={styles.statLabel}>Approved</p>
                     </div>
-                    <div className="glass-card" style={{ padding: "0.75rem 1.25rem", textAlign: "center" }}>
-                        <p style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--danger)" }}>
+                    <div className={styles.statCard}>
+                        <p className={`${styles.statValue} ${styles.statValueRejected}`}>
                             {counts.rejected}
                         </p>
-                        <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Rejected</p>
+                        <p className={styles.statLabel}>Rejected</p>
                     </div>
                 </div>
             </header>
 
             {/* Tabs */}
-            <div className="flex gap-4" style={{ borderBottom: "1px solid var(--glass-border)" }}>
+            <div className={styles.tabs}>
                 <button
                     onClick={() => setActiveTab("pending")}
-                    style={{
-                        padding: "0.75rem 1rem",
-                        background: "none",
-                        border: "none",
-                        borderBottom: activeTab === "pending" ? "2px solid var(--accent)" : "2px solid transparent",
-                        color: activeTab === "pending" ? "var(--accent)" : "var(--text-secondary)",
-                        fontWeight: activeTab === "pending" ? 600 : 400,
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                    }}
+                    className={`${styles.tab} ${activeTab === "pending" ? styles.tabActive : ""}`}
                 >
                     Pending ({requests.length})
                 </button>
                 <button
                     onClick={() => setActiveTab("all")}
-                    style={{
-                        padding: "0.75rem 1rem",
-                        background: "none",
-                        border: "none",
-                        borderBottom: activeTab === "all" ? "2px solid var(--accent)" : "2px solid transparent",
-                        color: activeTab === "all" ? "var(--accent)" : "var(--text-secondary)",
-                        fontWeight: activeTab === "all" ? 600 : 400,
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                    }}
+                    className={`${styles.tab} ${activeTab === "all" ? styles.tabActive : ""}`}
                 >
                     All Requests
                 </button>
             </div>
 
             {/* Requests List */}
-            <div className="flex flex-col gap-4">
+            <div className={styles.requestList}>
                 {displayedRequests.map((request) => (
-                    <div key={request.id} className="glass-card">
-                        <div className="flex justify-between items-start" style={{ marginBottom: "1rem" }}>
-                            <div className="flex items-center gap-3">
-                                <div
-                                    style={{
-                                        width: 40,
-                                        height: 40,
-                                        borderRadius: "50%",
-                                        background: "rgba(183, 175, 163, 0.1)",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                    }}
-                                >
-                                    <User size={20} className="text-accent" />
+                    <div key={request.id} className={styles.card}>
+                        <div className={styles.cardHeader}>
+                            <div className={styles.userInfo}>
+                                <div className={styles.userAvatar}>
+                                    <User size={20} />
                                 </div>
                                 <div>
-                                    <h3 style={{ fontWeight: 600 }}>{request.user.name || "Unknown"}</h3>
-                                    <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
-                                        {request.user.email}
-                                    </p>
+                                    <h3 className={styles.userName}>{request.user.name || "Unknown"}</h3>
+                                    <p className={styles.userEmail}>{request.user.email}</p>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-3">
+                            <div className={styles.cardMeta}>
                                 <span
+                                    className={styles.typeBadge}
                                     style={{
-                                        padding: "0.25rem 0.75rem",
-                                        borderRadius: "50px",
-                                        fontSize: "0.75rem",
-                                        fontWeight: 600,
                                         background: `${TYPE_COLORS[request.type]}20`,
                                         color: TYPE_COLORS[request.type],
                                         border: `1px solid ${TYPE_COLORS[request.type]}40`,
@@ -312,91 +278,73 @@ export default function RequestsClient({ pendingRequests, allRequests, counts }:
                         </div>
 
                         {/* Request Details */}
-                        <div
-                            className="flex flex-col gap-3"
-                            style={{
-                                padding: "1rem",
-                                background: "rgba(255, 255, 255, 0.02)",
-                                borderRadius: "0.5rem",
-                                marginBottom: "1rem",
-                            }}
-                        >
+                        <div className={styles.details}>
                             {request.reason && (
-                                <div className="flex items-start gap-2">
-                                    <MessageSquare size={16} style={{ color: "var(--text-secondary)", marginTop: 2 }} />
+                                <div className={styles.detailRow}>
+                                    <MessageSquare size={16} className={styles.detailIcon} />
                                     <div>
-                                        <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: 4 }}>
-                                            Reason
-                                        </p>
-                                        <p style={{ lineHeight: 1.5 }}>{request.reason}</p>
+                                        <p className={styles.detailLabel}>Reason</p>
+                                        <p>{request.reason}</p>
                                     </div>
                                 </div>
                             )}
 
                             {request.schedule && (
-                                <div className="flex items-start gap-2">
-                                    <Calendar size={16} style={{ color: "var(--text-secondary)", marginTop: 2 }} />
+                                <div className={styles.detailRow}>
+                                    <Calendar size={16} className={styles.detailIcon} />
                                     <div>
-                                        <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: 4 }}>
-                                            Current Shift
-                                        </p>
+                                        <p className={styles.detailLabel}>Current Shift</p>
                                         <p>{formatShiftTime(request.schedule)}</p>
                                     </div>
                                 </div>
                             )}
 
                             {request.requestedStart && request.requestedEnd && (
-                                <div className="flex items-start gap-2">
-                                    <Calendar size={16} style={{ color: "var(--accent)", marginTop: 2 }} />
+                                <div className={styles.detailRow}>
+                                    <Calendar size={16} className={styles.detailIconAccent} />
                                     <div>
-                                        <p style={{ fontSize: "0.75rem", color: "var(--accent)", marginBottom: 4 }}>
+                                        <p className={styles.detailLabelAccent}>
                                             {request.type === "TIME_OFF" ? "Time Off Period" : "Requested Change"}
                                         </p>
-                                        <p style={{ color: "var(--accent)" }}>
+                                        <p className={styles.detailValueAccent}>
                                             {formatDateRange(request.requestedStart, request.requestedEnd)}
                                         </p>
                                     </div>
                                 </div>
                             )}
 
-                            {/* Time Off Type */}
                             {request.type === "TIME_OFF" && request.timeOffType && (
-                                <div className="flex items-start gap-2">
-                                    <Palmtree size={16} style={{ color: "#10b981", marginTop: 2 }} />
+                                <div className={styles.detailRow}>
+                                    <Palmtree size={16} className={styles.detailIconGreen} />
                                     <div>
-                                        <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: 4 }}>
-                                            Type of Leave
-                                        </p>
-                                        <p style={{ color: "#10b981" }}>
+                                        <p className={styles.detailLabel}>Type of Leave</p>
+                                        <p className={styles.detailValueGreen}>
                                             {TIME_OFF_LABELS[request.timeOffType] || request.timeOffType}
                                         </p>
                                     </div>
                                 </div>
                             )}
 
-                            {/* Shift Swap Details */}
                             {request.type === "SHIFT_SWAP" && request.targetUser && (
-                                <div className="flex items-start gap-2">
-                                    <RefreshCw size={16} style={{ color: "#8b5cf6", marginTop: 2 }} />
+                                <div className={styles.detailRow}>
+                                    <RefreshCw size={16} className={styles.detailIconPurple} />
                                     <div>
-                                        <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: 4 }}>
-                                            Swap With
-                                        </p>
-                                        <p style={{ color: "#8b5cf6" }}>
+                                        <p className={styles.detailLabel}>Swap With</p>
+                                        <p className={styles.detailValuePurple}>
                                             {request.targetUser.name || request.targetUser.email}
                                         </p>
                                         {request.targetAccepted === null && (
-                                            <span style={{ fontSize: "0.75rem", color: "var(--warning)" }}>
+                                            <span className={`${styles.swapStatus} ${styles.swapStatusPending}`}>
                                                 Awaiting target acceptance
                                             </span>
                                         )}
                                         {request.targetAccepted === true && (
-                                            <span className="flex items-center gap-1" style={{ fontSize: "0.75rem", color: "var(--success)" }}>
+                                            <span className={`${styles.swapStatus} ${styles.swapStatusAccepted}`}>
                                                 <UserCheck size={12} /> Accepted by target
                                             </span>
                                         )}
                                         {request.targetAccepted === false && (
-                                            <span style={{ fontSize: "0.75rem", color: "var(--danger)" }}>
+                                            <span className={`${styles.swapStatus} ${styles.swapStatusRejected}`}>
                                                 Rejected by target
                                             </span>
                                         )}
@@ -405,24 +353,27 @@ export default function RequestsClient({ pendingRequests, allRequests, counts }:
                             )}
 
                             {request.type === "SHIFT_SWAP" && request.targetSchedule && (
-                                <div className="flex items-start gap-2">
-                                    <Calendar size={16} style={{ color: "#8b5cf6", marginTop: 2 }} />
+                                <div className={styles.detailRow}>
+                                    <Calendar size={16} className={styles.detailIconPurple} />
                                     <div>
-                                        <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: 4 }}>
-                                            Target&apos;s Shift
-                                        </p>
+                                        <p className={styles.detailLabel}>Target&apos;s Shift</p>
                                         <p>{formatShiftTime(request.targetSchedule)}</p>
                                     </div>
                                 </div>
                             )}
 
                             {request.adminNotes && (
-                                <div className="flex items-start gap-2" style={{ marginTop: "0.5rem", paddingTop: "0.5rem", borderTop: "1px solid var(--glass-border)" }}>
-                                    <AlertCircle size={16} style={{ color: request.status === "APPROVED" ? "var(--success)" : "var(--danger)", marginTop: 2 }} />
+                                <div className={styles.adminNotesRow}>
+                                    <AlertCircle
+                                        size={16}
+                                        style={{
+                                            color: request.status === "APPROVED" ? "var(--success)" : "var(--danger)",
+                                            marginTop: 2,
+                                            flexShrink: 0,
+                                        }}
+                                    />
                                     <div>
-                                        <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: 4 }}>
-                                            Admin Notes
-                                        </p>
+                                        <p className={styles.detailLabel}>Admin Notes</p>
                                         <p>{request.adminNotes}</p>
                                     </div>
                                 </div>
@@ -430,17 +381,16 @@ export default function RequestsClient({ pendingRequests, allRequests, counts }:
                         </div>
 
                         {/* Footer */}
-                        <div className="flex items-center justify-between">
-                            <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+                        <div className={styles.cardFooter}>
+                            <p className={styles.submittedDate}>
                                 Submitted {formatDate(request.createdAt)}
                             </p>
 
                             {request.status === "PENDING" && (
-                                <div className="flex gap-2">
+                                <div className={styles.cardActions}>
                                     <button
                                         onClick={() => setActionModal({ request, action: "reject" })}
-                                        className="btn btn-outline"
-                                        style={{ color: "var(--danger)", borderColor: "var(--danger)" }}
+                                        className={`btn btn-outline ${styles.rejectBtn}`}
                                     >
                                         <XCircle size={16} /> Reject
                                     </button>
@@ -457,12 +407,9 @@ export default function RequestsClient({ pendingRequests, allRequests, counts }:
                 ))}
 
                 {displayedRequests.length === 0 && (
-                    <div
-                        className="glass-card"
-                        style={{ textAlign: "center", padding: "3rem" }}
-                    >
-                        <FileEdit size={48} style={{ opacity: 0.3, margin: "0 auto 1rem" }} />
-                        <p style={{ color: "var(--text-secondary)" }}>
+                    <div className={styles.emptyState}>
+                        <FileEdit size={48} className={styles.emptyIcon} />
+                        <p className={styles.emptyText}>
                             {activeTab === "pending"
                                 ? "No pending requests. All caught up!"
                                 : "No requests found."}
@@ -474,59 +421,45 @@ export default function RequestsClient({ pendingRequests, allRequests, counts }:
             {/* Action Modal */}
             {actionModal && (
                 <div
-                    className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                    className={styles.overlay}
                     onClick={(e) => {
-                        if (e.target === e.currentTarget) {
-                            setActionModal(null);
-                            setAdminNotes("");
-                            setApplyChanges(false);
-                        }
+                        if (e.target === e.currentTarget) closeModal();
                     }}
                 >
-                    <div className="glass-card w-full max-w-md animate-scale-in">
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-3">
+                    <div className={styles.modal}>
+                        <div className={styles.modalHeader}>
+                            <div className={styles.modalHeaderLeft}>
                                 {actionModal.action === "approve" ? (
                                     <CheckCircle size={24} style={{ color: "var(--success)" }} />
                                 ) : (
                                     <XCircle size={24} style={{ color: "var(--danger)" }} />
                                 )}
-                                <h2 className="font-display" style={{ fontSize: "1.25rem" }}>
+                                <h2 className={styles.modalTitle}>
                                     {actionModal.action === "approve" ? "Approve Request" : "Reject Request"}
                                 </h2>
                             </div>
-                            <button
-                                onClick={() => {
-                                    setActionModal(null);
-                                    setAdminNotes("");
-                                    setApplyChanges(false);
-                                }}
-                                className="btn-icon"
-                            >
+                            <button onClick={closeModal} className="btn-icon">
                                 <X size={18} />
                             </button>
                         </div>
 
-                        <div className="flex flex-col gap-4">
-                            <div>
-                                <p style={{ fontSize: "0.875rem", marginBottom: "0.5rem" }}>
+                        <div className={styles.modalBody}>
+                            <div className={styles.modalInfo}>
+                                <p>
                                     <strong>Dispatcher:</strong> {actionModal.request.user.name}
                                 </p>
-                                <p style={{ fontSize: "0.875rem", marginBottom: "0.5rem" }}>
+                                <p>
                                     <strong>Type:</strong> {TYPE_LABELS[actionModal.request.type]}
                                 </p>
                                 {actionModal.request.reason && (
-                                    <p style={{ fontSize: "0.875rem" }}>
+                                    <p>
                                         <strong>Reason:</strong> {actionModal.request.reason}
                                     </p>
                                 )}
                             </div>
 
-                            <div className="flex flex-col gap-1">
-                                <label
-                                    className="text-xs uppercase tracking-wider font-bold"
-                                    style={{ color: "var(--text-secondary)" }}
-                                >
+                            <div className={styles.modalField}>
+                                <label className={styles.modalLabel}>
                                     Admin Notes {actionModal.action === "reject" && "(Required)"}
                                 </label>
                                 <textarea
@@ -546,40 +479,24 @@ export default function RequestsClient({ pendingRequests, allRequests, counts }:
                             {actionModal.action === "approve" &&
                                 actionModal.request.requestedStart &&
                                 actionModal.request.requestedEnd && (
-                                    <label className="flex items-center gap-2" style={{ cursor: "pointer" }}>
+                                    <label className={styles.checkboxLabel}>
                                         <input
                                             type="checkbox"
                                             checked={applyChanges}
                                             onChange={(e) => setApplyChanges(e.target.checked)}
-                                            style={{ width: 16, height: 16 }}
+                                            className={styles.checkbox}
                                         />
-                                        <span style={{ fontSize: "0.875rem" }}>
-                                            Automatically apply the schedule change
-                                        </span>
+                                        <span>Automatically apply the schedule change</span>
                                     </label>
                                 )}
 
-                            <div className="flex justify-end gap-3 mt-2">
-                                <button
-                                    onClick={() => {
-                                        setActionModal(null);
-                                        setAdminNotes("");
-                                        setApplyChanges(false);
-                                    }}
-                                    className="btn btn-outline"
-                                >
+                            <div className={styles.modalFooter}>
+                                <button onClick={closeModal} className="btn btn-outline">
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleAction}
-                                    className="btn"
-                                    style={{
-                                        background:
-                                            actionModal.action === "approve"
-                                                ? "var(--success)"
-                                                : "var(--danger)",
-                                        color: "white",
-                                    }}
+                                    className={`btn ${actionModal.action === "approve" ? styles.approveBtn : styles.rejectActionBtn}`}
                                     disabled={loading}
                                 >
                                     {loading ? (
