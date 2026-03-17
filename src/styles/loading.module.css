@@ -1,0 +1,357 @@
+/**
+ * Shared Loading Skeleton Styles
+ * Used by all loading.tsx files across the app
+ */
+
+/* ===========================================
+   Animations
+   =========================================== */
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ===========================================
+   Base Skeleton Element
+   =========================================== */
+
+.skeleton {
+  background: var(--skeleton-bg, #e5e7eb);
+  border-radius: var(--radius-md, 6px);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.skeletonRound {
+  composes: skeleton;
+  border-radius: 9999px;
+}
+
+/* ===========================================
+   Root Loading (Full-page Spinner)
+   =========================================== */
+
+.rootContainer {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-primary, #f9fafb);
+}
+
+.rootInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.spinner {
+  width: 3rem;
+  height: 3rem;
+  border: 4px solid var(--spinner-track, #bfdbfe);
+  border-top-color: var(--spinner-active, #2563eb);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinnerText {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+/* ===========================================
+   Page Layout
+   =========================================== */
+
+.page {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ===========================================
+   Header Patterns
+   =========================================== */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.headerLeftStacked {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.headerRight {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* ===========================================
+   Grid Layouts
+   =========================================== */
+
+.statsGrid2x4 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .statsGrid2x4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.statsGrid1x3 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .statsGrid1x3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.contentGrid1x3 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .contentGrid1x3 {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+.statsGrid1x2x4 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .statsGrid1x2x4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .statsGrid1x2x4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* ===========================================
+   Card (skeleton wrapper)
+   =========================================== */
+
+.card {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: var(--radius-lg, 8px);
+  padding: 1rem;
+}
+
+.cardP5 {
+  composes: card;
+  padding: 1.25rem;
+}
+
+/* ===========================================
+   Stat Card
+   =========================================== */
+
+.statLabel {
+  composes: skeleton;
+  height: 1rem;
+  width: 5rem;
+  margin-bottom: 0.5rem;
+}
+
+.statValue {
+  composes: skeleton;
+  height: 1.75rem;
+  width: 3rem;
+}
+
+.statValueLarge {
+  composes: skeleton;
+  height: 2rem;
+  width: 6rem;
+}
+
+/* ===========================================
+   Row / List Patterns
+   =========================================== */
+
+.spacedColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.spacedColumnSm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.spacedColumn1 {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.rowItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: var(--bg-subtle, rgba(249, 250, 251, 1));
+  border-radius: var(--radius-lg, 8px);
+}
+
+.flex1 {
+  flex: 1;
+  min-width: 0;
+}
+
+.flexShrink0 {
+  flex-shrink: 0;
+}
+
+.mlAuto {
+  margin-left: auto;
+}
+
+.textRight {
+  text-align: right;
+}
+
+/* ===========================================
+   List with Dividers
+   =========================================== */
+
+.dividedList {
+  display: flex;
+  flex-direction: column;
+}
+
+.dividedList > * + * {
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+
+.dividedItem {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+/* ===========================================
+   Filters Row
+   =========================================== */
+
+.filtersRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+/* ===========================================
+   Table Skeleton
+   =========================================== */
+
+.tableWrapper {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tableHead {
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+.tableTh {
+  padding: 1rem;
+  text-align: left;
+}
+
+.tableRow {
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+.tableTd {
+  padding: 1rem;
+}
+
+/* ===========================================
+   Header Bar with Border
+   =========================================== */
+
+.cardHeaderBar {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ===========================================
+   Summary Card Header
+   =========================================== */
+
+.summaryHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+/* ===========================================
+   Accent Skeleton (blue tint)
+   =========================================== */
+
+.skeletonAccent {
+  background: var(--skeleton-accent-bg, #bfdbfe);
+  border-radius: var(--radius-md, 6px);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.skeletonAccentRound {
+  composes: skeletonAccent;
+  border-radius: 9999px;
+}

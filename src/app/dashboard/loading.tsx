@@ -1,58 +1,58 @@
+import styles from '@/styles/loading.module.css';
+
 export default function DashboardLoading() {
   return (
-    <div className="p-6 space-y-6">
+    <div className={styles.page}>
       {/* Top bar skeleton */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="h-12 w-12 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
-          <div className="space-y-2">
-            <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-            <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+      <div className={styles.header}>
+        <div className={styles.headerLeft}>
+          <div className={styles.skeletonRound} style={{ width: '3rem', height: '3rem' }} />
+          <div className={styles.spacedColumn}>
+            <div className={styles.skeleton} style={{ width: '8rem', height: '1.25rem' }} />
+            <div className={styles.skeleton} style={{ width: '6rem', height: '1rem' }} />
           </div>
         </div>
-        <div className="h-10 w-28 bg-blue-200 dark:bg-blue-800 rounded-lg animate-pulse" />
+        <div className={styles.skeletonAccent} style={{ width: '7rem', height: '2.5rem', borderRadius: 'var(--radius-lg, 8px)' }} />
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className={styles.statsGrid2x4}>
         {[1, 2, 3, 4].map((i) => (
-          <div
-            key={i}
-            className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700"
-          >
-            <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2" />
-            <div className="h-7 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          <div key={i} className={styles.card}>
+            <div className={styles.statLabel} />
+            <div className={styles.statValue} />
           </div>
         ))}
       </div>
 
       {/* Main content grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className={styles.contentGrid1x3}>
         {/* Large panel */}
-        <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 space-y-4">
-          <div className="h-6 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-              <div className="h-8 w-8 bg-gray-200 dark:bg-gray-600 rounded animate-pulse" />
-              <div className="flex-1 space-y-1">
-                <div className="h-4 w-48 bg-gray-200 dark:bg-gray-600 rounded animate-pulse" />
-                <div className="h-3 w-32 bg-gray-200 dark:bg-gray-600 rounded animate-pulse" />
+        <div className={styles.card}>
+          <div className={styles.spacedColumn1}>
+            <div className={styles.skeleton} style={{ width: '10rem', height: '1.5rem' }} />
+            {[1, 2, 3].map((i) => (
+              <div key={i} className={styles.rowItem}>
+                <div className={styles.skeleton} style={{ width: '2rem', height: '2rem' }} />
+                <div className={styles.flex1}>
+                  <div className={styles.spacedColumnSm}>
+                    <div className={styles.skeleton} style={{ width: '12rem', height: '1rem' }} />
+                    <div className={styles.skeleton} style={{ width: '8rem', height: '0.75rem' }} />
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         {/* Side panels */}
-        <div className="space-y-4">
+        <div className={styles.spacedColumn1}>
           {[1, 2].map((i) => (
-            <div
-              key={i}
-              className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700"
-            >
-              <div className="h-5 w-28 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-3" />
-              <div className="space-y-2">
+            <div key={i} className={styles.card}>
+              <div className={styles.skeleton} style={{ width: '7rem', height: '1.25rem', marginBottom: '0.75rem' }} />
+              <div className={styles.spacedColumn}>
                 {[1, 2, 3].map((j) => (
-                  <div key={j} className="h-4 w-full bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                  <div key={j} className={styles.skeleton} style={{ width: '100%', height: '1rem' }} />
                 ))}
               </div>
             </div>

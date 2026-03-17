@@ -1,39 +1,38 @@
+import styles from '@/styles/loading.module.css';
+
 export default function AdminLoading() {
   return (
-    <div className="p-6 space-y-6">
+    <div className={styles.page}>
       {/* Header skeleton */}
-      <div className="flex items-center justify-between">
-        <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-        <div className="h-10 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+      <div className={styles.header}>
+        <div className={styles.skeleton} style={{ width: '12rem', height: '2rem' }} />
+        <div className={styles.skeleton} style={{ width: '8rem', height: '2.5rem' }} />
       </div>
 
       {/* Stats cards skeleton */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={styles.statsGrid1x2x4}>
         {[1, 2, 3, 4].map((i) => (
-          <div
-            key={i}
-            className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700"
-          >
-            <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2" />
-            <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          <div key={i} className={styles.card}>
+            <div className={styles.statLabel} style={{ width: '6rem' }} />
+            <div className={styles.statValueLarge} style={{ width: '4rem' }} />
           </div>
         ))}
       </div>
 
       {/* Table skeleton */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+      <div className={styles.card} style={{ padding: 0 }}>
+        <div className={styles.cardHeaderBar}>
+          <div className={styles.skeleton} style={{ width: '8rem', height: '1.5rem' }} />
         </div>
-        <div className="divide-y divide-gray-200 dark:divide-gray-700">
+        <div className={styles.dividedList}>
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="p-4 flex items-center gap-4">
-              <div className="h-10 w-10 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
-              <div className="flex-1 space-y-2">
-                <div className="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                <div className="h-3 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            <div key={i} className={styles.dividedItem}>
+              <div className={styles.skeletonRound} style={{ width: '2.5rem', height: '2.5rem' }} />
+              <div className={`${styles.flex1} ${styles.spacedColumn}`}>
+                <div className={styles.skeleton} style={{ width: '12rem', height: '1rem' }} />
+                <div className={styles.skeleton} style={{ width: '8rem', height: '0.75rem' }} />
               </div>
-              <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+              <div className={styles.skeleton} style={{ width: '5rem', height: '2rem' }} />
             </div>
           ))}
         </div>
