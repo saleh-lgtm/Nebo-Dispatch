@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { geocodeTripAddresses } from "@/lib/geocoding";
 
@@ -50,41 +52,43 @@ function formatPhoneE164(phone: string | null | undefined): string {
  *
  * Push TBR trips to Google Sheet via Apps Script
  *
- * Authentication:
- * - Header: x-tbr-ingest-secret matching TBR_INGEST_SECRET env var
- * - OR Basic Auth with username "tbr" and password matching TBR_INGEST_SECRET
+ * Authentication (any one of):
+ * 1. NextAuth session cookie (for browser calls from logged-in users)
+ * 2. Header: x-tbr-ingest-secret matching TBR_INGEST_SECRET env var
+ * 3. Basic Auth with username "tbr" and password matching TBR_INGEST_SECRET
  */
 export async function POST(request: NextRequest) {
-    // Authentication
+    // 1. Session-based auth (browser calls from logged-in users)
+    const session = await getServerSession(authOptions);
+    const sessionValid = !!session?.user;
+
+    // 2 & 3. Secret-based auth (external/automated callers)
+    let secretValid = false;
     const ingestSecret = process.env.TBR_INGEST_SECRET;
 
-    if (!ingestSecret) {
-        console.error("TBR_INGEST_SECRET not configured");
-        return NextResponse.json(
-            { error: "Server configuration error" },
-            { status: 500 }
-        );
-    }
+    if (ingestSecret) {
+        // Check for header auth
+        const headerSecret = request.headers.get("x-tbr-ingest-secret");
+        if (headerSecret === ingestSecret) {
+            secretValid = true;
+        }
 
-    // Check for header auth
-    const headerSecret = request.headers.get("x-tbr-ingest-secret");
-
-    // Check for Basic Auth
-    const authHeader = request.headers.get("authorization");
-    let basicAuthValid = false;
-    if (authHeader?.startsWith("Basic ")) {
-        try {
-            const base64Credentials = authHeader.slice(6);
-            const credentials = Buffer.from(base64Credentials, "base64").toString("utf-8");
-            const [username, password] = credentials.split(":");
-            basicAuthValid = username === "tbr" && password === ingestSecret;
-        } catch {
-            // Invalid base64
+        // Check for Basic Auth
+        const authHeader = request.headers.get("authorization");
+        if (!secretValid && authHeader?.startsWith("Basic ")) {
+            try {
+                const base64Credentials = authHeader.slice(6);
+                const credentials = Buffer.from(base64Credentials, "base64").toString("utf-8");
+                const [username, password] = credentials.split(":");
+                secretValid = username === "tbr" && password === ingestSecret;
+            } catch {
+                // Invalid base64
+            }
         }
     }
 
-    // Validate authentication
-    if (headerSecret !== ingestSecret && !basicAuthValid) {
+    // Validate authentication — must pass at least one method
+    if (!sessionValid && !secretValid) {
         return NextResponse.json(
             { error: "Unauthorized" },
             { status: 401 }
