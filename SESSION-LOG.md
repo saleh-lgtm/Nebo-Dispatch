@@ -4,6 +4,45 @@ Permanent session history. Newest entries at top.
 
 ---
 
+### Session — 2026-03-16 ~Late Night (3)
+**Focus:** Fix broken edit/delete buttons on Company Announcements page + redesign cards
+**Changes:**
+- Modified: src/lib/notesActions.ts — `getAllAnnouncementsWithStats` now returns per-announcement `acknowledgedCount` and `totalUsers` (includes reads with acknowledged field, counts active approved users)
+- Modified: src/app/admin/notes/page.tsx — passes `totalUsers` prop, removed `currentUserId` prop and `as never` cast
+- Rewritten: src/app/admin/notes/NotesClient.tsx — full CSS Modules rewrite, proper modal overlays, icon buttons (Pencil + Trash2), acknowledgment badges
+- Created: src/app/admin/notes/NotesClient.module.css — white cards on light gray background, fixed-position modal overlays, badge styles
+- Commit: f096f21 fix: notes edit/delete buttons + redesign announcement cards
+**Decisions:** Modals must use CSS Modules with explicit `position: fixed` — global CSS lacks Tailwind-style utility classes (fixed, inset-0, z-50, etc.). Light card design (white on #f3f4f6) for announcements page.
+**Issues Found:** Modals used nonexistent Tailwind classes (fixed, inset-0, z-50, bg-black/80, backdrop-blur-sm) causing them to render inline instead of as overlays — edit/delete appeared broken because the modal was invisible. All checks pass (TypeScript ✅, ESLint ✅, Build ✅).
+
+---
+
+### Session — 2026-03-16 ~Late Night (2)
+**Focus:** Split ConfirmationsClient.tsx into focused sub-components (phase 1 of 2)
+**Changes:**
+- Created: src/app/admin/confirmations/components/utils.ts — shared format helpers (formatDate, formatTime, formatDateTime, isOverdue, getTimeDiff)
+- Created: src/app/admin/confirmations/components/TripsToolbarClient.tsx — search, filters panel, results summary
+- Created: src/app/admin/confirmations/components/TripsToolbar.module.css
+- Created: src/app/admin/confirmations/components/TripsTableClient.tsx — sortable data table, pagination
+- Created: src/app/admin/confirmations/components/TripsTable.module.css
+- Modified: src/app/admin/confirmations/ConfirmationsClient.tsx — removed extracted code, imports new sub-components (2865 → 1931 lines)
+- Commit: ba8445b refactor: extract TripsToolbar, TripsTable, and utils from ConfirmationsClient (1/2)
+**Decisions:** Format helpers take `now` as parameter (not closure) for testability. Sub-components use CSS Modules (not style jsx). Phase 2 will extract AnalyticsTab, DispatchersTab, AccountabilityTab.
+**Issues Found:** None — all checks pass (TypeScript ✅, ESLint ✅, Build ✅)
+
+---
+
+### Session — 2026-03-16 ~Late Night
+**Focus:** Fix scheduler grid day labels off by one — UTC display bug
+**Changes:**
+- Modified: src/app/admin/scheduler/CommandSchedulerClient.tsx — `isToday()` and day header use `getUTCDate()`/`getUTCMonth()`/`getUTCFullYear()`, aria-label uses `timeZone: 'UTC'`
+- Modified: src/app/admin/scheduler/MobileSchedulerClient.tsx — `formatDateHeader()`, week range, day buttons all use UTC methods
+- Commit: a4311b9 fix: scheduler day labels off by one — align column headers with dates
+**Decisions:** All scheduler date display must use UTC methods since `getWeekStart()`/`addDays()` use UTC arithmetic. Local `.getDate()` on UTC midnight dates shifts back one day in US Central timezone.
+**Issues Found:** The UTC fix from the earlier scheduler session (dbe11a0) converted date arithmetic to UTC but missed the display layer — `.getDate()` and `toLocaleDateString()` without `timeZone: 'UTC'` still used local time. All checks pass (TypeScript ✅, ESLint ✅, Build ✅).
+
+---
+
 ### Session — 2026-03-16 ~Evening
 **Focus:** Server action hardening — 3 more files (54 functions): notesActions, sopActions, calendarExportActions
 **Changes:**
