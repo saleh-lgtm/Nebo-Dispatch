@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
-import { Phone, BarChart3, Users, ShieldAlert, ListFilter } from "lucide-react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { Phone, BarChart3, Users, ShieldAlert, ListFilter, X } from "lucide-react";
 import TabBar from "@/components/ui/TabBar";
-import { getAllConfirmations, completeConfirmation, getConfirmationTabData } from "@/lib/tripConfirmationActions";
+import { getAllConfirmations, completeConfirmation, getConfirmationTabData, getNewConfirmationsSince } from "@/lib/tripConfirmationActions";
 import { useRouter } from "next/navigation";
 import {
     ConfirmationModal,
@@ -24,6 +24,7 @@ import {
     SortDirection,
     StatusFilter,
 } from "./types";
+import type { CurrentUser } from "./types";
 import styles from "./Confirmations.module.css";
 
 interface Props {
@@ -35,6 +36,7 @@ interface Props {
     allConfirmations: TripConfirmation[];
     totalConfirmations: number;
     dispatchers: Dispatcher[];
+    currentUser: CurrentUser;
 }
 
 export default function ConfirmationsClient({
@@ -46,6 +48,7 @@ export default function ConfirmationsClient({
     allConfirmations: initialConfirmations,
     totalConfirmations: initialTotal,
     dispatchers,
+    currentUser,
 }: Props) {
     const [selectedTab, setSelectedTab] = useState<
         "trips" | "overview" | "dispatchers" | "accountability"
@@ -58,8 +61,8 @@ export default function ConfirmationsClient({
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
     const [dispatcherFilter, setDispatcherFilter] = useState<string>("ALL");
-    const [sortField, setSortField] = useState<SortField>("pickupAt");
-    const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+    const [sortField, setSortField] = useState<SortField>("dueAt");
+    const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
     const [showFilters, setShowFilters] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
@@ -69,6 +72,52 @@ export default function ConfirmationsClient({
     const [completing, setCompleting] = useState<string | null>(null);
     const [now, setNow] = useState(() => Date.now());
     const router = useRouter();
+
+    // Toast notification state
+    const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+    // Auto-dismiss toast after 5 seconds
+    useEffect(() => {
+        if (!toast) return;
+        const timer = setTimeout(() => setToast(null), 5000);
+        return () => clearTimeout(timer);
+    }, [toast]);
+
+    // Auto-refresh: poll for new confirmations every 30 seconds
+    const lastRefreshRef = useRef(new Date());
+    const selectedTabRef = useRef(selectedTab);
+    selectedTabRef.current = selectedTab;
+
+    useEffect(() => {
+        const poll = async () => {
+            if (document.visibilityState === "hidden") return;
+            if (selectedTabRef.current !== "trips") return;
+
+            try {
+                const result = await getNewConfirmationsSince(lastRefreshRef.current);
+                if (result.confirmations.length > 0) {
+                    setConfirmations(prev => {
+                        const existingIds = new Set(prev.map(c => c.id));
+                        const newTrips = result.confirmations.filter(c => !existingIds.has(c.id));
+
+                        if (newTrips.length > 0) {
+                            setTotalCount(prevCount => prevCount + newTrips.length);
+                            setToast({ message: `${newTrips.length} new trip${newTrips.length > 1 ? "s" : ""} added`, type: "success" });
+                            return [...(newTrips as TripConfirmation[]), ...prev];
+                        }
+
+                        return prev;
+                    });
+                    lastRefreshRef.current = result.timestamp;
+                }
+            } catch (err) {
+                console.error("Auto-refresh failed:", err);
+            }
+        };
+
+        const interval = setInterval(poll, 30000);
+        return () => clearInterval(interval);
+    }, []);
 
     // Lazy loading state for tabs
     const [lazyDispatcherMetrics, setLazyDispatcherMetrics] = useState<DispatcherMetric[] | null>(null);
@@ -80,7 +129,7 @@ export default function ConfirmationsClient({
 
     // Update time every minute for accurate time displays
     useEffect(() => {
-        const interval = setInterval(() => setNow(Date.now()), 60000);
+        const interval = setInterval(() => setNow(Date.now()), 15000);
         return () => clearInterval(interval);
     }, []);
 
@@ -134,7 +183,6 @@ export default function ConfirmationsClient({
     // Filter and sort confirmations locally
     const filteredAndSortedConfirmations = useMemo(() => {
         let filtered = [...confirmations];
-        const currentTime = Date.now();
 
         if (searchQuery) {
             const query = searchQuery.toLowerCase();
@@ -155,17 +203,33 @@ export default function ConfirmationsClient({
             filtered = filtered.filter((c) => c.completedBy?.id === dispatcherFilter);
         }
 
+        // Smart sort: dueAt asc groups PENDING first, then completed
+        if (sortField === "dueAt" && sortDirection === "asc") {
+            const pending = filtered.filter(c => c.status === "PENDING");
+            const nonPending = filtered.filter(c => c.status !== "PENDING");
+
+            pending.sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
+
+            nonPending.sort((a, b) => {
+                const aTime = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+                const bTime = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+                return bTime - aTime;
+            });
+
+            return [...pending, ...nonPending];
+        }
+
+        // Legacy smart sort for pickupAt desc
         if (sortField === "pickupAt" && sortDirection === "desc") {
+            const currentTime = Date.now();
             const upcoming = filtered.filter((c) => new Date(c.pickupAt).getTime() >= currentTime);
             const past = filtered.filter((c) => new Date(c.pickupAt).getTime() < currentTime);
             upcoming.sort((a, b) => new Date(a.pickupAt).getTime() - new Date(b.pickupAt).getTime());
             past.sort((a, b) => new Date(b.pickupAt).getTime() - new Date(a.pickupAt).getTime());
-            if (upcoming.length > 0 && past.length > 0) {
-                (upcoming[upcoming.length - 1] as TripConfirmation & { _isLastUpcoming?: boolean })._isLastUpcoming = true;
-            }
             return [...upcoming, ...past];
         }
 
+        // Generic sort
         filtered.sort((a, b) => {
             let aVal: string | number | null = null;
             let bVal: string | number | null = null;
@@ -194,6 +258,20 @@ export default function ConfirmationsClient({
     }, [filteredAndSortedConfirmations]);
 
     const pastCount = filteredAndSortedConfirmations.length - upcomingCount;
+
+    const pendingDividerIndex = useMemo(() => {
+        if (sortField !== "dueAt" || sortDirection !== "asc") return undefined;
+        const paginated = filteredAndSortedConfirmations.slice(
+            (currentPage - 1) * ITEMS_PER_PAGE,
+            (currentPage - 1) * ITEMS_PER_PAGE + ITEMS_PER_PAGE
+        );
+        for (let i = 0; i < paginated.length; i++) {
+            if (paginated[i].status !== "PENDING" && (i === 0 || paginated[i - 1].status === "PENDING")) {
+                return i;
+            }
+        }
+        return undefined;
+    }, [filteredAndSortedConfirmations, sortField, sortDirection, currentPage]);
 
     const paginatedConfirmations = useMemo(() => {
         const start = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -257,6 +335,37 @@ export default function ConfirmationsClient({
             setCompleting(null);
         }
     };
+
+    const handleQuickAction = useCallback(async (
+        tripId: string,
+        newStatus: "CONFIRMED" | "NO_ANSWER"
+    ) => {
+        const prevConfirmations = [...confirmations];
+        const prevTotalCount = totalCount;
+
+        setConfirmations(prev => prev.map(c =>
+            c.id === tripId ? {
+                ...c,
+                status: newStatus,
+                completedAt: new Date().toISOString(),
+                completedBy: { id: currentUser.id, name: currentUser.name },
+                minutesBeforeDue: Math.round(
+                    (new Date(c.dueAt).getTime() - Date.now()) / 60000
+                ),
+            } : c
+        ));
+        setCompleting(tripId);
+
+        try {
+            await completeConfirmation(tripId, newStatus);
+        } catch {
+            setConfirmations(prevConfirmations);
+            setTotalCount(prevTotalCount);
+            setToast({ message: "Failed to update - please try again", type: "error" });
+        } finally {
+            setCompleting(null);
+        }
+    }, [confirmations, totalCount, currentUser]);
 
     return (
         <div className={styles.confirmationsPage}>
@@ -339,6 +448,8 @@ export default function ConfirmationsClient({
                         onSelectTrip={setSelectedTrip}
                         completingId={completing}
                         now={now}
+                        onQuickAction={handleQuickAction}
+                        pendingDividerIndex={pendingDividerIndex}
                     />
                 </div>
             )}
@@ -381,6 +492,16 @@ export default function ConfirmationsClient({
                     expandedMissed={expandedMissed}
                     onToggleMissed={toggleMissedExpand}
                 />
+            )}
+
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`${styles.toast} ${toast.type === "success" ? styles.toastSuccess : styles.toastError}`}>
+                    <span>{toast.message}</span>
+                    <button className={styles.toastDismiss} onClick={() => setToast(null)}>
+                        <X size={14} />
+                    </button>
+                </div>
             )}
         </div>
     );

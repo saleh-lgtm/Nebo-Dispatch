@@ -80,6 +80,13 @@ export type SortField = "pickupAt" | "dueAt" | "status" | "tripNumber" | "create
 export type SortDirection = "asc" | "desc";
 export type StatusFilter = "ALL" | "PENDING" | "CONFIRMED" | "NO_ANSWER" | "CANCELLED" | "RESCHEDULED" | "EXPIRED";
 
+export type UrgencyLevel = "overdue" | "critical" | "warning" | "normal" | "completed";
+
+export interface CurrentUser {
+    id: string;
+    name: string;
+}
+
 export const STATUS_CONFIG: Record<
     string,
     { label: string; icon: typeof CheckCircle; color: string; bgColor: string }

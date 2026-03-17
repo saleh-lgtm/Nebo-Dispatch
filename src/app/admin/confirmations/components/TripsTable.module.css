@@ -14,8 +14,8 @@
 }
 
 .tripsTable .colActions {
-    width: 90px;
-    text-align: center;
+    width: 200px;
+    text-align: right;
 }
 
 .tripsTable tbody tr .colActions {
@@ -89,6 +89,42 @@
 
 .tripsTable tbody tr.overdue:hover {
     background: rgba(239, 68, 68, 0.12);
+}
+
+/* Urgency row indicators */
+.tripsTable tbody tr.urgencyOverdue {
+    background: var(--danger-soft);
+    border-left: 3px solid var(--danger);
+}
+
+.tripsTable tbody tr.urgencyOverdue:hover {
+    background: rgba(239, 68, 68, 0.12);
+}
+
+.tripsTable tbody tr.urgencyCritical {
+    border-left: 3px solid var(--danger);
+}
+
+.tripsTable tbody tr.urgencyWarning {
+    border-left: 3px solid var(--warning);
+}
+
+/* Section divider between pending and completed */
+.sectionDivider td {
+    padding: 0.25rem 1rem;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+}
+
+.sectionDividerContent {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 .tripsTable td {
@@ -175,6 +211,37 @@
 
 .timeDiffOverdue {
     color: var(--danger);
+}
+
+/* Countdown timer */
+.countdown {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 0.8125rem;
+    white-space: nowrap;
+}
+
+.countdownNormal {
+    color: var(--success);
+}
+
+.countdownWarning {
+    color: var(--warning);
+}
+
+.countdownCritical {
+    color: var(--danger);
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.countdownOverdue {
+    color: var(--danger);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
 }
 
 .completedCell {
@@ -280,6 +347,88 @@
 }
 
 .actionBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Quick Action Buttons */
+.quickActions {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    justify-content: flex-end;
+}
+
+.quickConfirmBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.375rem 0.625rem;
+    background: var(--success);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.quickConfirmBtn:hover:not(:disabled) {
+    background: var(--success-hover);
+    transform: translateY(-1px);
+}
+
+.quickConfirmBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.quickNoAnswerBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.375rem 0.625rem;
+    background: var(--warning);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.quickNoAnswerBtn:hover:not(:disabled) {
+    background: var(--warning-hover);
+    transform: translateY(-1px);
+}
+
+.quickNoAnswerBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.editBtn {
+    padding: 0.375rem 0.5rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.editBtn:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.editBtn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }

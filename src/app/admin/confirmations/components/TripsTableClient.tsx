@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment } from "react";
 import {
     ArrowUpDown,
     ArrowUp,
@@ -10,9 +11,11 @@ import {
     Building2,
     ChevronLeft,
     ChevronRight,
+    CheckCircle,
+    PhoneOff,
 } from "lucide-react";
 import { TripConfirmation, SortField, SortDirection, STATUS_CONFIG } from "../types";
-import { formatDate, formatTime, formatDateTime, isOverdue, getTimeDiff } from "./utils";
+import { formatDate, formatTime, formatDateTime, getCountdownDisplay, getUrgencyLevel } from "./utils";
 import styles from "./TripsTable.module.css";
 
 interface TripsTableProps {
@@ -26,6 +29,8 @@ interface TripsTableProps {
     onSelectTrip: (trip: TripConfirmation) => void;
     completingId: string | null;
     now: number;
+    onQuickAction: (tripId: string, status: "CONFIRMED" | "NO_ANSWER") => void;
+    pendingDividerIndex?: number;
 }
 
 function SortIcon({ field, sortField, sortDirection }: { field: SortField; sortField: SortField; sortDirection: SortDirection }) {
@@ -48,6 +53,8 @@ export default function TripsTableClient({
     onSelectTrip,
     completingId,
     now,
+    onQuickAction,
+    pendingDividerIndex,
 }: TripsTableProps) {
     return (
         <>
@@ -92,110 +99,167 @@ export default function TripsTableClient({
                                 </td>
                             </tr>
                         ) : (
-                            trips.map((trip) => {
+                            trips.map((trip, index) => {
                                 const config = STATUS_CONFIG[trip.status] || STATUS_CONFIG.PENDING;
                                 const Icon = config.icon;
-                                const isPending = trip.status === "PENDING";
-                                const overdue = isPending && isOverdue(trip.dueAt, now);
+                                const urgencyLevel = getUrgencyLevel(trip.dueAt, trip.status, now);
+                                const showDivider = pendingDividerIndex !== undefined && index === pendingDividerIndex;
+
+                                const rowClass =
+                                    urgencyLevel === "overdue" ? styles.urgencyOverdue :
+                                    urgencyLevel === "critical" ? styles.urgencyCritical :
+                                    urgencyLevel === "warning" ? styles.urgencyWarning :
+                                    "";
 
                                 return (
-                                    <tr key={trip.id} className={overdue ? styles.overdue : ""}>
-                                        <td className={styles.colStatus}>
-                                            <div
-                                                className={styles.statusBadge}
-                                                style={{
-                                                    color: config.color,
-                                                    background: config.bgColor,
-                                                }}
-                                            >
-                                                <Icon size={12} />
-                                                <span>{config.label}</span>
-                                            </div>
-                                        </td>
-                                        <td className={styles.colTrip}>
-                                            <div className={styles.tripInfo}>
-                                                <span className={styles.tripNumber}>#{trip.tripNumber}</span>
-                                                {trip.reservationNumber && (
-                                                    <span className={styles.resNumber}>
-                                                        Res: {trip.reservationNumber}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className={styles.colPassenger}>
-                                            <div className={styles.personCell}>
-                                                <User size={14} />
-                                                <span>{trip.passengerName}</span>
-                                            </div>
-                                        </td>
-                                        <td className={styles.colDriver}>
-                                            <div className={styles.personCell}>
-                                                <Car size={14} />
-                                                <span>{trip.driverName}</span>
-                                            </div>
-                                        </td>
-                                        <td className={styles.colAccount}>
-                                            {trip.accountName ? (
-                                                <div className={styles.accountCell}>
-                                                    <Building2 size={14} />
-                                                    <span>{trip.accountName}</span>
+                                    <Fragment key={trip.id}>
+                                        {showDivider && (
+                                            <tr className={styles.sectionDivider}>
+                                                <td colSpan={10}>
+                                                    <div className={styles.sectionDividerContent}>
+                                                        <span>Completed / Expired</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                        <tr className={rowClass}>
+                                            <td className={styles.colStatus}>
+                                                <div
+                                                    className={styles.statusBadge}
+                                                    style={{
+                                                        color: config.color,
+                                                        background: config.bgColor,
+                                                    }}
+                                                >
+                                                    <Icon size={12} />
+                                                    <span>{config.label}</span>
                                                 </div>
-                                            ) : (
-                                                <span className={styles.emptyCell}>—</span>
-                                            )}
-                                        </td>
-                                        <td className={styles.colPickup}>
-                                            <div className={styles.datetimeCell}>
-                                                <span className={styles.date}>{formatDate(trip.pickupAt)}</span>
-                                                <span className={styles.time}>{formatTime(trip.pickupAt)}</span>
-                                            </div>
-                                        </td>
-                                        <td className={styles.colDue}>
-                                            <div className={`${styles.dueCell} ${overdue ? styles.overdue : ""}`}>
-                                                <span className={styles.time}>{formatTime(trip.dueAt)}</span>
-                                                {isPending && (
-                                                    <span className={`${styles.timeDiff} ${overdue ? styles.timeDiffOverdue : ""}`}>
-                                                        {overdue ? "+" : "-"}{getTimeDiff(trip.dueAt, now)}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className={styles.colCompleted}>
-                                            {trip.completedAt ? (
-                                                <div className={styles.completedCell}>
-                                                    <span className={styles.datetime}>{formatDateTime(trip.completedAt)}</span>
-                                                    {trip.minutesBeforeDue != null && (
-                                                        <span className={`${styles.leadTime} ${trip.minutesBeforeDue > 0 ? styles.early : styles.late}`}>
-                                                            {trip.minutesBeforeDue > 0 ? "+" : ""}{trip.minutesBeforeDue}m
+                                            </td>
+                                            <td className={styles.colTrip}>
+                                                <div className={styles.tripInfo}>
+                                                    <span className={styles.tripNumber}>#{trip.tripNumber}</span>
+                                                    {trip.reservationNumber && (
+                                                        <span className={styles.resNumber}>
+                                                            Res: {trip.reservationNumber}
                                                         </span>
                                                     )}
                                                 </div>
-                                            ) : (
-                                                <span className={`${styles.emptyCell} ${styles.awaiting}`}>Awaiting</span>
-                                            )}
-                                        </td>
-                                        <td className={styles.colDispatcher}>
-                                            {trip.completedBy ? (
-                                                <div className={styles.dispatcherCell}>
-                                                    <div className={styles.avatar}>
-                                                        {(trip.completedBy.name || "?").charAt(0).toUpperCase()}
-                                                    </div>
-                                                    <span className={styles.name}>{trip.completedBy.name}</span>
+                                            </td>
+                                            <td className={styles.colPassenger}>
+                                                <div className={styles.personCell}>
+                                                    <User size={14} />
+                                                    <span>{trip.passengerName}</span>
                                                 </div>
-                                            ) : (
-                                                <span className={styles.emptyCell}>—</span>
-                                            )}
-                                        </td>
-                                        <td className={styles.colActions}>
-                                            <button
-                                                className={styles.actionBtn}
-                                                onClick={() => onSelectTrip(trip)}
-                                                disabled={completingId === trip.id}
-                                            >
-                                                {completingId === trip.id ? "..." : "Edit"}
-                                            </button>
-                                        </td>
-                                    </tr>
+                                            </td>
+                                            <td className={styles.colDriver}>
+                                                <div className={styles.personCell}>
+                                                    <Car size={14} />
+                                                    <span>{trip.driverName}</span>
+                                                </div>
+                                            </td>
+                                            <td className={styles.colAccount}>
+                                                {trip.accountName ? (
+                                                    <div className={styles.accountCell}>
+                                                        <Building2 size={14} />
+                                                        <span>{trip.accountName}</span>
+                                                    </div>
+                                                ) : (
+                                                    <span className={styles.emptyCell}>—</span>
+                                                )}
+                                            </td>
+                                            <td className={styles.colPickup}>
+                                                <div className={styles.datetimeCell}>
+                                                    <span className={styles.date}>{formatDate(trip.pickupAt)}</span>
+                                                    <span className={styles.time}>{formatTime(trip.pickupAt)}</span>
+                                                </div>
+                                            </td>
+                                            <td className={styles.colDue}>
+                                                {(() => {
+                                                    const { text, urgency } = getCountdownDisplay(trip.dueAt, trip.status, now);
+                                                    const countdownClass =
+                                                        urgency === "overdue" ? styles.countdownOverdue :
+                                                        urgency === "critical" ? styles.countdownCritical :
+                                                        urgency === "warning" ? styles.countdownWarning :
+                                                        urgency === "completed" ? "" :
+                                                        styles.countdownNormal;
+                                                    return (
+                                                        <div className={styles.dueCell}>
+                                                            <span className={`${styles.countdown} ${countdownClass}`}>
+                                                                {text}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </td>
+                                            <td className={styles.colCompleted}>
+                                                {trip.completedAt ? (
+                                                    <div className={styles.completedCell}>
+                                                        <span className={styles.datetime}>{formatDateTime(trip.completedAt)}</span>
+                                                        {trip.minutesBeforeDue != null && (
+                                                            <span className={`${styles.leadTime} ${trip.minutesBeforeDue > 0 ? styles.early : styles.late}`}>
+                                                                {trip.minutesBeforeDue > 0 ? "+" : ""}{trip.minutesBeforeDue}m
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <span className={`${styles.emptyCell} ${styles.awaiting}`}>Awaiting</span>
+                                                )}
+                                            </td>
+                                            <td className={styles.colDispatcher}>
+                                                {trip.completedBy ? (
+                                                    <div className={styles.dispatcherCell}>
+                                                        <div className={styles.avatar}>
+                                                            {(trip.completedBy.name || "?").charAt(0).toUpperCase()}
+                                                        </div>
+                                                        <span className={styles.name}>{trip.completedBy.name}</span>
+                                                    </div>
+                                                ) : (
+                                                    <span className={styles.emptyCell}>—</span>
+                                                )}
+                                            </td>
+                                            <td className={styles.colActions}>
+                                                <div className={styles.quickActions}>
+                                                    {trip.status === "PENDING" ? (
+                                                        <>
+                                                            <button
+                                                                className={styles.quickConfirmBtn}
+                                                                onClick={(e) => { e.stopPropagation(); onQuickAction(trip.id, "CONFIRMED"); }}
+                                                                disabled={completingId === trip.id}
+                                                                title="Confirm trip"
+                                                            >
+                                                                <CheckCircle size={14} />
+                                                                Confirm
+                                                            </button>
+                                                            <button
+                                                                className={styles.quickNoAnswerBtn}
+                                                                onClick={(e) => { e.stopPropagation(); onQuickAction(trip.id, "NO_ANSWER"); }}
+                                                                disabled={completingId === trip.id}
+                                                                title="Mark no answer"
+                                                            >
+                                                                <PhoneOff size={14} />
+                                                                No Ans
+                                                            </button>
+                                                            <button
+                                                                className={styles.editBtn}
+                                                                onClick={() => onSelectTrip(trip)}
+                                                                disabled={completingId === trip.id}
+                                                            >
+                                                                Edit
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <button
+                                                            className={styles.editBtn}
+                                                            onClick={() => onSelectTrip(trip)}
+                                                            disabled={completingId === trip.id}
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </Fragment>
                                 );
                             })
                         )}

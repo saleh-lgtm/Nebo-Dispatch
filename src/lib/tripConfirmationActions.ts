@@ -1108,6 +1108,50 @@ export async function getPendingConfirmationCount() {
 }
 
 /**
+ * Get confirmations created since a given timestamp
+ * Used for auto-refresh polling — returns only new records
+ * Uses createdAt only (indexed) to avoid full table scan on updatedAt
+ */
+export async function getNewConfirmationsSince(since: Date) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+        throw new Error("Unauthorized");
+    }
+
+    // Role check — only admin roles can view confirmations
+    const isAdmin = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"].includes(
+        session.user.role || ""
+    );
+    if (!isAdmin) {
+        throw new Error("Admin access required");
+    }
+
+    // Validate input
+    const sinceDate = new Date(since);
+    if (isNaN(sinceDate.getTime())) {
+        throw new Error("Invalid date parameter");
+    }
+
+    const newConfirmations = await prisma.tripConfirmation.findMany({
+        where: {
+            createdAt: { gt: sinceDate },
+        },
+        orderBy: { dueAt: "asc" },
+        include: {
+            completedBy: {
+                select: { id: true, name: true },
+            },
+        },
+        take: 50,
+    });
+
+    return {
+        confirmations: newConfirmations,
+        timestamp: new Date(),
+    };
+}
+
+/**
  * Get all confirmations with optional filters for admin view
  * Shows ALL trips (pending, completed, expired) with full details
  * OPTIMIZED: Uses database-level pagination instead of fetching all records

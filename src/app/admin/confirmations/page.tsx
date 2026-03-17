@@ -41,6 +41,10 @@ export default async function ConfirmationsPage() {
             allConfirmations={allConfirmationsData.confirmations}
             totalConfirmations={allConfirmationsData.total}
             dispatchers={dispatchers}
+            currentUser={{
+                id: session.user.id,
+                name: session.user.name || "Unknown",
+            }}
         />
     );
 }
