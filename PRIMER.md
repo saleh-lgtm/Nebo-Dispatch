@@ -18,11 +18,11 @@ Staff-only tool for dispatchers, admins, and accounting.
 - Data-driven sidebar navigation with role-based groups and badge counts
 - Shared UI component library: ToggleGroup, TabBar (14/14 rolled out), PillSelector
 - Admin user management with force-logout capability
-- 45 server action files (23 hardened), 71 Prisma models, 26 enums
+- 46 server action files (23 hardened), 71 Prisma models, 26 enums
 
 ## Recent Sessions (last 3)
 
-- **2026-03-17 ~Evening:** Added force-logout via tokenVersion + 12h session expiry. Hotfixed pre-existing sessions lacking tokenVersion (undefined !== 0 was invalidating all sessions).
+- **2026-03-17 ~Evening:** Added force-logout via tokenVersion + 12h session expiry. Fixed 4 production bugs: pre-existing sessions without tokenVersion, empty session crash, unprotected JWT DB query, and non-function exports in "use server" files.
 - **2026-03-17 ~Afternoon:** Rolled out ToggleGroup to MobileSchedulerClient — replaced 3 manual toggles. Both scheduler views now use shared components.
 - **2026-03-16 ~Late Night (5):** Built 3 shared UI components (ToggleGroup, TabBar, PillSelector). Converted 5 loading skeletons from Tailwind. Added Zod validation to 3 API routes.
 
@@ -30,15 +30,14 @@ Staff-only tool for dispatchers, admins, and accounting.
 
 **Shared UI Component Rollout:**
 - TabBar: fully rolled out (14/14 complete)
-- ToggleGroup: adopted in CommandSchedulerClient + MobileSchedulerClient (2 of 5 instances)
-- PillSelector: adopted in PortalsClient (1 of 3 instances)
+- ToggleGroup: adopted in 2 of 5 instances
+- PillSelector: adopted in 1 of 3 instances
 
 **ConfirmationsClient.tsx Split (Phase 2):**
-- 3 remaining sub-components to extract: AnalyticsTab, DispatchersTab, AccountabilityTab
-- Parent still at ~1900 lines — target ~200 lines after phase 2
+- 3 sub-components to extract: AnalyticsTab, DispatchersTab, AccountabilityTab
 
 **Server Action Hardening:**
-- 23 of 45 server action files hardened — remaining 22 need review
+- 23 of 46 server action files hardened — remaining 23 need review
 
 ## Known Issues
 
@@ -51,24 +50,24 @@ Staff-only tool for dispatchers, admins, and accounting.
 
 ## Next Session
 
-1. **Roll out ToggleGroup** — 3 remaining toggle instances + PillSelector 2 remaining
-2. **ConfirmationsClient phase 2** — extract AnalyticsTab, DispatchersTab, AccountabilityTab
-3. Continue server action hardening — remaining 22 files
-4. Create dispatcher /confirmations page
-5. Complete Twilio production setup per TODO-TWILIO-SETUP.md
+1. **Audit all "use server" files** — verify no remaining non-function exports (grep for `export const|let|enum` in *Actions.ts files)
+2. **Roll out ToggleGroup** — 3 remaining instances + PillSelector 2 remaining
+3. **ConfirmationsClient phase 2** — extract AnalyticsTab, DispatchersTab, AccountabilityTab
+4. Continue server action hardening — remaining 23 files
+5. Create dispatcher /confirmations page
+6. Complete Twilio production setup per TODO-TWILIO-SETUP.md
 
 ## Key Decisions
 
 - CSS Modules only — no Tailwind. Modals MUST use CSS Modules with explicit `position: fixed`
 - Server actions for CRUD — API routes only for webhooks/external
+- **"use server" files can ONLY export async functions** — constants/objects go in separate files
 - `npm run db:push` — no migrations
 - Client components use *Client.tsx suffix
 - All server actions return `{ success: boolean, data?: T, error?: string }`
-- Navigation config lives in src/config/navigation.ts (data-driven)
-- JWT tokenVersion checked every 5 min — force-logout invalidates by incrementing version
-- Pre-existing JWTs without tokenVersion default to 0 (matches DB default) — critical for backwards compat
+- Force-logout: set JWT `exp: 0` so `getServerSession()` returns null — never return empty sessions
+- JWT tokenVersion checked every 5 min with try/catch (fail-open on DB errors)
+- Pre-existing JWTs without tokenVersion default to 0 (matches DB default)
 - Session maxAge: 12 hours — prevents multi-day stale sessions
-- push-to-la accepts 3 auth methods: session cookie, header secret, Basic Auth
-- Scheduler display must use UTC methods since date arithmetic is UTC-based
 - Shared UI: ToggleGroup (toggle buttons), TabBar (pill/underline tabs), PillSelector (chip filters)
 - SESSION-LOG.md is append-only (newest at top), PRIMER.md summarizes last 3
