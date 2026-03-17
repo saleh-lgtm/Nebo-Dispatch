@@ -210,24 +210,29 @@ export const authOptions: NextAuthOptions = {
             // Periodically check tokenVersion against DB to detect force-logout
             const now = Date.now();
             if (now - (token.tokenVersionCheckedAt || 0) > TOKEN_VERSION_CHECK_INTERVAL) {
-                const dbUser = await prisma.user.findUnique({
-                    where: { id: token.id },
-                    select: { tokenVersion: true, isActive: true },
-                });
+                try {
+                    const dbUser = await prisma.user.findUnique({
+                        where: { id: token.id },
+                        select: { tokenVersion: true, isActive: true },
+                    });
 
-                // Invalidate token if user not found, deactivated, or version bumped
-                // Treat missing tokenVersion (pre-existing sessions) as 0 to match DB default
-                const currentVersion = token.tokenVersion ?? 0;
-                if (!dbUser || !dbUser.isActive || dbUser.tokenVersion !== currentVersion) {
-                    // Set exp to 0 so NextAuth treats the JWT as expired
-                    // getServerSession() will return null → pages redirect to /login
-                    return { ...token, exp: 0 };
+                    // Invalidate token if user not found, deactivated, or version bumped
+                    // Treat missing tokenVersion (pre-existing sessions) as 0 to match DB default
+                    const currentVersion = token.tokenVersion ?? 0;
+                    if (!dbUser || !dbUser.isActive || dbUser.tokenVersion !== currentVersion) {
+                        // Set exp to 0 so NextAuth treats the JWT as expired
+                        // getServerSession() will return null → pages redirect to /login
+                        return { ...token, exp: 0 };
+                    }
+
+                    // Backfill tokenVersion for pre-existing sessions
+                    token.tokenVersion = currentVersion;
+                    token.tokenVersionCheckedAt = now;
+                } catch {
+                    // DB check failed (connection issue, cold start, etc.)
+                    // Fail open: let the token through, retry on next interval
+                    console.error("tokenVersion check failed, skipping");
                 }
-
-                // Backfill tokenVersion for pre-existing sessions
-                token.tokenVersion = currentVersion;
-
-                token.tokenVersionCheckedAt = now;
             }
 
             return token;
