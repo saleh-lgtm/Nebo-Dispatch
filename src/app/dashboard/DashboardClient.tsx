@@ -12,6 +12,7 @@ import {
     PlayCircle,
     DollarSign,
     ChevronDown,
+    Award,
 } from "lucide-react";
 import { createActiveShift } from "@/lib/actions";
 import { useState, useCallback } from "react";
@@ -192,6 +193,7 @@ interface Props {
     myTasks: Task[];
     taskProgress: TaskWithProgress[];
     upcomingConfirmations: Confirmation[];
+    accountabilityScore: number;
     userId: string;
     isAdmin: boolean;
     isSuperAdmin: boolean;
@@ -209,6 +211,7 @@ export default function DashboardClient({
     myTasks,
     taskProgress,
     upcomingConfirmations,
+    accountabilityScore,
     userId,
     isAdmin,
     isSuperAdmin,
@@ -353,6 +356,24 @@ export default function DashboardClient({
                         </div>
                         <div className={styles.statFooter}>
                             <span>Next 3 hours</span>
+                        </div>
+                    </div>
+                )}
+
+                {/* Accountability Score - dispatchers and admins */}
+                {!isSuperAdmin && (
+                    <div className={styles.statCard}>
+                        <div className={styles.statContent}>
+                            <div className={`${styles.statIcon} ${accountabilityScore >= 90 ? styles.iconSuccess : accountabilityScore >= 70 ? styles.iconWarning : styles.iconDanger}`}>
+                                <Award size={22} />
+                            </div>
+                            <div className={styles.statText}>
+                                <span className={styles.statLabel}>Accountability</span>
+                                <span className={styles.statValue}>{accountabilityScore}</span>
+                            </div>
+                        </div>
+                        <div className={styles.statFooter}>
+                            <span>{accountabilityScore >= 90 ? 'Good standing' : accountabilityScore >= 70 ? 'Needs improvement' : 'At risk'}</span>
                         </div>
                     </div>
                 )}

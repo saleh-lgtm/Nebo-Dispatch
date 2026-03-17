@@ -120,6 +120,11 @@
     color: var(--info);
 }
 
+.iconDanger {
+    background: var(--danger-bg);
+    color: var(--danger);
+}
+
 .statText {
     display: flex;
     flex-direction: column;

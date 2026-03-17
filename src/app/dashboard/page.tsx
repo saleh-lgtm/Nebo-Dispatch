@@ -114,6 +114,7 @@ export default async function DashboardPage() {
         myTasks,
         taskProgress,
         upcomingConfirmations,
+        accountabilityScore,
     ] = await Promise.all([
         // User count for admins
         safePromise(
@@ -177,6 +178,15 @@ export default async function DashboardPage() {
 
         // Upcoming confirmations (next 10 trips within 24 hours)
         safePromise(getUpcomingConfirmations(10), []),
+
+        // Accountability score for dispatchers/admins
+        safePromise(
+            prisma.user.findUnique({
+                where: { id: session.user.id },
+                select: { accountabilityScore: true },
+            }).then(u => u?.accountabilityScore ?? 100),
+            100
+        ),
     ]);
 
     const stats = {
@@ -198,6 +208,7 @@ export default async function DashboardPage() {
             myTasks={myTasks}
             taskProgress={taskProgress}
             upcomingConfirmations={upcomingConfirmations as never}
+            accountabilityScore={accountabilityScore}
             userId={session.user.id}
             isAdmin={isAdmin}
             isSuperAdmin={isSuperAdmin}
