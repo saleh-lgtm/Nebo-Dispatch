@@ -14,23 +14,15 @@ import {
     ShieldAlert,
     ChevronDown,
     ChevronUp,
-    Search,
-    Filter,
-    ArrowUpDown,
-    ArrowUp,
-    ArrowDown,
-    Car,
-    Building2,
-    X,
-    ChevronLeft,
-    ChevronRight,
     ListFilter,
-    User,
     AlertTriangle,
 } from "lucide-react";
 import { getAllConfirmations, completeConfirmation, getConfirmationTabData } from "@/lib/tripConfirmationActions";
 import { useRouter } from "next/navigation";
 import ConfirmationModal from "./components/ConfirmationModal";
+import TripsToolbarClient from "./components/TripsToolbarClient";
+import TripsTableClient from "./components/TripsTableClient";
+import { formatTime } from "./components/utils";
 import {
     Stats,
     DispatcherMetric,
@@ -139,51 +131,6 @@ export default function ConfirmationsClient({
 
     const ITEMS_PER_PAGE = 25;
 
-    const formatDateTime = (date: Date | string) => {
-        const d = new Date(date);
-        return d.toLocaleString("en-US", {
-            month: "short",
-            day: "numeric",
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-            timeZone: "America/Chicago",
-        });
-    };
-
-    const formatDate = (date: Date | string) => {
-        return new Date(date).toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-            timeZone: "America/Chicago",
-        });
-    };
-
-    const formatTime = (date: Date | string) => {
-        return new Date(date).toLocaleTimeString("en-US", {
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-            timeZone: "America/Chicago",
-        });
-    };
-
-    const isOverdue = (dueAt: Date | string) => {
-        return new Date(dueAt).getTime() < now;
-    };
-
-    const getTimeDiff = (target: Date | string) => {
-        const diff = new Date(target).getTime() - now;
-        const mins = Math.abs(Math.round(diff / 60000));
-        const hours = Math.floor(mins / 60);
-        const remainingMins = mins % 60;
-
-        if (hours > 0) {
-            return `${hours}h ${remainingMins}m`;
-        }
-        return `${mins}m`;
-    };
 
     const pendingCount = activeTodayConfirmations.filter((c) => c.status === "PENDING").length;
     const completedToday = activeTodayConfirmations.filter((c) => c.completedAt !== null).length;
@@ -379,15 +326,6 @@ export default function ConfirmationsClient({
         }
     };
 
-    const SortIcon = ({ field }: { field: SortField }) => {
-        if (sortField !== field) return <ArrowUpDown size={14} className="sort-icon inactive" />;
-        return sortDirection === "asc" ? (
-            <ArrowUp size={14} className="sort-icon active" />
-        ) : (
-            <ArrowDown size={14} className="sort-icon active" />
-        );
-    };
-
     return (
         <div className="confirmations-page">
             {/* Header */}
@@ -462,317 +400,42 @@ export default function ConfirmationsClient({
             {/* ALL TRIPS TAB */}
             {selectedTab === "trips" && (
                 <div className="trips-content">
-                    {/* Search and Filters Bar */}
-                    <div className="toolbar">
-                        <div className="search-box">
-                            <Search size={16} />
-                            <input
-                                type="text"
-                                placeholder="Search trip #, passenger, driver, account..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
-                            {searchQuery && (
-                                <button className="clear-search" onClick={() => setSearchQuery("")}>
-                                    <X size={14} />
-                                </button>
-                            )}
-                        </div>
-
-                        <div className="toolbar-actions">
-                            <button
-                                className={`filter-toggle ${showFilters ? "active" : ""} ${hasActiveFilters ? "has-filters" : ""}`}
-                                onClick={() => setShowFilters(!showFilters)}
-                            >
-                                <Filter size={16} />
-                                Filters
-                                {hasActiveFilters && <span className="filter-dot" />}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Expanded Filters Panel */}
-                    {showFilters && (
-                        <div className="filters-panel">
-                            <div className="filter-group">
-                                <label>Status</label>
-                                <select
-                                    value={statusFilter}
-                                    onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-                                >
-                                    <option value="ALL">All Statuses</option>
-                                    <option value="PENDING">Pending</option>
-                                    <option value="CONFIRMED">Confirmed</option>
-                                    <option value="NO_ANSWER">No Answer</option>
-                                    <option value="CANCELLED">Cancelled</option>
-                                    <option value="RESCHEDULED">Rescheduled</option>
-                                    <option value="EXPIRED">Expired</option>
-                                </select>
-                            </div>
-
-                            <div className="filter-group">
-                                <label>Completed By</label>
-                                <select
-                                    value={dispatcherFilter}
-                                    onChange={(e) => setDispatcherFilter(e.target.value)}
-                                >
-                                    <option value="ALL">All Dispatchers</option>
-                                    {dispatchers.map((d) => (
-                                        <option key={d.id} value={d.id}>
-                                            {d.name} ({d.count})
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="filter-group">
-                                <label>Date From</label>
-                                <input
-                                    type="date"
-                                    value={dateFrom}
-                                    onChange={(e) => setDateFrom(e.target.value)}
-                                />
-                            </div>
-
-                            <div className="filter-group">
-                                <label>Date To</label>
-                                <input
-                                    type="date"
-                                    value={dateTo}
-                                    onChange={(e) => setDateTo(e.target.value)}
-                                />
-                            </div>
-
-                            <div className="filter-actions">
-                                <button className="apply-btn" onClick={fetchConfirmations} disabled={isLoading}>
-                                    {isLoading ? "Loading..." : "Apply Filters"}
-                                </button>
-                                {hasActiveFilters && (
-                                    <button className="clear-btn" onClick={clearFilters}>
-                                        Clear All
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Results Summary */}
-                    <div className="results-summary">
-                        <span className="results-count">
-                            Showing <strong>{paginatedConfirmations.length}</strong> of{" "}
-                            <strong>{filteredAndSortedConfirmations.length}</strong> trips
-                        </span>
-                        <div className="section-counts">
-                            <span className="upcoming-count">
-                                <Clock size={12} />
-                                {upcomingCount} upcoming
-                            </span>
-                            <span className="past-count">
-                                <CheckCircle size={12} />
-                                {pastCount} past
-                            </span>
-                        </div>
-                        {hasActiveFilters && (
-                            <span className="filtered-indicator">
-                                (filtered from {totalCount} total)
-                            </span>
-                        )}
-                    </div>
-
-                    {/* Data Table */}
-                    <div className="table-container">
-                        <table className="trips-table">
-                            <thead>
-                                <tr>
-                                    <th className="col-status">Status</th>
-                                    <th className="col-trip sortable" onClick={() => handleSort("tripNumber")}>
-                                        <span>Trip #</span>
-                                        <SortIcon field="tripNumber" />
-                                    </th>
-                                    <th className="col-passenger">Passenger</th>
-                                    <th className="col-driver">Driver</th>
-                                    <th className="col-account">Account</th>
-                                    <th className="col-pickup sortable" onClick={() => handleSort("pickupAt")}>
-                                        <span>Pickup</span>
-                                        <SortIcon field="pickupAt" />
-                                    </th>
-                                    <th className="col-due sortable" onClick={() => handleSort("dueAt")}>
-                                        <span>Due</span>
-                                        <SortIcon field="dueAt" />
-                                    </th>
-                                    <th className="col-completed sortable" onClick={() => handleSort("completedAt")}>
-                                        <span>Completed</span>
-                                        <SortIcon field="completedAt" />
-                                    </th>
-                                    <th className="col-dispatcher">By</th>
-                                    <th className="col-actions">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {paginatedConfirmations.length === 0 ? (
-                                    <tr className="empty-row">
-                                        <td colSpan={10}>
-                                            <div className="empty-state">
-                                                <Calendar size={40} />
-                                                <p>No trips found</p>
-                                                <span>Try adjusting your filters</span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    paginatedConfirmations.map((trip) => {
-                                        const config = STATUS_CONFIG[trip.status] || STATUS_CONFIG.PENDING;
-                                        const Icon = config.icon;
-                                        const isPending = trip.status === "PENDING";
-                                        const overdue = isPending && isOverdue(trip.dueAt);
-
-                                        return (
-                                            <tr key={trip.id} className={overdue ? "overdue" : ""}>
-                                                <td className="col-status">
-                                                    <div
-                                                        className="status-badge"
-                                                        style={{
-                                                            color: config.color,
-                                                            background: config.bgColor,
-                                                        }}
-                                                    >
-                                                        <Icon size={12} />
-                                                        <span>{config.label}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="col-trip">
-                                                    <div className="trip-info">
-                                                        <span className="trip-number">#{trip.tripNumber}</span>
-                                                        {trip.reservationNumber && (
-                                                            <span className="res-number">
-                                                                Res: {trip.reservationNumber}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="col-passenger">
-                                                    <div className="person-cell">
-                                                        <User size={14} />
-                                                        <span>{trip.passengerName}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="col-driver">
-                                                    <div className="person-cell">
-                                                        <Car size={14} />
-                                                        <span>{trip.driverName}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="col-account">
-                                                    {trip.accountName ? (
-                                                        <div className="account-cell">
-                                                            <Building2 size={14} />
-                                                            <span>{trip.accountName}</span>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="empty-cell">—</span>
-                                                    )}
-                                                </td>
-                                                <td className="col-pickup">
-                                                    <div className="datetime-cell">
-                                                        <span className="date">{formatDate(trip.pickupAt)}</span>
-                                                        <span className="time">{formatTime(trip.pickupAt)}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="col-due">
-                                                    <div className={`due-cell ${overdue ? "overdue" : ""}`}>
-                                                        <span className="time">{formatTime(trip.dueAt)}</span>
-                                                        {isPending && (
-                                                            <span className={`time-diff ${overdue ? "overdue" : ""}`}>
-                                                                {overdue ? "+" : "-"}{getTimeDiff(trip.dueAt)}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="col-completed">
-                                                    {trip.completedAt ? (
-                                                        <div className="completed-cell">
-                                                            <span className="datetime">{formatDateTime(trip.completedAt)}</span>
-                                                            {trip.minutesBeforeDue != null && (
-                                                                <span className={`lead-time ${trip.minutesBeforeDue > 0 ? "early" : "late"}`}>
-                                                                    {trip.minutesBeforeDue > 0 ? "+" : ""}{trip.minutesBeforeDue}m
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <span className="empty-cell awaiting">Awaiting</span>
-                                                    )}
-                                                </td>
-                                                <td className="col-dispatcher">
-                                                    {trip.completedBy ? (
-                                                        <div className="dispatcher-cell">
-                                                            <div className="avatar">
-                                                                {(trip.completedBy.name || "?").charAt(0).toUpperCase()}
-                                                            </div>
-                                                            <span className="name">{trip.completedBy.name}</span>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="empty-cell">—</span>
-                                                    )}
-                                                </td>
-                                                <td className="col-actions">
-                                                    <button
-                                                        className="action-btn"
-                                                        onClick={() => setSelectedTrip(trip)}
-                                                        disabled={completing === trip.id}
-                                                    >
-                                                        {completing === trip.id ? "..." : "Edit"}
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Pagination */}
-                    {totalPages > 1 && (
-                        <div className="pagination">
-                            <button
-                                className="page-btn"
-                                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                                disabled={currentPage === 1}
-                            >
-                                <ChevronLeft size={16} />
-                            </button>
-                            <div className="page-numbers">
-                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                    let pageNum: number;
-                                    if (totalPages <= 5) {
-                                        pageNum = i + 1;
-                                    } else if (currentPage <= 3) {
-                                        pageNum = i + 1;
-                                    } else if (currentPage >= totalPages - 2) {
-                                        pageNum = totalPages - 4 + i;
-                                    } else {
-                                        pageNum = currentPage - 2 + i;
-                                    }
-                                    return (
-                                        <button
-                                            key={pageNum}
-                                            className={`page-num ${currentPage === pageNum ? "active" : ""}`}
-                                            onClick={() => setCurrentPage(pageNum)}
-                                        >
-                                            {pageNum}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                            <button
-                                className="page-btn"
-                                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                                disabled={currentPage === totalPages}
-                            >
-                                <ChevronRight size={16} />
-                            </button>
-                        </div>
-                    )}
+                    <TripsToolbarClient
+                        searchQuery={searchQuery}
+                        onSearchChange={setSearchQuery}
+                        statusFilter={statusFilter}
+                        onStatusFilterChange={setStatusFilter}
+                        dispatcherFilter={dispatcherFilter}
+                        onDispatcherFilterChange={setDispatcherFilter}
+                        dateFrom={dateFrom}
+                        onDateFromChange={setDateFrom}
+                        dateTo={dateTo}
+                        onDateToChange={setDateTo}
+                        showFilters={showFilters}
+                        onToggleFilters={() => setShowFilters(!showFilters)}
+                        hasActiveFilters={!!hasActiveFilters}
+                        dispatchers={dispatchers}
+                        isLoading={isLoading}
+                        onApplyFilters={fetchConfirmations}
+                        onClearFilters={clearFilters}
+                        showing={paginatedConfirmations.length}
+                        total={filteredAndSortedConfirmations.length}
+                        upcomingCount={upcomingCount}
+                        pastCount={pastCount}
+                        grandTotal={totalCount}
+                    />
+                    <TripsTableClient
+                        trips={paginatedConfirmations}
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={setCurrentPage}
+                        onSelectTrip={setSelectedTrip}
+                        completingId={completing}
+                        now={now}
+                    />
                 </div>
             )}
 
@@ -1343,482 +1006,6 @@ export default function ConfirmationsClient({
                     gap: 1rem;
                 }
 
-                /* Toolbar */
-                .toolbar {
-                    display: flex;
-                    gap: 1rem;
-                    align-items: center;
-                    flex-wrap: wrap;
-                }
-
-                .search-box {
-                    flex: 1;
-                    min-width: 280px;
-                    max-width: 480px;
-                    display: flex;
-                    align-items: center;
-                    gap: 0.75rem;
-                    padding: 0.75rem 1rem;
-                    background: var(--bg-card);
-                    border: 1px solid var(--border);
-                    border-radius: 10px;
-                    transition: border-color 0.2s;
-                }
-
-                .search-box:focus-within {
-                    border-color: var(--accent);
-                    box-shadow: 0 0 0 3px var(--accent-soft);
-                }
-
-                .search-box :global(svg) {
-                    color: var(--text-muted);
-                    flex-shrink: 0;
-                }
-
-                .search-box input {
-                    flex: 1;
-                    background: transparent;
-                    border: none;
-                    color: var(--text-primary);
-                    font-size: 0.875rem;
-                    outline: none;
-                }
-
-                .search-box input::placeholder {
-                    color: var(--text-muted);
-                }
-
-                .clear-search {
-                    background: var(--bg-hover);
-                    border: none;
-                    border-radius: 4px;
-                    padding: 0.25rem;
-                    cursor: pointer;
-                    color: var(--text-muted);
-                    display: flex;
-                }
-
-                .clear-search:hover {
-                    color: var(--text-primary);
-                    background: var(--bg-active);
-                }
-
-                .toolbar-actions {
-                    display: flex;
-                    gap: 0.5rem;
-                }
-
-                .filter-toggle {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                    padding: 0.75rem 1rem;
-                    background: var(--bg-card);
-                    border: 1px solid var(--border);
-                    border-radius: 10px;
-                    color: var(--text-secondary);
-                    font-size: 0.875rem;
-                    font-weight: 500;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                    position: relative;
-                }
-
-                .filter-toggle:hover {
-                    border-color: var(--text-muted);
-                    color: var(--text-primary);
-                }
-
-                .filter-toggle.active {
-                    background: var(--accent-soft);
-                    border-color: var(--accent);
-                    color: var(--accent);
-                }
-
-                .filter-dot {
-                    position: absolute;
-                    top: 8px;
-                    right: 8px;
-                    width: 6px;
-                    height: 6px;
-                    background: var(--accent);
-                    border-radius: 50%;
-                }
-
-                /* Filters Panel */
-                .filters-panel {
-                    display: flex;
-                    gap: 1rem;
-                    padding: 1rem;
-                    background: var(--bg-card);
-                    border: 1px solid var(--border);
-                    border-radius: 12px;
-                    flex-wrap: wrap;
-                    align-items: flex-end;
-                }
-
-                .filter-group {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 0.375rem;
-                    min-width: 160px;
-                }
-
-                .filter-group label {
-                    font-size: 0.75rem;
-                    font-weight: 600;
-                    color: var(--text-muted);
-                    text-transform: uppercase;
-                    letter-spacing: 0.05em;
-                }
-
-                .filter-group select,
-                .filter-group input {
-                    padding: 0.625rem 0.875rem;
-                    background: var(--bg-surface);
-                    border: 1px solid var(--border);
-                    border-radius: 8px;
-                    color: var(--text-primary);
-                    font-size: 0.875rem;
-                    cursor: pointer;
-                }
-
-                .filter-group select:focus,
-                .filter-group input:focus {
-                    outline: none;
-                    border-color: var(--accent);
-                }
-
-                .filter-actions {
-                    display: flex;
-                    gap: 0.5rem;
-                    margin-left: auto;
-                }
-
-                .apply-btn {
-                    padding: 0.625rem 1.25rem;
-                    background: var(--accent);
-                    border: none;
-                    border-radius: 8px;
-                    color: white;
-                    font-size: 0.875rem;
-                    font-weight: 600;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                }
-
-                .apply-btn:hover:not(:disabled) {
-                    background: var(--accent-hover);
-                }
-
-                .apply-btn:disabled {
-                    opacity: 0.6;
-                    cursor: not-allowed;
-                }
-
-                .clear-btn {
-                    padding: 0.625rem 1rem;
-                    background: transparent;
-                    border: 1px solid var(--border);
-                    border-radius: 8px;
-                    color: var(--text-secondary);
-                    font-size: 0.875rem;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                }
-
-                .clear-btn:hover {
-                    border-color: var(--danger);
-                    color: var(--danger);
-                }
-
-                /* Results Summary */
-                .results-summary {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                    padding: 0.5rem 0;
-                    color: var(--text-secondary);
-                    font-size: 0.8125rem;
-                }
-
-                .results-summary strong {
-                    color: var(--text-primary);
-                }
-
-                .filtered-indicator {
-                    color: var(--text-muted);
-                }
-
-                .section-counts {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.75rem;
-                    margin-left: auto;
-                }
-
-                .upcoming-count,
-                .past-count {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.25rem;
-                    padding: 0.25rem 0.5rem;
-                    border-radius: 6px;
-                    font-size: 0.75rem;
-                    font-weight: 500;
-                }
-
-                .upcoming-count {
-                    background: var(--info-bg, rgba(96, 165, 250, 0.12));
-                    color: var(--info, #60a5fa);
-                }
-
-                .past-count {
-                    background: var(--success-bg, rgba(74, 222, 128, 0.12));
-                    color: var(--success, #4ade80);
-                }
-
-                /* Data Table */
-                .table-container {
-                    background: var(--bg-card);
-                    border: 1px solid var(--border);
-                    border-radius: 12px;
-                    overflow-x: auto;
-                }
-
-                .trips-table {
-                    width: 100%;
-                    min-width: 1000px;
-                    border-collapse: collapse;
-                    font-size: 0.8125rem;
-                }
-
-                .trips-table .col-actions {
-                    width: 90px;
-                    text-align: center;
-                }
-
-                .trips-table tbody tr .col-actions {
-                    background: var(--bg-card);
-                }
-
-                .trips-table tbody tr:hover .col-actions {
-                    background: var(--bg-hover);
-                }
-
-                .trips-table tbody tr.overdue .col-actions {
-                    background: var(--danger-soft);
-                }
-
-                .trips-table thead {
-                    background: var(--bg-surface);
-                    border-bottom: 1px solid var(--border);
-                }
-
-                .trips-table th {
-                    padding: 0.875rem 1rem;
-                    text-align: left;
-                    font-weight: 600;
-                    font-size: 0.7rem;
-                    color: var(--text-muted);
-                    text-transform: uppercase;
-                    letter-spacing: 0.05em;
-                    white-space: nowrap;
-                }
-
-                .trips-table th.sortable {
-                    cursor: pointer;
-                    user-select: none;
-                }
-
-                .trips-table th.sortable:hover {
-                    color: var(--text-primary);
-                }
-
-                .trips-table th.sortable span {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 0.375rem;
-                }
-
-                .trips-table th :global(.sort-icon) {
-                    opacity: 0.3;
-                }
-
-                .trips-table th :global(.sort-icon.active) {
-                    opacity: 1;
-                    color: var(--accent);
-                }
-
-                .trips-table tbody tr {
-                    border-bottom: 1px solid var(--border);
-                    transition: background 0.15s;
-                }
-
-                .trips-table tbody tr:last-child {
-                    border-bottom: none;
-                }
-
-                .trips-table tbody tr:hover {
-                    background: var(--bg-hover);
-                }
-
-                .trips-table tbody tr.overdue {
-                    background: var(--danger-soft);
-                }
-
-                .trips-table tbody tr.overdue:hover {
-                    background: rgba(239, 68, 68, 0.12);
-                }
-
-                .trips-table td {
-                    padding: 0.875rem 1rem;
-                    vertical-align: middle;
-                }
-
-                /* Table Cell Styles */
-                .status-badge {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 0.375rem;
-                    padding: 0.375rem 0.625rem;
-                    border-radius: 6px;
-                    font-size: 0.75rem;
-                    font-weight: 600;
-                    white-space: nowrap;
-                }
-
-                .trip-info {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 0.125rem;
-                }
-
-                .trip-number {
-                    font-weight: 700;
-                    color: var(--text-primary);
-                    font-family: 'JetBrains Mono', monospace;
-                }
-
-                .res-number {
-                    font-size: 0.7rem;
-                    color: var(--text-muted);
-                }
-
-                .person-cell,
-                .account-cell {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                    color: var(--text-secondary);
-                }
-
-                .person-cell :global(svg),
-                .account-cell :global(svg) {
-                    color: var(--text-muted);
-                    flex-shrink: 0;
-                }
-
-                .datetime-cell {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 0.125rem;
-                }
-
-                .datetime-cell .date {
-                    font-weight: 500;
-                    color: var(--text-primary);
-                }
-
-                .datetime-cell .time {
-                    font-size: 0.75rem;
-                    color: var(--text-muted);
-                    font-family: 'JetBrains Mono', monospace;
-                }
-
-                .due-cell {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 0.125rem;
-                }
-
-                .due-cell .time {
-                    font-family: 'JetBrains Mono', monospace;
-                    color: var(--text-secondary);
-                }
-
-                .time-diff {
-                    font-size: 0.7rem;
-                    font-weight: 600;
-                    color: var(--success);
-                }
-
-                .time-diff.overdue {
-                    color: var(--danger);
-                }
-
-                .completed-cell {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 0.125rem;
-                }
-
-                .completed-cell .datetime {
-                    font-size: 0.75rem;
-                    color: var(--text-secondary);
-                }
-
-                .lead-time {
-                    font-size: 0.7rem;
-                    font-weight: 600;
-                    font-family: 'JetBrains Mono', monospace;
-                }
-
-                .lead-time.early {
-                    color: var(--success);
-                }
-
-                .lead-time.late {
-                    color: var(--danger);
-                }
-
-                .dispatcher-cell {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                }
-
-                .dispatcher-cell .avatar {
-                    width: 24px;
-                    height: 24px;
-                    border-radius: 50%;
-                    background: var(--accent-soft);
-                    color: var(--accent);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 0.7rem;
-                    font-weight: 700;
-                }
-
-                .dispatcher-cell .name {
-                    color: var(--text-secondary);
-                    font-size: 0.8125rem;
-                }
-
-                .empty-cell {
-                    color: var(--text-muted);
-                }
-
-                .empty-cell.awaiting {
-                    color: var(--warning);
-                    font-weight: 500;
-                }
-
-                .empty-row td {
-                    padding: 3rem 1rem;
-                }
-
                 .empty-state {
                     display: flex;
                     flex-direction: column;
@@ -1867,70 +1054,6 @@ export default function ConfirmationsClient({
                     font-size: 0.75rem;
                     color: var(--accent-blue);
                     margin-left: 0.25rem;
-                }
-
-                /* Pagination */
-                .pagination {
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    gap: 0.5rem;
-                    padding: 1rem 0;
-                }
-
-                .page-btn {
-                    width: 36px;
-                    height: 36px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    background: var(--bg-card);
-                    border: 1px solid var(--border);
-                    border-radius: 8px;
-                    color: var(--text-secondary);
-                    cursor: pointer;
-                    transition: all 0.2s;
-                }
-
-                .page-btn:hover:not(:disabled) {
-                    border-color: var(--accent);
-                    color: var(--accent);
-                }
-
-                .page-btn:disabled {
-                    opacity: 0.4;
-                    cursor: not-allowed;
-                }
-
-                .page-numbers {
-                    display: flex;
-                    gap: 0.25rem;
-                }
-
-                .page-num {
-                    width: 36px;
-                    height: 36px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    background: transparent;
-                    border: 1px solid transparent;
-                    border-radius: 8px;
-                    color: var(--text-secondary);
-                    font-size: 0.875rem;
-                    font-weight: 500;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                }
-
-                .page-num:hover {
-                    background: var(--bg-hover);
-                }
-
-                .page-num.active {
-                    background: var(--accent);
-                    color: white;
-                    font-weight: 700;
                 }
 
                 /* ===== OVERVIEW TAB ===== */
@@ -2461,16 +1584,6 @@ export default function ConfirmationsClient({
                 }
 
                 /* ===== RESPONSIVE ===== */
-                @media (max-width: 1024px) {
-                    .table-container {
-                        overflow-x: auto;
-                    }
-
-                    .trips-table {
-                        min-width: 900px;
-                    }
-                }
-
                 @media (max-width: 768px) {
                     .confirmations-page {
                         padding: 1rem;
@@ -2496,10 +1609,7 @@ export default function ConfirmationsClient({
                         white-space: nowrap;
                         padding: 0.625rem 1rem;
                     }
-
-                    .toolbar {
-                        flex-direction: column;
-                    }
+                }
 
                 /* ===== MODAL STYLES ===== */
                 .modal-overlay {
@@ -2761,52 +1871,8 @@ export default function ConfirmationsClient({
                     color: var(--text-primary);
                 }
 
-                /* Action Button */
-                .action-btn {
-                    padding: 0.5rem 1rem;
-                    background: var(--accent);
-                    border: none;
-                    border-radius: 6px;
-                    color: white;
-                    font-size: 0.8125rem;
-                    font-weight: 600;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                }
-
-                .action-btn:hover:not(:disabled) {
-                    transform: translateY(-1px);
-                    filter: brightness(1.1);
-                }
-
-                .action-btn:disabled {
-                    opacity: 0.5;
-                    cursor: not-allowed;
-                }
-
                 /* ===== MEDIA QUERIES ===== */
                 @media (max-width: 768px) {
-                    .search-box {
-                        max-width: none;
-                    }
-
-                    .filters-panel {
-                        flex-direction: column;
-                    }
-
-                    .filter-group {
-                        width: 100%;
-                    }
-
-                    .filter-actions {
-                        margin-left: 0;
-                        width: 100%;
-                    }
-
-                    .apply-btn, .clear-btn {
-                        flex: 1;
-                    }
-
                     .stats-grid {
                         grid-template-columns: repeat(2, 1fr);
                     }

@@ -1,0 +1,360 @@
+/* Data Table */
+.tableContainer {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow-x: auto;
+}
+
+.tripsTable {
+    width: 100%;
+    min-width: 1000px;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+}
+
+.tripsTable .colActions {
+    width: 90px;
+    text-align: center;
+}
+
+.tripsTable tbody tr .colActions {
+    background: var(--bg-card);
+}
+
+.tripsTable tbody tr:hover .colActions {
+    background: var(--bg-hover);
+}
+
+.tripsTable tbody tr.overdue .colActions {
+    background: var(--danger-soft);
+}
+
+.tripsTable thead {
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+}
+
+.tripsTable th {
+    padding: 0.875rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+}
+
+.tripsTable th.sortable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.tripsTable th.sortable:hover {
+    color: var(--text-primary);
+}
+
+.tripsTable th.sortable span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.sortIconInactive {
+    opacity: 0.3;
+}
+
+.sortIconActive {
+    opacity: 1;
+    color: var(--accent);
+}
+
+.tripsTable tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+}
+
+.tripsTable tbody tr:last-child {
+    border-bottom: none;
+}
+
+.tripsTable tbody tr:hover {
+    background: var(--bg-hover);
+}
+
+.tripsTable tbody tr.overdue {
+    background: var(--danger-soft);
+}
+
+.tripsTable tbody tr.overdue:hover {
+    background: rgba(239, 68, 68, 0.12);
+}
+
+.tripsTable td {
+    padding: 0.875rem 1rem;
+    vertical-align: middle;
+}
+
+/* Table Cell Styles */
+.statusBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.625rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.tripInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.tripNumber {
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.resNumber {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.personCell,
+.accountCell {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+}
+
+.personCell svg,
+.accountCell svg {
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.datetimeCell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.datetimeCell .date {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.datetimeCell .time {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.dueCell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.dueCell .time {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-secondary);
+}
+
+.timeDiff {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--success);
+}
+
+.timeDiffOverdue {
+    color: var(--danger);
+}
+
+.completedCell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.completedCell .datetime {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.leadTime {
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.leadTime.early {
+    color: var(--success);
+}
+
+.leadTime.late {
+    color: var(--danger);
+}
+
+.dispatcherCell {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.dispatcherCell .avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.dispatcherCell .name {
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+}
+
+.emptyCell {
+    color: var(--text-muted);
+}
+
+.emptyCell.awaiting {
+    color: var(--warning);
+    font-weight: 500;
+}
+
+.emptyRow td {
+    padding: 3rem 1rem;
+}
+
+.emptyState {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.emptyState svg {
+    opacity: 0.3;
+}
+
+.emptyState p {
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.emptyState span {
+    font-size: 0.8125rem;
+}
+
+/* Action Button */
+.actionBtn {
+    padding: 0.5rem 1rem;
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.actionBtn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.1);
+}
+
+.actionBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Pagination */
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 0;
+}
+
+.pageBtn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.pageBtn:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.pageBtn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.pageNumbers {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.pageNum {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.pageNum:hover {
+    background: var(--bg-hover);
+}
+
+.pageNumActive {
+    background: var(--accent);
+    color: white;
+    font-weight: 700;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .tableContainer {
+        overflow-x: auto;
+    }
+
+    .tripsTable {
+        min-width: 900px;
+    }
+}
