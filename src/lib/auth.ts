@@ -187,10 +187,6 @@ export const authOptions: NextAuthOptions = {
     ],
     callbacks: {
         session: ({ session, token }) => {
-            // If token was invalidated by force-logout, return empty session
-            if (!token.id || token.tokenVersion === -1) {
-                return { ...session, user: { ...session.user, id: "", role: "" as Role } };
-            }
             return {
                 ...session,
                 user: {
@@ -223,7 +219,9 @@ export const authOptions: NextAuthOptions = {
                 // Treat missing tokenVersion (pre-existing sessions) as 0 to match DB default
                 const currentVersion = token.tokenVersion ?? 0;
                 if (!dbUser || !dbUser.isActive || dbUser.tokenVersion !== currentVersion) {
-                    return { ...token, id: "", role: "" as Role, tokenVersion: -1 };
+                    // Set exp to 0 so NextAuth treats the JWT as expired
+                    // getServerSession() will return null → pages redirect to /login
+                    return { ...token, exp: 0 };
                 }
 
                 // Backfill tokenVersion for pre-existing sessions
