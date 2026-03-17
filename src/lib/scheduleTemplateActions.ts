@@ -1,23 +1,15 @@
 "use server";
 
 import prisma from "./prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "./auth";
 import { revalidatePath } from "next/cache";
+import { requireAdmin } from "./auth-helpers";
 import type { Market, ShiftType } from "@/types/schedule";
 import { getWeekStart, addDays, formatHour, DAY_NAMES_FULL } from "@/types/schedule";
-
-// Helper to require admin role
-async function requireAdmin() {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-        throw new Error("Not authenticated");
-    }
-    if (!["SUPER_ADMIN", "ADMIN"].includes(session.user.role)) {
-        throw new Error("Admin access required");
-    }
-    return session.user.id;
-}
+import {
+    idParamSchema,
+    createScheduleTemplateSchema,
+    updateScheduleTemplateSchema,
+} from "./schemas";
 
 // Types - using Int hours (0-23), NOT Float
 export interface TemplateShiftInput {
@@ -56,36 +48,55 @@ export interface ScheduleTemplateWithShifts {
  */
 export async function getScheduleTemplates(
     includeInactive = false
-): Promise<ScheduleTemplateWithShifts[]> {
-    await requireAdmin();
+): Promise<{ success: boolean; data?: ScheduleTemplateWithShifts[]; error?: string }> {
+    try {
+        await requireAdmin();
 
-    return prisma.scheduleTemplate.findMany({
-        where: includeInactive ? {} : { isActive: true },
-        include: {
-            createdBy: { select: { name: true } },
-            shifts: {
-                orderBy: [{ dayOfWeek: "asc" }, { startHour: "asc" }, { order: "asc" }],
+        const templates = await prisma.scheduleTemplate.findMany({
+            where: includeInactive ? {} : { isActive: true },
+            include: {
+                createdBy: { select: { name: true } },
+                shifts: {
+                    orderBy: [{ dayOfWeek: "asc" }, { startHour: "asc" }, { order: "asc" }],
+                },
             },
-        },
-        orderBy: { name: "asc" },
-    });
+            orderBy: { name: "asc" },
+        });
+
+        return { success: true, data: templates };
+    } catch (error) {
+        console.error("getScheduleTemplates error:", error);
+        return { success: false, error: "Failed to get templates" };
+    }
 }
 
 /**
  * Get a single template by ID
  */
-export async function getScheduleTemplate(templateId: string): Promise<ScheduleTemplateWithShifts | null> {
-    await requireAdmin();
+export async function getScheduleTemplate(templateId: string): Promise<{ success: boolean; data?: ScheduleTemplateWithShifts | null; error?: string }> {
+    try {
+        await requireAdmin();
 
-    return prisma.scheduleTemplate.findUnique({
-        where: { id: templateId },
-        include: {
-            createdBy: { select: { name: true } },
-            shifts: {
-                orderBy: [{ dayOfWeek: "asc" }, { startHour: "asc" }, { order: "asc" }],
+        const parsed = idParamSchema.safeParse({ id: templateId });
+        if (!parsed.success) {
+            return { success: false, error: "Invalid template ID" };
+        }
+
+        const template = await prisma.scheduleTemplate.findUnique({
+            where: { id: parsed.data.id },
+            include: {
+                createdBy: { select: { name: true } },
+                shifts: {
+                    orderBy: [{ dayOfWeek: "asc" }, { startHour: "asc" }, { order: "asc" }],
+                },
             },
-        },
-    });
+        });
+
+        return { success: true, data: template };
+    } catch (error) {
+        console.error("getScheduleTemplate error:", error);
+        return { success: false, error: "Failed to get template" };
+    }
 }
 
 /**
@@ -96,34 +107,26 @@ export async function createScheduleTemplate(
     description: string | null,
     shifts: TemplateShiftInput[]
 ): Promise<{ success: boolean; templateId?: string; error?: string }> {
-    const userId = await requireAdmin();
-
     try {
-        // Validate shifts
-        for (const shift of shifts) {
-            if (shift.dayOfWeek < 0 || shift.dayOfWeek > 6) {
-                return { success: false, error: `Invalid day of week: ${shift.dayOfWeek}` };
-            }
-            if (shift.startHour < 0 || shift.startHour > 23) {
-                return { success: false, error: `Invalid start hour: ${shift.startHour}` };
-            }
-            if (shift.endHour < 0 || shift.endHour > 23) {
-                return { success: false, error: `Invalid end hour: ${shift.endHour}` };
-            }
+        const session = await requireAdmin();
+
+        const parsed = createScheduleTemplateSchema.safeParse({ name, description, shifts });
+        if (!parsed.success) {
+            return { success: false, error: parsed.error.issues[0]?.message || "Invalid input" };
         }
 
         const template = await prisma.scheduleTemplate.create({
             data: {
-                name,
-                description,
-                createdById: userId,
+                name: parsed.data.name,
+                description: parsed.data.description,
+                createdById: session.user.id,
                 shifts: {
-                    create: shifts.map((shift, idx) => ({
+                    create: parsed.data.shifts.map((shift, idx) => ({
                         dayOfWeek: shift.dayOfWeek,
                         startHour: shift.startHour,
                         endHour: shift.endHour,
-                        market: shift.market || null,
-                        shiftType: shift.shiftType || "CUSTOM",
+                        market: (shift.market as Market) || null,
+                        shiftType: (shift.shiftType as ShiftType) || "CUSTOM",
                         dispatcherId: shift.dispatcherId || null,
                         order: shift.order ?? idx,
                     })),
@@ -151,35 +154,45 @@ export async function updateScheduleTemplate(
         shifts?: TemplateShiftInput[];
     }
 ): Promise<{ success: boolean; error?: string }> {
-    await requireAdmin();
-
     try {
+        await requireAdmin();
+
+        const parsedId = idParamSchema.safeParse({ id: templateId });
+        if (!parsedId.success) {
+            return { success: false, error: "Invalid template ID" };
+        }
+
+        const parsed = updateScheduleTemplateSchema.safeParse(data);
+        if (!parsed.success) {
+            return { success: false, error: parsed.error.issues[0]?.message || "Invalid input" };
+        }
+
         // Update template fields
         await prisma.scheduleTemplate.update({
-            where: { id: templateId },
+            where: { id: parsedId.data.id },
             data: {
-                ...(data.name !== undefined && { name: data.name }),
-                ...(data.description !== undefined && { description: data.description }),
-                ...(data.isActive !== undefined && { isActive: data.isActive }),
+                ...(parsed.data.name !== undefined && { name: parsed.data.name }),
+                ...(parsed.data.description !== undefined && { description: parsed.data.description }),
+                ...(parsed.data.isActive !== undefined && { isActive: parsed.data.isActive }),
             },
         });
 
         // If shifts provided, replace all shifts
-        if (data.shifts) {
+        if (parsed.data.shifts) {
             // Delete existing shifts
             await prisma.scheduleTemplateShift.deleteMany({
-                where: { templateId },
+                where: { templateId: parsedId.data.id },
             });
 
             // Create new shifts
             await prisma.scheduleTemplateShift.createMany({
-                data: data.shifts.map((shift, idx) => ({
-                    templateId,
+                data: parsed.data.shifts.map((shift, idx) => ({
+                    templateId: parsedId.data.id,
                     dayOfWeek: shift.dayOfWeek,
                     startHour: shift.startHour,
                     endHour: shift.endHour,
-                    market: shift.market || null,
-                    shiftType: shift.shiftType || "CUSTOM",
+                    market: (shift.market as Market) || null,
+                    shiftType: (shift.shiftType as ShiftType) || "CUSTOM",
                     dispatcherId: shift.dispatcherId || null,
                     order: shift.order ?? idx,
                 })),
@@ -201,16 +214,21 @@ export async function deleteScheduleTemplate(
     templateId: string,
     hardDelete = false
 ): Promise<{ success: boolean; error?: string }> {
-    await requireAdmin();
-
     try {
+        await requireAdmin();
+
+        const parsed = idParamSchema.safeParse({ id: templateId });
+        if (!parsed.success) {
+            return { success: false, error: "Invalid template ID" };
+        }
+
         if (hardDelete) {
             await prisma.scheduleTemplate.delete({
-                where: { id: templateId },
+                where: { id: parsed.data.id },
             });
         } else {
             await prisma.scheduleTemplate.update({
-                where: { id: templateId },
+                where: { id: parsed.data.id },
                 data: { isActive: false },
             });
         }
@@ -239,19 +257,24 @@ export async function applyTemplateToWeek(
     skipped: number;
     errors: string[];
 }> {
-    await requireAdmin();
-
-    const result = {
-        success: true,
-        created: 0,
-        skipped: 0,
-        errors: [] as string[],
-    };
-
     try {
+        await requireAdmin();
+
+        const parsed = idParamSchema.safeParse({ id: templateId });
+        if (!parsed.success) {
+            return { success: false, created: 0, skipped: 0, errors: ["Invalid template ID"] };
+        }
+
+        const result = {
+            success: true,
+            created: 0,
+            skipped: 0,
+            errors: [] as string[],
+        };
+
         // Get the template with shifts
         const template = await prisma.scheduleTemplate.findUnique({
-            where: { id: templateId },
+            where: { id: parsed.data.id },
             include: {
                 shifts: {
                     orderBy: [{ dayOfWeek: "asc" }, { startHour: "asc" }],
@@ -348,9 +371,9 @@ export async function createTemplateFromWeek(
     description?: string,
     includeDispatchers = false
 ): Promise<{ success: boolean; templateId?: string; error?: string }> {
-    const userId = await requireAdmin();
-
     try {
+        const session = await requireAdmin();
+
         // Normalize weekStart to Monday
         const normalized = getWeekStart(weekStart);
 
@@ -391,7 +414,7 @@ export async function createTemplateFromWeek(
             data: {
                 name,
                 description: description || null,
-                createdById: userId,
+                createdById: session.user.id,
                 shifts: {
                     create: shifts.map((shift) => ({
                         dayOfWeek: shift.dayOfWeek,

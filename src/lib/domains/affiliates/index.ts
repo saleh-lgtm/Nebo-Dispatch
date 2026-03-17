@@ -13,9 +13,6 @@
 // ============================================
 
 export {
-  // Types
-  type CreateAttachmentData,
-
   // Affiliate queries
   getAffiliatesWithStatus,
   getPendingAffiliatesCount,

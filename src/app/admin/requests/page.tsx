@@ -32,9 +32,9 @@ export default async function AdminRequestsPage() {
 
     return (
         <RequestsClient
-            pendingRequests={pendingRequests}
-            allRequests={allRequests}
-            counts={counts}
+            pendingRequests={pendingRequests.success ? pendingRequests.data : []}
+            allRequests={allRequests.success ? allRequests.data : []}
+            counts={counts.success ? counts.data : { pending: 0, approved: 0, rejected: 0, total: 0 }}
         />
     );
 }

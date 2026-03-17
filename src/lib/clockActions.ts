@@ -36,182 +36,193 @@ export interface ShiftStatus {
 /**
  * Get current shift status for the logged-in user
  */
-export async function getShiftStatus(): Promise<ShiftStatus> {
-    const session = await requireAuth();
-    const userId = session.user.id;
+export async function getShiftStatus(): Promise<{ success: boolean; data?: ShiftStatus; error?: string }> {
+    try {
+        const session = await requireAuth();
+        const userId = session.user.id;
 
-    // Get active shift (clocked in but not out)
-    const activeShift = await prisma.shift.findFirst({
-        where: {
-            userId,
-            clockOut: null,
-        },
-        include: {
-            reports: {
-                where: { status: { in: ["SUBMITTED", "REVIEWED"] } },
-                take: 1,
+        // Get active shift (clocked in but not out)
+        const activeShift = await prisma.shift.findFirst({
+            where: {
+                userId,
+                clockOut: null,
             },
-        },
-    });
+            include: {
+                reports: {
+                    where: { status: { in: ["SUBMITTED", "REVIEWED"] } },
+                    take: 1,
+                },
+            },
+        });
 
-    // Get today's scheduled shift
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+        // Get today's scheduled shift
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-    const scheduledShift = await prisma.schedule.findFirst({
-        where: {
-            userId,
-            isPublished: true,
-            date: today,
-        },
-        orderBy: { startHour: "asc" },
-    });
+        const scheduledShift = await prisma.schedule.findFirst({
+            where: {
+                userId,
+                isPublished: true,
+                date: today,
+            },
+            orderBy: { startHour: "asc" },
+        });
 
-    return {
-        isClocked: !!activeShift,
-        shift: activeShift
-            ? {
-                  id: activeShift.id,
-                  clockIn: activeShift.clockIn,
-                  clockOut: activeShift.clockOut,
-                  scheduledStart: activeShift.scheduledStart,
-                  scheduledEnd: activeShift.scheduledEnd,
-                  earlyClockIn: activeShift.earlyClockIn,
-              }
-            : null,
-        scheduledShift: scheduledShift
-            ? {
-                  id: scheduledShift.id,
-                  date: scheduledShift.date,
-                  startHour: scheduledShift.startHour,
-                  endHour: scheduledShift.endHour,
-              }
-            : null,
-        hasSubmittedReport: activeShift ? activeShift.reports.length > 0 : false,
-    };
+        return {
+            success: true,
+            data: {
+                isClocked: !!activeShift,
+                shift: activeShift
+                    ? {
+                          id: activeShift.id,
+                          clockIn: activeShift.clockIn,
+                          clockOut: activeShift.clockOut,
+                          scheduledStart: activeShift.scheduledStart,
+                          scheduledEnd: activeShift.scheduledEnd,
+                          earlyClockIn: activeShift.earlyClockIn,
+                      }
+                    : null,
+                scheduledShift: scheduledShift
+                    ? {
+                          id: scheduledShift.id,
+                          date: scheduledShift.date,
+                          startHour: scheduledShift.startHour,
+                          endHour: scheduledShift.endHour,
+                      }
+                    : null,
+                hasSubmittedReport: activeShift ? activeShift.reports.length > 0 : false,
+            },
+        };
+    } catch (error) {
+        console.error("getShiftStatus error:", error);
+        return { success: false, error: "Failed to get shift status" };
+    }
 }
 
 /**
  * Clock in - creates a new shift with schedule comparison
  */
 export async function clockIn(): Promise<{ success: boolean; shiftId?: string; error?: string }> {
-    const session = await requireAuth();
-    const userId = session.user.id;
+    try {
+        const session = await requireAuth();
+        const userId = session.user.id;
 
-    // Check if already clocked in
-    const existingShift = await prisma.shift.findFirst({
-        where: { userId, clockOut: null },
-    });
+        // Check if already clocked in
+        const existingShift = await prisma.shift.findFirst({
+            where: { userId, clockOut: null },
+        });
 
-    if (existingShift) {
-        return { success: false, error: "Already clocked in" };
-    }
+        if (existingShift) {
+            return { success: false, error: "Already clocked in" };
+        }
 
-    // Get today's scheduled shift for comparison
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+        // Get today's scheduled shift for comparison
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-    const scheduledShift = await prisma.schedule.findFirst({
-        where: {
-            userId,
-            isPublished: true,
-            date: today,
-        },
-        orderBy: { startHour: "asc" },
-    });
+        const scheduledShift = await prisma.schedule.findFirst({
+            where: {
+                userId,
+                isPublished: true,
+                date: today,
+            },
+            orderBy: { startHour: "asc" },
+        });
 
-    const clockInTime = new Date();
-    let earlyClockIn: number | null = null;
-    let scheduledStart: Date | null = null;
-    let scheduledEnd: Date | null = null;
+        const clockInTime = new Date();
+        let earlyClockIn: number | null = null;
+        let scheduledStart: Date | null = null;
+        let scheduledEnd: Date | null = null;
 
-    if (scheduledShift) {
-        // Convert integer hours to DateTime for Shift model
-        scheduledStart = createDateWithHour(scheduledShift.date, scheduledShift.startHour);
-        // For overnight shifts, end date is next day
-        const isOvernight = scheduledShift.endHour <= scheduledShift.startHour && scheduledShift.endHour !== scheduledShift.startHour;
-        scheduledEnd = isOvernight
-            ? createDateWithHour(new Date(scheduledShift.date.getTime() + 24 * 60 * 60 * 1000), scheduledShift.endHour)
-            : createDateWithHour(scheduledShift.date, scheduledShift.endHour);
+        if (scheduledShift) {
+            // Convert integer hours to DateTime for Shift model
+            scheduledStart = createDateWithHour(scheduledShift.date, scheduledShift.startHour);
+            // For overnight shifts, end date is next day
+            const isOvernight = scheduledShift.endHour <= scheduledShift.startHour && scheduledShift.endHour !== scheduledShift.startHour;
+            scheduledEnd = isOvernight
+                ? createDateWithHour(new Date(scheduledShift.date.getTime() + 24 * 60 * 60 * 1000), scheduledShift.endHour)
+                : createDateWithHour(scheduledShift.date, scheduledShift.endHour);
 
-        // Calculate minutes early (positive) or late (negative)
-        earlyClockIn = Math.round((scheduledStart.getTime() - clockInTime.getTime()) / (1000 * 60));
-    }
+            // Calculate minutes early (positive) or late (negative)
+            earlyClockIn = Math.round((scheduledStart.getTime() - clockInTime.getTime()) / (1000 * 60));
+        }
 
-    // Create the shift
-    const shift = await prisma.shift.create({
-        data: {
-            userId,
-            clockIn: clockInTime,
-            scheduledStart,
-            scheduledEnd,
+        // Create the shift
+        const shift = await prisma.shift.create({
+            data: {
+                userId,
+                clockIn: clockInTime,
+                scheduledStart,
+                scheduledEnd,
+                earlyClockIn,
+            },
+        });
+
+        await createAuditLog(session.user.id, "CLOCK_IN", "Shift", shift.id, {
             earlyClockIn,
-        },
-    });
-
-    await createAuditLog(session.user.id, "CLOCK_IN", "Shift", shift.id, {
-        earlyClockIn,
-        scheduledStart,
-    });
-
-    // Create standard tasks for the new shift
-    const templates = await prisma.taskTemplate.findMany({
-        where: { isActive: true },
-        include: { items: true },
-    });
-
-    const taskEntries = templates.flatMap((t) =>
-        t.items.map((item) => ({
-            shiftId: shift.id,
-            content: item.content,
-        }))
-    );
-
-    if (taskEntries.length > 0) {
-        await prisma.shiftTask.createMany({ data: taskEntries });
-    } else {
-        // Fallback default tasks
-        const defaultTasks = [
-            "Check Reservations/Info/Admin inboxes",
-            "Make sure all emails are read",
-            "Check wake up calls mapping",
-            "Confirm all trips on portals",
-            "Confirm drivers/vehicles",
-            "Generate passenger link list",
-            "Monitor chauffeurs",
-        ];
-        await prisma.shiftTask.createMany({
-            data: defaultTasks.map((content) => ({ shiftId: shift.id, content })),
+            scheduledStart,
         });
-    }
 
-    // Add admin-assigned tasks to the shift
-    const adminTasks = await prisma.adminTask.findMany({
-        where: {
-            isActive: true,
-            OR: [{ assignToAll: true }, { assignedToId: userId }],
-        },
-        orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
-    });
+        // Create standard tasks for the new shift
+        const templates = await prisma.taskTemplate.findMany({
+            where: { isActive: true },
+            include: { items: true },
+        });
 
-    if (adminTasks.length > 0) {
-        await prisma.shiftTask.createMany({
-            data: adminTasks.map((task) => ({
+        const taskEntries = templates.flatMap((t) =>
+            t.items.map((item) => ({
                 shiftId: shift.id,
-                content: task.title,
-                isAdminTask: true,
-                assignedById: task.createdById,
-                priority: task.priority,
-            })),
+                content: item.content,
+            }))
+        );
+
+        if (taskEntries.length > 0) {
+            await prisma.shiftTask.createMany({ data: taskEntries });
+        } else {
+            // Fallback default tasks
+            const defaultTasks = [
+                "Check Reservations/Info/Admin inboxes",
+                "Make sure all emails are read",
+                "Check wake up calls mapping",
+                "Confirm all trips on portals",
+                "Confirm drivers/vehicles",
+                "Generate passenger link list",
+                "Monitor chauffeurs",
+            ];
+            await prisma.shiftTask.createMany({
+                data: defaultTasks.map((content) => ({ shiftId: shift.id, content })),
+            });
+        }
+
+        // Add admin-assigned tasks to the shift
+        const adminTasks = await prisma.adminTask.findMany({
+            where: {
+                isActive: true,
+                OR: [{ assignToAll: true }, { assignedToId: userId }],
+            },
+            orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
         });
+
+        if (adminTasks.length > 0) {
+            await prisma.shiftTask.createMany({
+                data: adminTasks.map((task) => ({
+                    shiftId: shift.id,
+                    content: task.title,
+                    isAdminTask: true,
+                    assignedById: task.createdById,
+                    priority: task.priority,
+                })),
+            });
+        }
+
+        revalidatePath("/dashboard");
+        revalidatePath("/reports/shift");
+
+        return { success: true, shiftId: shift.id };
+    } catch (error) {
+        console.error("clockIn error:", error);
+        return { success: false, error: "Failed to clock in. Please try again." };
     }
-
-    revalidatePath("/dashboard");
-    revalidatePath("/reports/shift");
-
-    return { success: true, shiftId: shift.id };
 }
 
 /**
@@ -353,76 +364,98 @@ export async function clockOut(forceWithoutReport = false): Promise<{
  * Get shifts with incomplete reports (for admin view)
  */
 export async function getIncompleteReportShifts() {
-    const session = await requireAuth();
+    try {
+        const session = await requireAuth();
 
-    if (session.user.role !== "ADMIN" && session.user.role !== "SUPER_ADMIN") {
-        throw new Error("Unauthorized");
-    }
+        if (session.user.role !== "ADMIN" && session.user.role !== "SUPER_ADMIN") {
+            return { success: false, error: "Unauthorized", data: [] };
+        }
 
-    return await prisma.shift.findMany({
-        where: {
-            incompleteReportFlag: true,
-            clockOut: { not: null },
-        },
-        include: {
-            user: {
-                select: { id: true, name: true, email: true },
+        const shifts = await prisma.shift.findMany({
+            where: {
+                incompleteReportFlag: true,
+                clockOut: { not: null },
             },
-        },
-        orderBy: { clockOut: "desc" },
-        take: 50,
-    });
+            include: {
+                user: {
+                    select: { id: true, name: true, email: true },
+                },
+            },
+            orderBy: { clockOut: "desc" },
+            take: 50,
+        });
+
+        return { success: true, data: shifts };
+    } catch (error) {
+        console.error("getIncompleteReportShifts error:", error);
+        return { success: false, error: "Failed to get incomplete report shifts", data: [] };
+    }
 }
 
 /**
  * Check if user can logout - blocks if they have an active shift without a submitted report
  */
 export async function canLogout(): Promise<{
-    allowed: boolean;
-    reason?: string;
-    hasActiveShift: boolean;
-    hasSubmittedReport: boolean;
-    shiftId?: string;
-}> {
-    const session = await requireAuth();
-    const userId = session.user.id;
-
-    // Only dispatchers need shift report validation
-    if (session.user.role !== "DISPATCHER") {
-        return { allowed: true, hasActiveShift: false, hasSubmittedReport: true };
-    }
-
-    // Get active shift
-    const activeShift = await prisma.shift.findFirst({
-        where: { userId, clockOut: null },
-        include: {
-            reports: {
-                where: { status: { in: ["SUBMITTED", "REVIEWED"] } },
-                take: 1,
-            },
-        },
-    });
-
-    if (!activeShift) {
-        return { allowed: true, hasActiveShift: false, hasSubmittedReport: true };
-    }
-
-    const hasReport = activeShift.reports.length > 0;
-
-    if (!hasReport) {
-        return {
-            allowed: false,
-            reason: "You must submit a shift report before logging out. Please complete your shift report first.",
-            hasActiveShift: true,
-            hasSubmittedReport: false,
-            shiftId: activeShift.id,
-        };
-    }
-
-    return {
-        allowed: true,
-        hasActiveShift: true,
-        hasSubmittedReport: true,
-        shiftId: activeShift.id,
+    success: boolean;
+    data?: {
+        allowed: boolean;
+        reason?: string;
+        hasActiveShift: boolean;
+        hasSubmittedReport: boolean;
+        shiftId?: string;
     };
+    error?: string;
+}> {
+    try {
+        const session = await requireAuth();
+        const userId = session.user.id;
+
+        // Only dispatchers need shift report validation
+        if (session.user.role !== "DISPATCHER") {
+            return { success: true, data: { allowed: true, hasActiveShift: false, hasSubmittedReport: true } };
+        }
+
+        // Get active shift
+        const activeShift = await prisma.shift.findFirst({
+            where: { userId, clockOut: null },
+            include: {
+                reports: {
+                    where: { status: { in: ["SUBMITTED", "REVIEWED"] } },
+                    take: 1,
+                },
+            },
+        });
+
+        if (!activeShift) {
+            return { success: true, data: { allowed: true, hasActiveShift: false, hasSubmittedReport: true } };
+        }
+
+        const hasReport = activeShift.reports.length > 0;
+
+        if (!hasReport) {
+            return {
+                success: true,
+                data: {
+                    allowed: false,
+                    reason: "You must submit a shift report before logging out. Please complete your shift report first.",
+                    hasActiveShift: true,
+                    hasSubmittedReport: false,
+                    shiftId: activeShift.id,
+                },
+            };
+        }
+
+        return {
+            success: true,
+            data: {
+                allowed: true,
+                hasActiveShift: true,
+                hasSubmittedReport: true,
+                shiftId: activeShift.id,
+            },
+        };
+    } catch (error) {
+        console.error("canLogout error:", error);
+        return { success: false, error: "Failed to check logout status" };
+    }
 }

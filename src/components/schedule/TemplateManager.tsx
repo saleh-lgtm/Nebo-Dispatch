@@ -49,8 +49,10 @@ export function TemplateManager({
     const loadTemplates = async () => {
         try {
             setLoading(true);
-            const data = await getScheduleTemplates(showInactive);
-            setTemplates(data);
+            const result = await getScheduleTemplates(showInactive);
+            if (result.success && result.data) {
+                setTemplates(result.data);
+            }
         } catch {
             addToast("Failed to load templates", "error");
         } finally {

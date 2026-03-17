@@ -52,9 +52,9 @@ export default async function AccountingPage() {
 
     return (
         <AccountingClient
-            initialStats={stats}
-            initialFlags={flaggedData.flags}
-            totalFlags={flaggedData.total}
+            initialStats={stats.success ? stats.data : { pending: 0, inReview: 0, resolved: 0, total: 0, recentFlags: [] }}
+            initialFlags={flaggedData.success && flaggedData.data ? flaggedData.data.flags : []}
+            totalFlags={flaggedData.success && flaggedData.data ? flaggedData.data.total : 0}
             userRole={session.user.role}
             isAdmin={isAdmin}
             affiliates={affiliatesData.success ? affiliatesData.data : []}

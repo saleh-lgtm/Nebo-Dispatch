@@ -60,8 +60,10 @@ export default function ClockButton() {
 
     async function loadStatus() {
         try {
-            const s = await getShiftStatus();
-            setStatus(s);
+            const result = await getShiftStatus();
+            if (result.success && result.data) {
+                setStatus(result.data);
+            }
         } catch (e) {
             console.error("Failed to load shift status:", e);
         } finally {

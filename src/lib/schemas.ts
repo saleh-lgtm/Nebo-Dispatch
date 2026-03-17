@@ -699,6 +699,99 @@ export const signedUrlSchema = z.object({
     expiresIn: z.number().min(60).max(86400).optional(),
 });
 
+// ===== ACCOUNTING SCHEMAS =====
+
+export const flagReservationSchema = z.object({
+    shiftReportId: z.string().min(1, "Shift report ID is required"),
+    reservationType: z.enum(["accepted", "modified", "cancelled"]),
+    reservationId: z.string().min(1, "Reservation ID is required"),
+    reservationNotes: z.string().max(2000).optional(),
+    flagReason: z.string().max(2000).optional(),
+});
+
+export const createAccountingFlagsSchema = z.object({
+    shiftReportId: z.string().min(1, "Shift report ID is required"),
+    flags: z.array(z.object({
+        reservationType: z.enum(["accepted", "modified", "cancelled"]),
+        reservationId: z.string().min(1, "Reservation ID is required"),
+        reservationNotes: z.string().max(2000).optional(),
+        flagReason: z.string().max(2000).optional(),
+    })),
+});
+
+export const getFlaggedReservationsSchema = z.object({
+    status: z.enum(["PENDING", "IN_REVIEW", "RESOLVED"]).optional(),
+    limit: z.number().min(1).max(200).optional(),
+    offset: z.number().min(0).optional(),
+});
+
+export const resolveAccountingFlagSchema = z.object({
+    flagId: z.string().min(1, "Flag ID is required"),
+    resolution: z.string().min(1, "Resolution is required").max(2000),
+    accountingNotes: z.string().max(2000).optional(),
+});
+
+// ===== ADMIN REQUEST SCHEMAS =====
+
+export const approveRequestSchema = z.object({
+    id: z.string().min(1, "Request ID is required"),
+    adminNotes: z.string().max(2000).optional(),
+    applyChanges: z.boolean().optional(),
+});
+
+export const rejectRequestSchema = z.object({
+    id: z.string().min(1, "Request ID is required"),
+    adminNotes: z.string().min(1, "Reason is required").max(2000),
+});
+
+// ===== AFFILIATE EXTENDED SCHEMAS =====
+
+export const updateAffiliateSchema = z.object({
+    name: z.string().min(2).max(100).optional(),
+    email: z.string().email().optional(),
+    phone: z.string().max(20).optional(),
+    state: z.string().max(50).optional(),
+    cities: z.array(z.string()).optional(),
+    notes: z.string().max(2000).optional(),
+    cityTransferRate: z.string().max(50).optional(),
+});
+
+export const createAffiliateAttachmentSchema = z.object({
+    affiliateId: z.string().min(1, "Affiliate ID is required"),
+    title: z.string().min(1, "Title is required").max(200),
+    description: z.string().max(1000).optional(),
+    documentType: z.string().max(100).optional(),
+    fileUrl: z.string().min(1, "File URL is required").max(500),
+    fileName: z.string().min(1, "File name is required").max(200),
+    fileSize: z.number().optional(),
+    mimeType: z.string().max(100).optional(),
+});
+
+// ===== SCHEDULE TEMPLATE SCHEMAS =====
+
+export const templateShiftInputSchema = z.object({
+    dayOfWeek: z.number().min(0).max(6),
+    startHour: z.number().min(0).max(23),
+    endHour: z.number().min(0).max(23),
+    market: z.string().optional(),
+    shiftType: z.string().optional(),
+    dispatcherId: z.string().optional(),
+    order: z.number().min(0).optional(),
+});
+
+export const createScheduleTemplateSchema = z.object({
+    name: z.string().min(1, "Name is required").max(200),
+    description: z.string().max(1000).nullable(),
+    shifts: z.array(templateShiftInputSchema),
+});
+
+export const updateScheduleTemplateSchema = z.object({
+    name: z.string().min(1).max(200).optional(),
+    description: z.string().max(1000).nullable().optional(),
+    isActive: z.boolean().optional(),
+    shifts: z.array(templateShiftInputSchema).optional(),
+});
+
 // ===== HELPER FUNCTIONS =====
 
 export type LoginInput = z.infer<typeof loginSchema>;

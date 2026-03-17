@@ -56,8 +56,10 @@ export default function FlagsSection({
         try {
             const status = tab === "ALL" ? undefined : tab;
             const result = await getFlaggedReservations({ status, limit: 50 });
-            setFlags(result.flags as unknown as AccountingFlag[]);
-            setTotal(result.total);
+            if (result.success && result.data) {
+                setFlags(result.data.flags as unknown as AccountingFlag[]);
+                setTotal(result.data.total);
+            }
         } catch (error) {
             console.error("Failed to fetch flags:", error);
         } finally {
