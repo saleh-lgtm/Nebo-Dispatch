@@ -37,7 +37,9 @@ export default function SwapRequestForm({
         const twoWeeksLater = new Date();
         twoWeeksLater.setDate(twoWeeksLater.getDate() + 14);
         const result = await getSwapableShifts(now, twoWeeksLater);
-        setAvailableShifts(result.availableShifts);
+        if (result.success && result.data) {
+          setAvailableShifts(result.data.availableShifts);
+        }
       } catch (err) {
         console.error("Failed to load shifts:", err);
       }

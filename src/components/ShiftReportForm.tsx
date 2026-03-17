@@ -307,7 +307,7 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
             if (billingReviews.length > 0) {
                 const validReviews = billingReviews.filter(r => r.tripNumber.trim());
                 if (validReviews.length > 0) {
-                    await createBillingReviews(
+                    const brResult = await createBillingReviews(
                         validReviews.map(r => ({
                             tripNumber: r.tripNumber,
                             passengerName: r.passengerName,
@@ -319,6 +319,9 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
                         })),
                         activeShift.id
                     );
+                    if (!brResult.success) {
+                        console.error("Failed to save billing reviews:", brResult.error);
+                    }
                 }
             }
 

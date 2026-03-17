@@ -129,8 +129,12 @@ export default function AuditClient({ initialLogs, totalLogs, stats, users }: Pr
                 limit: LIMIT,
                 offset: (newPage - 1) * LIMIT,
             });
-            setLogs(result.logs);
-            setTotal(result.total);
+            if (!result.success || !result.data) {
+                addToast(result.error || "Failed to fetch audit logs", "error");
+                return;
+            }
+            setLogs(result.data.logs);
+            setTotal(result.data.total);
             setPage(newPage);
         } catch {
             addToast("Failed to fetch audit logs", "error");

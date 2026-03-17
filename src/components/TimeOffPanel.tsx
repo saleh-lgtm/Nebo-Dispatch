@@ -107,8 +107,12 @@ export default function TimeOffPanel({ myRequests, pendingRequests = [], isAdmin
         setLoading(id);
         setShowCancelConfirm(null);
         try {
-            await cancelTimeOff(id);
-            addToast("Request cancelled successfully", "success");
+            const result = await cancelTimeOff(id);
+            if (!result.success) {
+                addToast(result.error || "Failed to cancel request", "error");
+            } else {
+                addToast("Request cancelled successfully", "success");
+            }
         } catch (err) {
             console.error(err);
             addToast(err instanceof Error ? err.message : "Failed to cancel request", "error");
@@ -119,13 +123,17 @@ export default function TimeOffPanel({ myRequests, pendingRequests = [], isAdmin
     const handleApprove = async (id: string) => {
         setLoading(id);
         try {
-            await approveTimeOff(id, adminNotes[id] || undefined);
-            setAdminNotes((prev) => {
-                const updated = { ...prev };
-                delete updated[id];
-                return updated;
-            });
-            addToast("Request approved", "success");
+            const result = await approveTimeOff(id, adminNotes[id] || undefined);
+            if (!result.success) {
+                addToast(result.error || "Failed to approve request", "error");
+            } else {
+                setAdminNotes((prev) => {
+                    const updated = { ...prev };
+                    delete updated[id];
+                    return updated;
+                });
+                addToast("Request approved", "success");
+            }
         } catch (err) {
             console.error(err);
             addToast(err instanceof Error ? err.message : "Failed to approve request", "error");
@@ -136,13 +144,17 @@ export default function TimeOffPanel({ myRequests, pendingRequests = [], isAdmin
     const handleReject = async (id: string) => {
         setLoading(id);
         try {
-            await rejectTimeOff(id, adminNotes[id] || undefined);
-            setAdminNotes((prev) => {
-                const updated = { ...prev };
-                delete updated[id];
-                return updated;
-            });
-            addToast("Request rejected", "info");
+            const result = await rejectTimeOff(id, adminNotes[id] || undefined);
+            if (!result.success) {
+                addToast(result.error || "Failed to reject request", "error");
+            } else {
+                setAdminNotes((prev) => {
+                    const updated = { ...prev };
+                    delete updated[id];
+                    return updated;
+                });
+                addToast("Request rejected", "info");
+            }
         } catch (err) {
             console.error(err);
             addToast(err instanceof Error ? err.message : "Failed to reject request", "error");

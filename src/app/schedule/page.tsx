@@ -30,10 +30,10 @@ export default async function SchedulePage() {
         requests,
         upcomingShifts,
         pastShifts,
-        myTimeOffRequests,
-        pendingTimeOffRequests,
-        swapRequestsData,
-        pendingSwapRequests,
+        timeOffResult,
+        pendingTimeOffResult,
+        swapResult,
+        pendingSwapResult,
         mySchedules,
     ] = await Promise.all([
         getDispatcherSchedule(session.user.id),
@@ -41,7 +41,7 @@ export default async function SchedulePage() {
         getUpcomingShifts(session.user.id),
         getPastShifts(session.user.id),
         getMyTimeOffRequests(),
-        isAdmin ? getPendingTimeOffRequests() : Promise.resolve([]),
+        isAdmin ? getPendingTimeOffRequests() : Promise.resolve({ success: true as const, data: [] as never[] }),
         getMySwapRequests(),
         getPendingSwapRequests(),
         prisma.schedule.findMany({
@@ -54,6 +54,11 @@ export default async function SchedulePage() {
             take: 20,
         }),
     ]);
+
+    const myTimeOffRequests = timeOffResult.success && timeOffResult.data ? timeOffResult.data : [] as never[];
+    const pendingTimeOffRequests = pendingTimeOffResult.success && pendingTimeOffResult.data ? pendingTimeOffResult.data : [] as never[];
+    const swapRequestsData = swapResult.success && swapResult.data ? swapResult.data : { madeRequests: [] as never[], receivedRequests: [] as never[] };
+    const pendingSwapRequests = pendingSwapResult.success && pendingSwapResult.data ? pendingSwapResult.data : { pendingTargetRequests: [] as never[], pendingAdminRequests: [] as never[] };
 
     return (
         <ScheduleClient

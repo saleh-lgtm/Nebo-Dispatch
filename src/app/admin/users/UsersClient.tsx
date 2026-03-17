@@ -87,7 +87,11 @@ export default function UsersClient({ users, stats, currentUserId }: Props) {
         setLoading(true);
         setError("");
         try {
-            await createUser(newUser);
+            const result = await createUser(newUser);
+            if (!result.success) {
+                setError(result.error || "Failed to create user");
+                return;
+            }
             setSuccess("User created successfully");
             setShowCreateModal(false);
             setNewUser({ name: "", email: "", password: "", role: "DISPATCHER" });
@@ -104,7 +108,11 @@ export default function UsersClient({ users, stats, currentUserId }: Props) {
         setLoading(true);
         setError("");
         try {
-            await updateUser(selectedUser.id, editData);
+            const result = await updateUser(selectedUser.id, editData);
+            if (!result.success) {
+                setError(result.error || "Failed to update user");
+                return;
+            }
             setSuccess("User updated successfully");
             setShowEditModal(false);
             router.refresh();
@@ -119,7 +127,11 @@ export default function UsersClient({ users, stats, currentUserId }: Props) {
         setLoading(true);
         setError("");
         try {
-            await changeUserRole(userId, newRole);
+            const result = await changeUserRole(userId, newRole);
+            if (!result.success) {
+                setError(result.error || "Failed to change role");
+                return;
+            }
             setSuccess("Role updated successfully");
             setActiveDropdown(null);
             router.refresh();
@@ -135,7 +147,11 @@ export default function UsersClient({ users, stats, currentUserId }: Props) {
         setLoading(true);
         setError("");
         try {
-            await resetUserPassword(selectedUser.id, newPassword);
+            const result = await resetUserPassword(selectedUser.id, newPassword);
+            if (!result.success) {
+                setError(result.error || "Failed to reset password");
+                return;
+            }
             setSuccess("Password reset successfully");
             setShowResetPasswordModal(false);
             setNewPassword("");
@@ -152,7 +168,11 @@ export default function UsersClient({ users, stats, currentUserId }: Props) {
         setLoading(true);
         setError("");
         try {
-            await deleteUser(selectedUser.id);
+            const result = await deleteUser(selectedUser.id);
+            if (!result.success) {
+                setError(result.error || "Failed to deactivate user");
+                return;
+            }
             setSuccess("User deactivated successfully");
             setShowDeleteModal(false);
             router.refresh();
@@ -167,7 +187,11 @@ export default function UsersClient({ users, stats, currentUserId }: Props) {
         setLoading(true);
         setError("");
         try {
-            await forceLogoutUser(user.id);
+            const result = await forceLogoutUser(user.id);
+            if (!result.success) {
+                setError(result.error || "Failed to force logout user");
+                return;
+            }
             setSuccess(`Force logged out ${user.name}. Their session will expire within 5 minutes.`);
             setActiveDropdown(null);
             router.refresh();

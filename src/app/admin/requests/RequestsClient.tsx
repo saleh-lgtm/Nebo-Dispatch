@@ -131,7 +131,12 @@ export default function RequestsClient({ pendingRequests, allRequests, counts }:
                         setLoading(false);
                         return;
                     }
-                    await adminApproveSwap(actionModal.request.id, adminNotes || undefined);
+                    const swapResult = await adminApproveSwap(actionModal.request.id, adminNotes || undefined);
+                    if (!swapResult.success) {
+                        alert(swapResult.error || "Failed to approve swap");
+                        setLoading(false);
+                        return;
+                    }
                 } else {
                     await approveRequest(actionModal.request.id, adminNotes || undefined, applyChanges);
                 }

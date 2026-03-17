@@ -25,10 +25,13 @@ export default async function AdminUsersPage() {
         redirect("/dashboard");
     }
 
-    const [users, stats] = await Promise.all([
+    const [usersResult, statsResult] = await Promise.all([
         getAllUsers(),
         getUserStats(),
     ]);
+
+    const users = usersResult.success && usersResult.data ? usersResult.data : [] as never[];
+    const stats = statsResult.success && statsResult.data ? statsResult.data : { total: 0, byRole: { superAdmins: 0, admins: 0, dispatchers: 0 }, active: 0, inactive: 0 };
 
     return (
         <UsersClient

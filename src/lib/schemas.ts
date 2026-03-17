@@ -792,6 +792,102 @@ export const updateScheduleTemplateSchema = z.object({
     shifts: z.array(templateShiftInputSchema).optional(),
 });
 
+// ===== AUDIT LOG SCHEMAS =====
+
+export const auditLogInputSchema = z.object({
+    userId: z.string().min(1, "User ID is required"),
+    action: z.string().min(1, "Action is required"),
+    entity: z.string().min(1, "Entity is required"),
+    entityId: z.string().optional(),
+    ipAddress: z.string().optional(),
+});
+
+export const auditLogsFilterSchema = z.object({
+    userId: z.string().optional(),
+    action: z.string().optional(),
+    entity: z.string().optional(),
+    startDate: z.coerce.date().optional(),
+    endDate: z.coerce.date().optional(),
+    limit: z.number().min(1).max(200).optional(),
+    offset: z.number().min(0).optional(),
+});
+
+// ===== BILLING REVIEW SCHEMAS =====
+
+export const createBillingReviewSchema = z.object({
+    tripNumber: z.string().min(1, "Trip number is required").max(50),
+    passengerName: z.string().max(200).optional(),
+    tripDate: z.coerce.date().optional(),
+    reason: z.enum([
+        "EXTRA_WAITING_TIME", "EXTRA_STOPS", "ROUTE_CHANGE", "TOLL_FEES",
+        "PARKING_FEES", "GRATUITY_ADJUSTMENT", "PRICE_CORRECTION",
+        "NO_SHOW_CHARGE", "CANCELLATION_FEE", "DAMAGE_CHARGE",
+        "AFFILIATE_BILLING", "OTHER",
+    ]),
+    reasonOther: z.string().max(500).optional(),
+    amount: z.number().min(0).optional(),
+    notes: z.string().max(2000).optional(),
+    shiftId: z.string().optional(),
+    shiftReportId: z.string().optional(),
+});
+
+export const billingReviewOptionsSchema = z.object({
+    status: z.enum(["PENDING", "IN_REVIEW", "RESOLVED"]).optional(),
+    limit: z.number().min(1).max(200).optional(),
+    offset: z.number().min(0).optional(),
+    submittedById: z.string().optional(),
+});
+
+export const resolveBillingReviewSchema = z.object({
+    reviewId: z.string().min(1, "Review ID is required"),
+    resolution: z.string().min(1, "Resolution is required").max(2000),
+    resolvedAmount: z.number().min(0).optional(),
+    accountingNotes: z.string().max(2000).optional(),
+});
+
+// ===== SHIFT SWAP SCHEMAS =====
+
+export const requestShiftSwapSchema = z.object({
+    targetUserId: z.string().min(1, "Target user is required"),
+    requesterShiftId: z.string().min(1, "Your shift is required"),
+    targetShiftId: z.string().min(1, "Target shift is required"),
+    reason: z.string().max(1000).optional(),
+});
+
+export const respondToSwapSchema = z.object({
+    id: z.string().min(1, "Swap request ID is required"),
+    accept: z.boolean(),
+    response: z.string().max(1000).optional(),
+});
+
+// ===== TIME OFF SCHEMAS =====
+
+export const requestTimeOffSchema = z.object({
+    startDate: z.coerce.date(),
+    endDate: z.coerce.date(),
+    reason: z.string().min(1, "Reason is required").max(1000),
+    type: z.enum(["VACATION", "SICK", "PERSONAL", "OTHER"]),
+});
+
+export const timeOffFiltersSchema = z.object({
+    status: z.string().optional(),
+    userId: z.string().optional(),
+    startDate: z.coerce.date().optional(),
+    endDate: z.coerce.date().optional(),
+});
+
+// ===== USER MANAGEMENT SCHEMAS =====
+
+export const changeUserRoleSchema = z.object({
+    id: z.string().min(1, "User ID is required"),
+    newRole: z.enum(["ADMIN", "DISPATCHER"]),
+});
+
+export const adminResetPasswordSchema = z.object({
+    id: z.string().min(1, "User ID is required"),
+    newPassword: z.string().min(6, "Password must be at least 6 characters"),
+});
+
 // ===== HELPER FUNCTIONS =====
 
 export type LoginInput = z.infer<typeof loginSchema>;

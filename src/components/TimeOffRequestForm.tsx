@@ -35,12 +35,17 @@ export default function TimeOffRequestForm({ onSuccess, onCancel }: Props) {
 
         setLoading(true);
         try {
-            await requestTimeOff(
+            const result = await requestTimeOff(
                 new Date(form.startDate),
                 new Date(form.endDate),
                 form.reason.trim(),
                 form.type
             );
+            if (!result.success) {
+                setError(result.error || "Failed to submit request");
+                setLoading(false);
+                return;
+            }
             setForm({ startDate: "", endDate: "", type: "VACATION", reason: "" });
             onSuccess?.();
         } catch (err) {

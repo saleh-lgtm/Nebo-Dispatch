@@ -32,11 +32,15 @@ export default async function AdminAuditPage() {
         redirect("/dashboard");
     }
 
-    const [{ logs, total }, stats, users] = await Promise.all([
+    const [auditResult, statsResult, usersResult] = await Promise.all([
         getAuditLogs({ limit: 50 }),
         getAuditStats(30),
         getAllUsers(),
     ]);
+
+    const { logs, total } = auditResult.success && auditResult.data ? auditResult.data : { logs: [] as never[], total: 0 };
+    const stats = statsResult.success && statsResult.data ? statsResult.data : { total: 0, byAction: {} as Record<string, number>, byEntity: {} as Record<string, number>, byDay: {} as Record<string, number> };
+    const users = usersResult.success && usersResult.data ? usersResult.data : [];
 
     return (
         <AuditClient

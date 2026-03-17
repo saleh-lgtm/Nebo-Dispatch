@@ -160,7 +160,9 @@ export default function ShiftSwapPanel({
             twoWeeksLater.setDate(twoWeeksLater.getDate() + 14);
 
             const result = await getSwapableShifts(now, twoWeeksLater);
-            setAvailableShifts(result.availableShifts);
+            if (result.success && result.data) {
+                setAvailableShifts(result.data.availableShifts);
+            }
         } catch (err) {
             console.error("Failed to load shifts:", err);
         }
@@ -192,12 +194,17 @@ export default function ShiftSwapPanel({
 
         setLoading("form");
         try {
-            await requestShiftSwap(
+            const result = await requestShiftSwap(
                 targetShift.userId,
                 form.myShiftId,
                 form.targetShiftId,
                 form.reason || undefined
             );
+            if (!result.success) {
+                setFormError(result.error || "Failed to submit swap request");
+                setLoading(null);
+                return;
+            }
             setForm({ myShiftId: "", targetShiftId: "", reason: "" });
             setShowForm(false);
         } catch (err) {
@@ -209,13 +216,17 @@ export default function ShiftSwapPanel({
     const handleRespondToSwap = async (id: string, accept: boolean) => {
         setLoading(id);
         try {
-            await respondToSwap(id, accept, targetResponse[id] || undefined);
-            setTargetResponse((prev) => {
-                const updated = { ...prev };
-                delete updated[id];
-                return updated;
-            });
-            addToast(accept ? "Swap request accepted" : "Swap request declined", accept ? "success" : "info");
+            const result = await respondToSwap(id, accept, targetResponse[id] || undefined);
+            if (!result.success) {
+                addToast(result.error || "Failed to respond to swap", "error");
+            } else {
+                setTargetResponse((prev) => {
+                    const updated = { ...prev };
+                    delete updated[id];
+                    return updated;
+                });
+                addToast(accept ? "Swap request accepted" : "Swap request declined", accept ? "success" : "info");
+            }
         } catch (err) {
             console.error(err);
             addToast(err instanceof Error ? err.message : "Failed to respond to swap", "error");
@@ -226,13 +237,17 @@ export default function ShiftSwapPanel({
     const handleAdminApprove = async (id: string) => {
         setLoading(id);
         try {
-            await adminApproveSwap(id, adminNotes[id] || undefined);
-            setAdminNotes((prev) => {
-                const updated = { ...prev };
-                delete updated[id];
-                return updated;
-            });
-            addToast("Swap approved", "success");
+            const result = await adminApproveSwap(id, adminNotes[id] || undefined);
+            if (!result.success) {
+                addToast(result.error || "Failed to approve swap", "error");
+            } else {
+                setAdminNotes((prev) => {
+                    const updated = { ...prev };
+                    delete updated[id];
+                    return updated;
+                });
+                addToast("Swap approved", "success");
+            }
         } catch (err) {
             console.error(err);
             addToast(err instanceof Error ? err.message : "Failed to approve swap", "error");
@@ -243,13 +258,17 @@ export default function ShiftSwapPanel({
     const handleAdminReject = async (id: string) => {
         setLoading(id);
         try {
-            await adminRejectSwap(id, adminNotes[id] || undefined);
-            setAdminNotes((prev) => {
-                const updated = { ...prev };
-                delete updated[id];
-                return updated;
-            });
-            addToast("Swap rejected", "info");
+            const result = await adminRejectSwap(id, adminNotes[id] || undefined);
+            if (!result.success) {
+                addToast(result.error || "Failed to reject swap", "error");
+            } else {
+                setAdminNotes((prev) => {
+                    const updated = { ...prev };
+                    delete updated[id];
+                    return updated;
+                });
+                addToast("Swap rejected", "info");
+            }
         } catch (err) {
             console.error(err);
             addToast(err instanceof Error ? err.message : "Failed to reject swap", "error");
@@ -261,8 +280,12 @@ export default function ShiftSwapPanel({
         setPendingCancelId(null);
         setLoading(id);
         try {
-            await cancelSwapRequest(id);
-            addToast("Swap request cancelled", "success");
+            const result = await cancelSwapRequest(id);
+            if (!result.success) {
+                addToast(result.error || "Failed to cancel swap", "error");
+            } else {
+                addToast("Swap request cancelled", "success");
+            }
         } catch (err) {
             console.error(err);
             addToast(err instanceof Error ? err.message : "Failed to cancel swap", "error");
