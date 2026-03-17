@@ -634,6 +634,8 @@ export async function markExpiredConfirmations() {
             id: true,
             dueAt: true,
             pickupAt: true,
+            tripNumber: true,
+            passengerName: true,
         },
     });
 
@@ -706,6 +708,49 @@ export async function markExpiredConfirmations() {
         );
         const results = await Promise.all(createPromises);
         accountabilityRecords = results.filter(r => r !== null).length;
+    }
+
+    // Deduct accountability points (1 per missed confirmation per dispatcher, floor at 0)
+    if (accountabilityData.length > 0) {
+        const deductionsByDispatcher = new Map<string, number>();
+        for (const record of accountabilityData) {
+            deductionsByDispatcher.set(
+                record.dispatcherId,
+                (deductionsByDispatcher.get(record.dispatcherId) || 0) + 1
+            );
+        }
+
+        for (const [dispatcherId, points] of deductionsByDispatcher) {
+            const user = await prisma.user.findUnique({
+                where: { id: dispatcherId },
+                select: { accountabilityScore: true },
+            });
+            const currentScore = user?.accountabilityScore ?? 100;
+            const newScore = Math.max(0, currentScore - points);
+            await prisma.user.update({
+                where: { id: dispatcherId },
+                data: { accountabilityScore: newScore },
+            });
+        }
+
+        // Create MISSED_CONFIRMATION notification per dispatcher per missed trip
+        const tripMap = new Map(toExpire.map(c => [c.id, c]));
+        for (const record of accountabilityData) {
+            const trip = tripMap.get(record.confirmationId);
+            if (!trip) continue;
+
+            await prisma.notification.create({
+                data: {
+                    userId: record.dispatcherId,
+                    type: "MISSED_CONFIRMATION",
+                    title: "Missed Confirmation",
+                    message: `Missed confirmation: Trip #${trip.tripNumber} for ${trip.passengerName} — -1 point`,
+                    entityType: "TripConfirmation",
+                    entityId: record.confirmationId,
+                    actionUrl: "/admin/confirmations",
+                },
+            });
+        }
     }
 
     // OPTIMIZATION: Update all confirmations in a single query
