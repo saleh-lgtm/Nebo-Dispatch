@@ -1,23 +1,48 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { z } from "zod";
+import { ConfirmationStatus } from "@prisma/client";
+
+const confirmationStatuses = Object.values(ConfirmationStatus) as [string, ...string[]];
+
+const querySchema = z.object({
+    take: z.coerce.number().int().min(1).max(50).optional().default(5),
+    status: z.enum(confirmationStatuses).optional(),
+});
 
 /**
  * Debug endpoint to check TripConfirmation table status
  * Only accessible by SUPER_ADMIN
+ *
+ * Query params:
+ *   take — number of recent records to return (1–50, default 5)
+ *   status — filter by confirmation status
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user || session.user.role !== "SUPER_ADMIN") {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const params = Object.fromEntries(request.nextUrl.searchParams.entries());
+    const parsed = querySchema.safeParse(params);
+
+    if (!parsed.success) {
+        return NextResponse.json(
+            { error: "Invalid query parameters", details: parsed.error.flatten().fieldErrors },
+            { status: 400 }
+        );
+    }
+
+    const { take, status } = parsed.data;
     const now = new Date();
 
     try {
-        // Get counts
+        const statusFilter = status ? { status: status as ConfirmationStatus } : {};
+
         const [
             totalCount,
             pendingCount,
@@ -27,7 +52,7 @@ export async function GET() {
             recentConfirmations,
             manifestLogs,
         ] = await Promise.all([
-            prisma.tripConfirmation.count(),
+            prisma.tripConfirmation.count({ where: statusFilter }),
             prisma.tripConfirmation.count({ where: { status: "PENDING" } }),
             prisma.tripConfirmation.count({ where: { archivedAt: null } }),
             prisma.tripConfirmation.count({ where: { pickupAt: { gte: now } } }),
@@ -39,8 +64,9 @@ export async function GET() {
                 },
             }),
             prisma.tripConfirmation.findMany({
-                take: 5,
+                take,
                 orderBy: { createdAt: "desc" },
+                where: statusFilter,
                 select: {
                     id: true,
                     tripNumber: true,
@@ -53,7 +79,7 @@ export async function GET() {
                 },
             }),
             prisma.manifestLog.findMany({
-                take: 5,
+                take,
                 orderBy: { receivedAt: "desc" },
                 select: {
                     id: true,

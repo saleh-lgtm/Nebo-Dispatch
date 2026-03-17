@@ -3,6 +3,17 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import * as XLSX from "xlsx";
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
+const ALLOWED_MIME_TYPES = new Set([
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+    "application/vnd.ms-excel",    // .xls
+    "text/csv",                    // .csv
+    "application/csv",             // .csv (alternate)
+]);
+
+const ALLOWED_EXTENSIONS = [".xlsx", ".xls", ".csv"];
+
 export async function POST(request: NextRequest) {
     // Auth check
     const session = await getServerSession(authOptions);
@@ -21,20 +32,35 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "No file provided" }, { status: 400 });
         }
 
-        // Validate file type
-        const validExtensions = [".xlsx", ".xls"];
-        const hasValidExtension = validExtensions.some((ext) =>
+        // Validate file size
+        if (file.size > MAX_FILE_SIZE) {
+            return NextResponse.json(
+                { error: `File too large. Maximum size is 10 MB, got ${(file.size / 1024 / 1024).toFixed(1)} MB` },
+                { status: 400 }
+            );
+        }
+
+        // Validate MIME type
+        if (file.type && !ALLOWED_MIME_TYPES.has(file.type)) {
+            return NextResponse.json(
+                { error: `Invalid file type "${file.type}". Allowed: xlsx, xls, csv` },
+                { status: 400 }
+            );
+        }
+
+        // Validate file extension
+        const hasValidExtension = ALLOWED_EXTENSIONS.some((ext) =>
             file.name.toLowerCase().endsWith(ext)
         );
 
         if (!hasValidExtension) {
             return NextResponse.json(
-                { error: "Invalid file type. Please upload an Excel file (.xlsx or .xls)" },
+                { error: "Invalid file extension. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file" },
                 { status: 400 }
             );
         }
 
-        // Parse Excel
+        // Parse file
         const arrayBuffer = await file.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer, { type: "array" });
         const sheetName = workbook.SheetNames[0];
@@ -104,9 +130,9 @@ export async function POST(request: NextRequest) {
             fileSize: file.size,
         });
     } catch (error) {
-        console.error("Excel parsing error:", error);
+        console.error("File parsing error:", error);
         return NextResponse.json(
-            { error: "Failed to parse Excel file", details: String(error) },
+            { error: "Failed to parse file", details: error instanceof Error ? error.message : String(error) },
             { status: 500 }
         );
     }
