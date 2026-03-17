@@ -220,9 +220,14 @@ export const authOptions: NextAuthOptions = {
                 });
 
                 // Invalidate token if user not found, deactivated, or version bumped
-                if (!dbUser || !dbUser.isActive || dbUser.tokenVersion !== token.tokenVersion) {
+                // Treat missing tokenVersion (pre-existing sessions) as 0 to match DB default
+                const currentVersion = token.tokenVersion ?? 0;
+                if (!dbUser || !dbUser.isActive || dbUser.tokenVersion !== currentVersion) {
                     return { ...token, id: "", role: "" as Role, tokenVersion: -1 };
                 }
+
+                // Backfill tokenVersion for pre-existing sessions
+                token.tokenVersion = currentVersion;
 
                 token.tokenVersionCheckedAt = now;
             }
