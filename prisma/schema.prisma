@@ -1659,6 +1659,7 @@ model TripConfirmation {
   @@index([manifestDate])
   @@index([archivedAt])
   @@index([pickupAt])                    // For sorting/filtering by pickup time
+  @@index([status, pickupAt])            // For filtering by status + pickup time
   @@index([status, archivedAt, pickupAt]) // For dashboard query (pending + not archived + future)
   @@index([createdAt])                   // For stats queries
 }
