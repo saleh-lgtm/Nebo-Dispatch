@@ -39,41 +39,8 @@
     margin: 0;
 }
 
-/* Tabs */
-.tabs {
-    display: flex;
-    gap: 0.5rem;
+.tabBar {
     margin-bottom: 1.5rem;
-    padding: 0.25rem;
-    background: var(--bg-muted);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    width: fit-content;
-}
-
-.tab {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.625rem 1rem;
-    background: transparent;
-    border: none;
-    border-radius: 8px;
-    color: var(--text-secondary);
-    font-size: 0.875rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.tab:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-}
-
-.tabActive {
-    background: var(--accent);
-    color: white;
 }
 
 /* Stats Grid */
@@ -648,11 +615,6 @@
 
     .quickActions {
         grid-template-columns: 1fr;
-    }
-
-    .tabs {
-        width: 100%;
-        overflow-x: auto;
     }
 
     .dispatcherTable {

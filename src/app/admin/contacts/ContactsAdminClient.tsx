@@ -13,6 +13,7 @@ import {
     Tags,
 } from "lucide-react";
 import { TagBadge, TagFilter, TagManager, TagAssignmentModal } from "@/components/contacts";
+import TabBar from "@/components/ui/TabBar";
 import styles from "./ContactsAdmin.module.css";
 
 interface TagData {
@@ -121,24 +122,15 @@ export default function ContactsAdminClient({ initialContacts, initialTags }: Pr
             </header>
 
             {/* Tabs */}
-            <div className={styles.tabs}>
-                <button
-                    className={`${styles.tab} ${activeTab === "contacts" ? styles.tabActive : ""}`}
-                    onClick={() => setActiveTab("contacts")}
-                >
-                    <Users size={16} />
-                    Contacts
-                    <span className={styles.tabCount}>{contacts.length}</span>
-                </button>
-                <button
-                    className={`${styles.tab} ${activeTab === "tags" ? styles.tabActive : ""}`}
-                    onClick={() => setActiveTab("tags")}
-                >
-                    <Tag size={16} />
-                    Tags
-                    <span className={styles.tabCount}>{tags.length}</span>
-                </button>
-            </div>
+            <TabBar
+                tabs={[
+                    { value: "contacts", label: "Contacts", icon: <Users size={16} />, count: contacts.length },
+                    { value: "tags", label: "Tags", icon: <Tag size={16} />, count: tags.length },
+                ]}
+                activeTab={activeTab}
+                onChange={(v) => setActiveTab(v as "contacts" | "tags")}
+                className={styles.tabBar}
+            />
 
             {activeTab === "contacts" ? (
                 <>

@@ -77,35 +77,8 @@
     color: var(--text-secondary);
 }
 
-/* ── Tabs ── */
-
-.tabs {
-    display: flex;
-    gap: 0.25rem;
+.tabBar {
     margin-bottom: 1.5rem;
-    border-bottom: 1px solid var(--glass-border);
-}
-
-.tab {
-    padding: 0.75rem 1rem;
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    color: var(--text-secondary);
-    font-weight: 400;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: all var(--transition-fast);
-}
-
-.tab:hover {
-    color: var(--text-primary);
-}
-
-.tabActive {
-    border-bottom-color: var(--accent);
-    color: var(--accent);
-    font-weight: 600;
 }
 
 /* ── Request List ── */

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { approveRequest, rejectRequest } from "@/lib/adminRequestActions";
 import { adminApproveSwap } from "@/lib/shiftSwapActions";
+import TabBar from "@/components/ui/TabBar";
 import styles from "./Requests.module.css";
 
 interface ScheduleData {
@@ -232,20 +233,16 @@ export default function RequestsClient({ pendingRequests, allRequests, counts }:
             </header>
 
             {/* Tabs */}
-            <div className={styles.tabs}>
-                <button
-                    onClick={() => setActiveTab("pending")}
-                    className={`${styles.tab} ${activeTab === "pending" ? styles.tabActive : ""}`}
-                >
-                    Pending ({requests.length})
-                </button>
-                <button
-                    onClick={() => setActiveTab("all")}
-                    className={`${styles.tab} ${activeTab === "all" ? styles.tabActive : ""}`}
-                >
-                    All Requests
-                </button>
-            </div>
+            <TabBar
+                tabs={[
+                    { value: "pending", label: "Pending", count: requests.length },
+                    { value: "all", label: "All Requests" },
+                ]}
+                activeTab={activeTab}
+                onChange={(v) => setActiveTab(v as "pending" | "all")}
+                variant="underline"
+                className={styles.tabBar}
+            />
 
             {/* Requests List */}
             <div className={styles.requestList}>

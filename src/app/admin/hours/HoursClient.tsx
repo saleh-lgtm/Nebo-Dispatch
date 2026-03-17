@@ -10,6 +10,7 @@ import {
     PlayCircle,
     Filter,
 } from "lucide-react";
+import TabBar from "@/components/ui/TabBar";
 
 interface HoursSummary {
     userId: string;
@@ -170,22 +171,14 @@ export default function HoursClient({
                     <Users size={18} />
                     <h2>Dispatcher Hours</h2>
                     <div className="header-actions">
-                        <div className="tabs">
-                            <button
-                                onClick={() => setActiveTab("weekly")}
-                                className={activeTab === "weekly" ? "active" : ""}
-                            >
-                                <Calendar size={14} />
-                                This Week
-                            </button>
-                            <button
-                                onClick={() => setActiveTab("monthly")}
-                                className={activeTab === "monthly" ? "active" : ""}
-                            >
-                                <Calendar size={14} />
-                                This Month
-                            </button>
-                        </div>
+                        <TabBar
+                            tabs={[
+                                { value: "weekly", label: "This Week", icon: <Calendar size={14} /> },
+                                { value: "monthly", label: "This Month", icon: <Calendar size={14} /> },
+                            ]}
+                            activeTab={activeTab}
+                            onChange={(v) => setActiveTab(v as "weekly" | "monthly")}
+                        />
                         <div className="filter-dropdown">
                             <Filter size={14} />
                             <select
@@ -408,39 +401,6 @@ export default function HoursClient({
                     display: flex;
                     align-items: center;
                     gap: 1rem;
-                }
-
-                .tabs {
-                    display: flex;
-                    gap: 0.25rem;
-                    background: var(--bg-secondary);
-                    padding: 0.25rem;
-                    border-radius: var(--radius-md);
-                }
-
-                .tabs button {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.375rem;
-                    padding: 0.5rem 0.875rem;
-                    border-radius: var(--radius-sm);
-                    border: none;
-                    background: transparent;
-                    color: var(--text-secondary);
-                    font-size: 0.8rem;
-                    font-weight: 500;
-                    cursor: pointer;
-                    transition: all 0.15s;
-                }
-
-                .tabs button:hover {
-                    color: var(--text-primary);
-                }
-
-                .tabs button.active {
-                    background: var(--bg-card);
-                    color: var(--primary);
-                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
                 }
 
                 .filter-dropdown {

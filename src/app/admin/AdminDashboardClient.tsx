@@ -28,6 +28,7 @@ import {
 } from "@/lib/adminDashboardActions";
 import { DISPATCHER_FEATURES, TASK_PRESETS } from "@/lib/adminConstants";
 import { DispatcherFeature, PermissionLevel } from "@prisma/client";
+import TabBar from "@/components/ui/TabBar";
 import styles from "./AdminDashboard.module.css";
 
 type TabType = "overview" | "permissions" | "analytics";
@@ -127,29 +128,16 @@ export default function AdminDashboardClient({
             </header>
 
             {/* Tabs */}
-            <div className={styles.tabs}>
-                <button
-                    className={`${styles.tab} ${activeTab === "overview" ? styles.tabActive : ""}`}
-                    onClick={() => setActiveTab("overview")}
-                >
-                    <LayoutDashboard size={16} />
-                    Overview
-                </button>
-                <button
-                    className={`${styles.tab} ${activeTab === "permissions" ? styles.tabActive : ""}`}
-                    onClick={() => setActiveTab("permissions")}
-                >
-                    <Shield size={16} />
-                    Permissions
-                </button>
-                <button
-                    className={`${styles.tab} ${activeTab === "analytics" ? styles.tabActive : ""}`}
-                    onClick={() => setActiveTab("analytics")}
-                >
-                    <TrendingUp size={16} />
-                    Analytics
-                </button>
-            </div>
+            <TabBar
+                tabs={[
+                    { value: "overview", label: "Overview", icon: <LayoutDashboard size={16} /> },
+                    { value: "permissions", label: "Permissions", icon: <Shield size={16} /> },
+                    { value: "analytics", label: "Analytics", icon: <TrendingUp size={16} /> },
+                ]}
+                activeTab={activeTab}
+                onChange={(v) => setActiveTab(v as TabType)}
+                className={styles.tabBar}
+            />
 
             {activeTab === "overview" && (
                 <>
