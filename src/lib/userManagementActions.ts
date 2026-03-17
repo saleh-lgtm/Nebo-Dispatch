@@ -249,6 +249,41 @@ export async function resetUserPassword(id: string, newPassword: string) {
     return { success: true };
 }
 
+// Force logout user by incrementing tokenVersion (SUPER_ADMIN only)
+export async function forceLogoutUser(id: string) {
+    const session = await requireSuperAdmin();
+
+    const targetUser = await prisma.user.findUnique({
+        where: { id },
+        select: { id: true, role: true, name: true },
+    });
+
+    if (!targetUser) {
+        throw new Error("User not found");
+    }
+
+    // Cannot force-logout another SUPER_ADMIN
+    if (targetUser.role === "SUPER_ADMIN" && session.user.id !== id) {
+        throw new Error("Cannot force logout another super admin");
+    }
+
+    await prisma.user.update({
+        where: { id },
+        data: { tokenVersion: { increment: 1 } },
+    });
+
+    await createAuditLog(
+        session.user.id,
+        "FORCE_LOGOUT",
+        "User",
+        id,
+        { targetName: targetUser.name, forcedBy: session.user.id }
+    );
+
+    revalidatePath("/admin/users");
+    return { success: true };
+}
+
 // Delete user (SUPER_ADMIN only, cannot delete SUPER_ADMIN)
 export async function deleteUser(id: string) {
     const session = await requireSuperAdmin();

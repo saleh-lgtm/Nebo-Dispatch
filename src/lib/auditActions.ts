@@ -24,7 +24,8 @@ export type AuditAction =
     | "CANCEL"
     | "ACCEPT"
     | "ACTIVATE"
-    | "DEACTIVATE";
+    | "DEACTIVATE"
+    | "FORCE_LOGOUT";
 
 export type AuditEntity =
     | "User"

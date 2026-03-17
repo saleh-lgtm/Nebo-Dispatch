@@ -7,6 +7,7 @@ import { Role } from "@prisma/client";
 // Security constants
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MINUTES = 15;
+const TOKEN_VERSION_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 // IP-based rate limiting for distributed brute force protection
 const IP_RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
@@ -46,7 +47,7 @@ export function setRequestIp(ip: string) {
 export const authOptions: NextAuthOptions = {
     session: {
         strategy: "jwt",
-        maxAge: 8 * 60 * 60, // 8 hours
+        maxAge: 12 * 60 * 60, // 12 hours — forces daily re-login
     },
     // SECURITY: Explicit cookie configuration for CSRF protection
     cookies: {
@@ -179,12 +180,17 @@ export const authOptions: NextAuthOptions = {
                     email: user.email,
                     name: user.name,
                     role: user.role,
+                    tokenVersion: user.tokenVersion,
                 };
             },
         }),
     ],
     callbacks: {
         session: ({ session, token }) => {
+            // If token was invalidated by force-logout, return empty session
+            if (!token.id || token.tokenVersion === -1) {
+                return { ...session, user: { ...session.user, id: "", role: "" as Role } };
+            }
             return {
                 ...session,
                 user: {
@@ -194,14 +200,33 @@ export const authOptions: NextAuthOptions = {
                 },
             };
         },
-        jwt: ({ token, user }) => {
+        jwt: async ({ token, user }) => {
             if (user) {
                 return {
                     ...token,
                     id: (user as { id: string }).id,
                     role: (user as { role: Role }).role,
+                    tokenVersion: (user as { tokenVersion: number }).tokenVersion,
+                    tokenVersionCheckedAt: Date.now(),
                 };
             }
+
+            // Periodically check tokenVersion against DB to detect force-logout
+            const now = Date.now();
+            if (now - (token.tokenVersionCheckedAt || 0) > TOKEN_VERSION_CHECK_INTERVAL) {
+                const dbUser = await prisma.user.findUnique({
+                    where: { id: token.id },
+                    select: { tokenVersion: true, isActive: true },
+                });
+
+                // Invalidate token if user not found, deactivated, or version bumped
+                if (!dbUser || !dbUser.isActive || dbUser.tokenVersion !== token.tokenVersion) {
+                    return { ...token, id: "", role: "" as Role, tokenVersion: -1 };
+                }
+
+                token.tokenVersionCheckedAt = now;
+            }
+
             return token;
         },
     },

@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Users, UserPlus, Shield, ShieldCheck, User, MoreVertical, X, AlertTriangle } from "lucide-react";
+import { Users, UserPlus, Shield, ShieldCheck, User, MoreVertical, X, AlertTriangle, LogOut } from "lucide-react";
 import {
     createUser,
     updateUser,
     changeUserRole,
     resetUserPassword,
+    forceLogoutUser,
     deleteUser,
 } from "@/lib/userManagementActions";
 
@@ -157,6 +158,21 @@ export default function UsersClient({ users, stats, currentUserId }: Props) {
             router.refresh();
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to deactivate user");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleForceLogout = async (user: UserData) => {
+        setLoading(true);
+        setError("");
+        try {
+            await forceLogoutUser(user.id);
+            setSuccess(`Force logged out ${user.name}. Their session will expire within 5 minutes.`);
+            setActiveDropdown(null);
+            router.refresh();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to force logout user");
         } finally {
             setLoading(false);
         }
@@ -340,6 +356,16 @@ export default function UsersClient({ users, stats, currentUserId }: Props) {
                                                         style={{ display: "block", width: "100%", padding: "0.75rem 1rem", textAlign: "left", background: "none", border: "none", cursor: "pointer", color: "var(--text-primary)" }}
                                                     >
                                                         Reset Password
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleForceLogout(user)}
+                                                        disabled={loading}
+                                                        style={{ display: "block", width: "100%", padding: "0.75rem 1rem", textAlign: "left", background: "none", border: "none", cursor: "pointer", color: "var(--warning)" }}
+                                                    >
+                                                        <span className="flex items-center gap-2">
+                                                            <LogOut size={14} />
+                                                            Force Logout
+                                                        </span>
                                                     </button>
                                                     <button
                                                         onClick={() => openDeleteModal(user)}
