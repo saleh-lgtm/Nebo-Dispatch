@@ -4,6 +4,56 @@ Permanent session history. Newest entries at top.
 
 ---
 
+### Session — 2026-03-17 ~Late Night
+**Focus:** Server action hardening batch — 5 files hardened (25/45 total)
+**Changes:**
+- Modified: src/lib/accountingActions.ts — added Zod validation, try/catch, `{ success, data, error }` return shape to all 9 functions
+- Modified: src/lib/adminRequestActions.ts — added Zod validation, try/catch, return shape to all 5 functions; replaced local auth helper with shared requireAdmin
+- Modified: src/lib/affiliateActions.ts — added Zod validation, try/catch, return shape to all 12 functions; removed CreateAttachmentData interface (replaced by Zod schema)
+- Modified: src/lib/clockActions.ts — added try/catch and return shape to getShiftStatus, getIncompleteReportShifts, canLogout; clockIn/clockOut already had good patterns
+- Modified: src/lib/scheduleTemplateActions.ts — added Zod validation, try/catch, return shape to read functions; replaced local requireAdmin with shared auth-helpers; mutations already had try/catch
+- Modified: src/lib/schemas.ts — added 14 new Zod schemas (accounting, admin request, affiliate update/attachment, schedule template)
+- Modified: src/app/accounting/components/flags/FlagsSection.tsx — updated to unwrap `result.data`
+- Modified: src/app/accounting/page.tsx — updated to unwrap `stats.data` and `flaggedData.data`
+- Modified: src/app/admin/requests/page.tsx — updated to unwrap `.data` for all 3 action calls
+- Modified: src/components/ClockButton.tsx — updated getShiftStatus() caller to unwrap `result.data`
+- Modified: src/components/schedule/TemplateManager.tsx — updated getScheduleTemplates() caller to unwrap `result.data`
+- Modified: src/lib/domains/affiliates/index.ts — removed CreateAttachmentData type export
+- Commits:
+  - bd0f62e fix: harden 5 server action files (25/45)
+**Decisions:** Return shape change applied to both reads and mutations consistently. Callers updated in same commit to avoid broken state. Schedule template's local requireAdmin replaced with shared auth-helpers version.
+**Issues Found:** None — TypeScript, ESLint, and production build all pass clean.
+
+---
+
+### Session — 2026-03-17 ~Night
+**Focus:** Fix and enhance dashboard confirmation widget — slow loading, modal bug, accountability scoring
+**Changes:**
+- Modified: src/lib/tripConfirmationActions.ts — scoped `getUpcomingConfirmations()` to next 24h + limit 10; added point deduction + MISSED_CONFIRMATION notifications to `markExpiredConfirmations()`; added tripNumber/passengerName to toExpire select
+- Deleted: src/components/ConfirmationWidget.tsx — old widget with `<style jsx>` and broken modal
+- Created: src/components/confirmations/DashboardConfirmationWidget.tsx — new one-click widget with CSS Modules, inline Confirm/No Answer buttons, optimistic dismiss, 15s countdown
+- Created: src/components/confirmations/DashboardConfirmationWidget.module.css — full widget styles
+- Modified: src/app/dashboard/DashboardClient.tsx — import new widget, added Award icon, added accountabilityScore prop + stat card
+- Modified: src/app/dashboard/page.tsx — changed limit 6→10, added accountabilityScore fetch
+- Modified: src/app/dashboard/Dashboard.module.css — added .iconDanger class
+- Modified: src/components/dashboard/index.ts — updated barrel: ConfirmationWidget → DashboardConfirmationWidget
+- Modified: prisma/schema.prisma — added accountabilityScore Int @default(100) to User, added MISSED_CONFIRMATION to NotificationType
+- Created: docs/superpowers/plans/2026-03-17-dashboard-confirmation-widget-fixes.md — implementation plan
+- Commits:
+  - a3ad8d4 perf: scope dashboard confirmations to next 24h, limit 10
+  - 0a73d09 feat: replace confirmation widget with one-click CSS Modules version
+  - 145b875 feat: add accountabilityScore to User, MISSED_CONFIRMATION notification type
+  - 8bc8483 feat: deduct accountability points and notify dispatchers on missed confirmations
+  - 1b7e871 feat: show accountability score on dispatcher dashboard
+  - 826c1e7 docs: update session logs and add confirmation widget plan
+**Decisions:** One-click pattern (no modal) preferred on dashboard — notes field deliberately removed for speed. accountabilityScore stored on User model (not separate table) since MissedConfirmationAccountability already tracks history. Score floors at 0 via Math.max. Point deductions use read-then-write (not decrement) to enforce floor. No $transaction wrapping — accountability records are source of truth, scores are recoverable. 24h query window balances performance vs visibility.
+**Issues Found:**
+- Old widget modal had position bug due to stacking context (overflow: visible + position: relative + z-index on parent)
+- src/components/dashboard/index.ts barrel re-exported old ConfirmationWidget — would have broken build if not updated
+- Next.js 16 build has intermittent _ssgManifest.js / pages-manifest.json errors during finalization (TypeScript compilation passes clean)
+
+---
+
 ### Session — 2026-03-17 ~Evening
 **Focus:** Add force-logout capability + 12h session expiry, fix 4 production bugs
 **Changes:**
