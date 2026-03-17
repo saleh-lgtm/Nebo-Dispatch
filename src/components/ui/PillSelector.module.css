@@ -1,0 +1,84 @@
+/* ===========================================
+   PillSelector — shared pill chip selector
+   =========================================== */
+
+.group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* ===========================================
+   Pill (default = sm)
+   =========================================== */
+
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.4375rem 0.875rem;
+  min-height: 36px;
+  background: var(--bg-surface, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border-radius: 9999px;
+  color: var(--text-secondary, #9ca3af);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pill:hover:not(.active):not(.activeColored) {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  color: var(--text-primary, #e5e7eb);
+}
+
+/* Active — accent (no custom color) */
+.active {
+  background: var(--accent-soft, rgba(59, 130, 246, 0.15));
+  border-color: var(--accent-border, rgba(59, 130, 246, 0.4));
+  color: var(--accent, #3b82f6);
+  font-weight: 600;
+}
+
+/* Active — custom color via --pill-color */
+.activeColored {
+  background: color-mix(in srgb, var(--pill-color) 18%, transparent);
+  border-color: color-mix(in srgb, var(--pill-color) 45%, transparent);
+  color: var(--pill-color);
+  font-weight: 600;
+}
+
+/* ===========================================
+   Count badge
+   =========================================== */
+
+.count {
+  background: rgba(255, 255, 255, 0.12);
+  padding: 0.0625rem 0.375rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.active .count {
+  background: var(--accent-border, rgba(59, 130, 246, 0.3));
+}
+
+.activeColored .count {
+  background: color-mix(in srgb, var(--pill-color) 30%, transparent);
+}
+
+/* ===========================================
+   Size: md
+   =========================================== */
+
+.md .pill {
+  padding: 0.5rem 1rem;
+  min-height: 40px;
+  font-size: 0.875rem;
+}

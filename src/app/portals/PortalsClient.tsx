@@ -23,6 +23,7 @@ import {
     Settings,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
+import PillSelector from "@/components/ui/PillSelector";
 import {
     getPortals,
     createPortal,
@@ -336,18 +337,15 @@ export default function PortalsClient() {
                         onChange={(e) => setSearch(e.target.value)}
                     />
                 </div>
-                <div className="category-pills">
-                    {CATEGORIES.map(cat => (
-                        <button
-                            key={cat.key}
-                            className={`category-pill ${category === cat.key ? "active" : ""}`}
-                            onClick={() => setCategory(cat.key)}
-                        >
-                            <cat.icon size={14} />
-                            {cat.label}
-                        </button>
-                    ))}
-                </div>
+                <PillSelector
+                    options={CATEGORIES.map(cat => ({
+                        value: cat.key,
+                        label: cat.label,
+                        icon: <cat.icon size={14} />,
+                    }))}
+                    selected={category}
+                    onChange={(v) => setCategory(v as string)}
+                />
             </div>
 
             {/* Recently Used */}
@@ -684,38 +682,6 @@ export default function PortalsClient() {
                     outline: none;
                     color: var(--text-primary);
                     font-size: 0.875rem;
-                }
-
-                .category-pills {
-                    display: flex;
-                    gap: 0.5rem;
-                    flex-wrap: wrap;
-                }
-
-                .category-pill {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.375rem;
-                    padding: 0.5rem 0.875rem;
-                    background: var(--bg-surface);
-                    border: 1px solid var(--border);
-                    border-radius: 9999px;
-                    color: var(--text-secondary);
-                    font-size: 0.8125rem;
-                    font-weight: 500;
-                    cursor: pointer;
-                    transition: var(--transition-fast);
-                }
-
-                .category-pill:hover {
-                    background: var(--bg-hover);
-                    color: var(--text-primary);
-                }
-
-                .category-pill.active {
-                    background: var(--accent-soft);
-                    border-color: var(--accent-border);
-                    color: var(--accent);
                 }
 
                 .recent-section {
@@ -1063,12 +1029,6 @@ export default function PortalsClient() {
 
                     .portals-grid {
                         grid-template-columns: 1fr;
-                    }
-
-                    .category-pills {
-                        overflow-x: auto;
-                        flex-wrap: nowrap;
-                        padding-bottom: 0.5rem;
                     }
 
                     .form-row {
