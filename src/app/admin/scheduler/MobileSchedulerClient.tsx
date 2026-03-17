@@ -209,9 +209,10 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
 
     const formatDateHeader = (dayIndex: number): string => {
         const date = getDateForDay(dayIndex);
-        return date.toLocaleDateString(undefined, {
+        return date.toLocaleDateString('en-US', {
             month: "short",
             day: "numeric",
+            timeZone: "UTC",
         });
     };
 
@@ -396,10 +397,10 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
                         ) : (
                             <>
                                 <span className="m-week-display__month">
-                                    {weekStart.toLocaleDateString(undefined, { month: "short" })}
+                                    {weekStart.toLocaleDateString('en-US', { month: "short", timeZone: "UTC" })}
                                 </span>
                                 <span className="m-week-display__range">
-                                    {weekStart.getDate()} - {addDays(weekStart, 6).getDate()}
+                                    {weekStart.getUTCDate()} - {addDays(weekStart, 6).getUTCDate()}
                                 </span>
                             </>
                         )}
@@ -418,7 +419,7 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
                             onClick={() => setSelectedDay(i)}
                         >
                             <span className="m-day-btn__name">{day}</span>
-                            <span className="m-day-btn__date">{getDateForDay(i).getDate()}</span>
+                            <span className="m-day-btn__date">{getDateForDay(i).getUTCDate()}</span>
                         </button>
                     ))}
                 </div>

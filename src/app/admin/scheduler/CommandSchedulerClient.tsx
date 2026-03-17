@@ -355,9 +355,9 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
     const isToday = (dayIndex: number): boolean => {
         const date = getDateForDay(dayIndex);
         const today = new Date();
-        return date.getDate() === today.getDate() &&
-            date.getMonth() === today.getMonth() &&
-            date.getFullYear() === today.getFullYear();
+        return date.getUTCDate() === today.getDate() &&
+            date.getUTCMonth() === today.getMonth() &&
+            date.getUTCFullYear() === today.getFullYear();
     };
 
     // Keyboard navigation
@@ -898,10 +898,10 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
                                         key={day}
                                         className={`cmd-day-header ${today ? 'cmd-day-header--today' : ''}`}
                                         role="columnheader"
-                                        aria-label={`${DAY_NAMES_FULL[i]}, ${date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}`}
+                                        aria-label={`${DAY_NAMES_FULL[i]}, ${date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' })}`}
                                     >
                                         <span className="cmd-day-header__name">{day}</span>
-                                        <span className="cmd-day-header__date">{date.getDate()}</span>
+                                        <span className="cmd-day-header__date">{date.getUTCDate()}</span>
                                     </div>
                                 );
                             })}
