@@ -1,0 +1,297 @@
+.widget {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.widgetActive {
+    border-color: var(--warning, #f59e0b);
+    box-shadow: 0 0 0 1px var(--warning, #f59e0b), 0 4px 12px rgba(245, 158, 11, 0.15);
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-secondary);
+}
+
+.headerActive {
+    background: linear-gradient(135deg, var(--bg-secondary), rgba(245, 158, 11, 0.08));
+}
+
+.title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.title svg {
+    color: var(--accent);
+}
+
+.headerRight {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.countBadge {
+    background: var(--danger);
+    color: white;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: var(--warning-bg, rgba(245, 158, 11, 0.12));
+    color: var(--warning, #f59e0b);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.errorBanner {
+    padding: 0.5rem 1rem;
+    background: var(--danger-bg, rgba(239, 68, 68, 0.1));
+    color: var(--danger, #ef4444);
+    font-size: 0.8rem;
+    text-align: center;
+}
+
+.list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.list::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
+}
+
+.card {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    border-left: 4px solid transparent;
+    transition: background 0.15s;
+}
+
+.card:hover {
+    background: var(--bg-hover);
+}
+
+.cardOverdue {
+    border-left-color: var(--danger, #ef4444);
+    background: var(--danger-bg, rgba(239, 68, 68, 0.05));
+}
+
+.cardUrgent {
+    border-left-color: var(--warning, #f59e0b);
+    background: var(--warning-bg, rgba(245, 158, 11, 0.05));
+}
+
+.cardCompleting {
+    opacity: 0.5;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+
+.position {
+    margin-right: 0.75rem;
+}
+
+.positionNum {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+}
+
+.positionFirst {
+    background: var(--warning, #f59e0b);
+    border-color: var(--warning);
+    color: white;
+}
+
+.info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.tripRow {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.tripNumber {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.pickupTime {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.detailRow {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.detailRow span {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.rightCol {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
+    margin-left: 0.75rem;
+}
+
+.countdown {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: var(--success-bg);
+    color: var(--success);
+}
+
+.countdownUrgent {
+    background: var(--warning-bg);
+    color: var(--warning);
+}
+
+.countdownOverdue {
+    background: var(--danger-bg);
+    color: var(--danger);
+}
+
+.actions {
+    display: flex;
+    gap: 0.375rem;
+}
+
+.confirmBtn {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.375rem 0.625rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--success, #4ade80);
+    color: white;
+    transition: all 0.15s;
+}
+
+.confirmBtn:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+}
+
+.confirmBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.noAnswerBtn {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.375rem 0.625rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--warning, #f59e0b);
+    color: white;
+    transition: all 0.15s;
+}
+
+.noAnswerBtn:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+}
+
+.noAnswerBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.emptyState {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 2rem;
+    color: var(--text-secondary);
+}
+
+.emptyState svg {
+    color: var(--success, #4ade80);
+    opacity: 0.7;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.85; }
+}

@@ -21,7 +21,7 @@ import RecentReportsPanel from "@/components/RecentReportsPanel";
 import EventsPanel from "@/components/EventsPanel";
 import TasksPanel from "@/components/TasksPanel";
 import AdminTaskProgressPanel from "@/components/AdminTaskProgressPanel";
-import ConfirmationWidget from "@/components/ConfirmationWidget";
+import DashboardConfirmationWidget from "@/components/confirmations/DashboardConfirmationWidget";
 import AnnouncementsCard from "@/components/AnnouncementsCard";
 import ShiftNotesCard from "@/components/ShiftNotesCard";
 import RoutePriceLookup from "@/components/pricing/RoutePriceLookup";
@@ -396,7 +396,7 @@ export default function DashboardClient({
             <div className={styles.contentGrid}>
                 <div className={styles.contentCol}>
                     {/* 2-Hour Confirmations - Top Priority */}
-                    <ConfirmationWidget confirmations={upcomingConfirmations} />
+                    <DashboardConfirmationWidget confirmations={upcomingConfirmations} />
 
                     {/* Quick Rate Lookup Widget */}
                     <div className={styles.notesCard}>

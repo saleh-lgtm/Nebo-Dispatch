@@ -27,4 +27,4 @@ export { default as ShiftSwapPanel } from "../ShiftSwapPanel";
 
 // Engagement & Analytics
 export { default as EngagementLeaderboard } from "../EngagementLeaderboard";
-export { default as ConfirmationWidget } from "../ConfirmationWidget";
+export { default as DashboardConfirmationWidget } from "../confirmations/DashboardConfirmationWidget";
