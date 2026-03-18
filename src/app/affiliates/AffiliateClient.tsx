@@ -23,6 +23,7 @@ import {
     ArrowUpRight,
     Paperclip,
 } from "lucide-react";
+import PillSelector from "@/components/ui/PillSelector";
 import { submitAffiliate } from "@/lib/actions";
 import { approveAffiliate, rejectAffiliate, deleteAffiliate, updateAffiliate } from "@/lib/affiliateActions";
 import { useToast } from "@/hooks/useToast";
@@ -286,65 +287,27 @@ export default function AffiliateClient({ initialAffiliates, session, isAdmin, p
 
             {/* Type Tabs - Farm In / Farm Out */}
             <div className="flex flex-col gap-4">
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => setTypeTab("FARM_OUT")}
-                        className={`btn ${typeTab === "FARM_OUT" ? "btn-primary" : "btn-ghost"}`}
-                        style={{ minWidth: "140px" }}
-                    >
-                        <ArrowUpRight size={16} />
-                        Farm Out
-                        {isAdmin && pendingCounts.farmOutCount > 0 && (
-                            <span className="badge badge-warning" style={{ marginLeft: "0.5rem" }}>
-                                {pendingCounts.farmOutCount}
-                            </span>
-                        )}
-                    </button>
-                    <button
-                        onClick={() => setTypeTab("FARM_IN")}
-                        className={`btn ${typeTab === "FARM_IN" ? "btn-primary" : "btn-ghost"}`}
-                        style={{ minWidth: "140px" }}
-                    >
-                        <ArrowDownLeft size={16} />
-                        Farm In
-                        {isAdmin && pendingCounts.farmInCount > 0 && (
-                            <span className="badge badge-warning" style={{ marginLeft: "0.5rem" }}>
-                                {pendingCounts.farmInCount}
-                            </span>
-                        )}
-                    </button>
-                </div>
+                <PillSelector
+                    options={[
+                        { value: "FARM_OUT", label: "Farm Out" },
+                        { value: "FARM_IN", label: "Farm In" },
+                    ]}
+                    selected={typeTab}
+                    onChange={(v) => setTypeTab(v as AffiliateType)}
+                    size="md"
+                />
 
                 {/* Status Tabs - Admin Only */}
                 {isAdmin && (
-                    <div className="flex gap-2 flex-wrap">
-                        <button
-                            onClick={() => setStatusTab("pending")}
-                            className={`btn btn-sm ${statusTab === "pending" ? "btn-primary" : "btn-ghost"}`}
-                        >
-                            <Clock size={14} />
-                            Pending
-                            {currentPendingCount > 0 && (
-                                <span className="badge badge-warning" style={{ marginLeft: "0.25rem", fontSize: "0.7rem" }}>
-                                    {currentPendingCount}
-                                </span>
-                            )}
-                        </button>
-                        <button
-                            onClick={() => setStatusTab("approved")}
-                            className={`btn btn-sm ${statusTab === "approved" ? "btn-primary" : "btn-ghost"}`}
-                        >
-                            <ShieldCheck size={14} />
-                            Approved
-                        </button>
-                        <button
-                            onClick={() => setStatusTab("all")}
-                            className={`btn btn-sm ${statusTab === "all" ? "btn-primary" : "btn-ghost"}`}
-                        >
-                            <Globe size={14} />
-                            All
-                        </button>
-                    </div>
+                    <PillSelector
+                        options={[
+                            { value: "pending", label: "Pending", count: currentPendingCount > 0 ? currentPendingCount : undefined },
+                            { value: "approved", label: "Approved" },
+                            { value: "all", label: "All" },
+                        ]}
+                        selected={statusTab}
+                        onChange={(v) => setStatusTab(v as "all" | "pending" | "approved")}
+                    />
                 )}
             </div>
 

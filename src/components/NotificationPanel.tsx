@@ -22,6 +22,7 @@ import {
 } from "@/lib/notificationActions";
 import { NotificationType } from "@prisma/client";
 import { useRouter } from "next/navigation";
+import ToggleGroup from "@/components/ui/ToggleGroup";
 
 interface Notification {
     id: string;
@@ -164,20 +165,15 @@ export default function NotificationPanel({ initialNotifications }: Props) {
                     {unreadCount > 0 && <span className="unread-badge">{unreadCount}</span>}
                 </div>
                 <div className="header-actions">
-                    <div className="filter-tabs">
-                        <button
-                            className={`filter-btn ${filter === "all" ? "active" : ""}`}
-                            onClick={() => setFilter("all")}
-                        >
-                            All
-                        </button>
-                        <button
-                            className={`filter-btn ${filter === "unread" ? "active" : ""}`}
-                            onClick={() => setFilter("unread")}
-                        >
-                            Unread
-                        </button>
-                    </div>
+                    <ToggleGroup
+                        options={[
+                            { value: "all", label: "All" },
+                            { value: "unread", label: "Unread" },
+                        ]}
+                        value={filter}
+                        onChange={(v) => setFilter(v as "all" | "unread")}
+                        size="sm"
+                    />
                     {unreadCount > 0 && (
                         <button
                             onClick={handleMarkAllRead}
@@ -297,34 +293,6 @@ export default function NotificationPanel({ initialNotifications }: Props) {
                     display: flex;
                     align-items: center;
                     gap: 0.5rem;
-                }
-
-                .filter-tabs {
-                    display: flex;
-                    background: var(--bg-secondary);
-                    border-radius: var(--radius-md);
-                    padding: 2px;
-                }
-
-                .filter-btn {
-                    padding: 0.375rem 0.75rem;
-                    background: transparent;
-                    border: none;
-                    color: var(--text-secondary);
-                    font-size: 0.75rem;
-                    font-weight: 500;
-                    cursor: pointer;
-                    border-radius: var(--radius-sm);
-                    transition: all 0.15s;
-                }
-
-                .filter-btn.active {
-                    background: var(--bg-primary);
-                    color: var(--text-primary);
-                }
-
-                .filter-btn:hover:not(.active) {
-                    color: var(--text-primary);
                 }
 
                 .action-btn {

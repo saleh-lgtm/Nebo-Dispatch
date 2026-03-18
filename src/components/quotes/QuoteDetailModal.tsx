@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
-    FileText,
     Clock,
     Plus,
     RefreshCw,
@@ -14,7 +13,6 @@ import {
     PhoneCall,
     Send,
     MessageCircle,
-    History,
     Trophy,
     ThumbsDown,
     Flag,
@@ -27,6 +25,7 @@ import {
     getQuoteWithHistory,
 } from "@/lib/domains/quotes";
 import { Quote, statusColors, formatTimeSince, formatTimeUntilExpiry } from "./types";
+import ToggleGroup from "@/components/ui/ToggleGroup";
 import styles from "./QuoteDetailModal.module.css";
 
 interface Props {
@@ -166,12 +165,15 @@ export default function QuoteDetailModal({ quoteId, onClose }: Props) {
 
                     {/* Tabs */}
                     <div className={styles.tabs}>
-                        <button onClick={() => setActiveTab("actions")} className={activeTab === "actions" ? styles.active : ""}>
-                            <History size={14} /> Activity
-                        </button>
-                        <button onClick={() => setActiveTab("details")} className={activeTab === "details" ? styles.active : ""}>
-                            <FileText size={14} /> Details
-                        </button>
+                        <ToggleGroup
+                            options={[
+                                { value: "actions", label: "Activity" },
+                                { value: "details", label: "Details" },
+                            ]}
+                            value={activeTab}
+                            onChange={(v) => setActiveTab(v as "actions" | "details")}
+                            size="sm"
+                        />
                     </div>
 
                     {/* Content */}

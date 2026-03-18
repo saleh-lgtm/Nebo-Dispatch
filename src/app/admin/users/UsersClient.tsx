@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Users, UserPlus, Shield, ShieldCheck, User, MoreVertical, X, AlertTriangle, LogOut } from "lucide-react";
+import PillSelector from "@/components/ui/PillSelector";
 import {
     createUser,
     updateUser,
@@ -283,17 +284,18 @@ export default function UsersClient({ users, stats, currentUserId }: Props) {
             </div>
 
             {/* Filter */}
-            <div className="flex gap-2" style={{ marginBottom: "1.5rem" }}>
-                {(["all", "SUPER_ADMIN", "ADMIN", "DISPATCHER"] as const).map((f) => (
-                    <button
-                        key={f}
-                        onClick={() => setFilter(f)}
-                        className={`btn ${filter === f ? "btn-primary" : ""}`}
-                        style={{ padding: "0.5rem 1rem", fontSize: "0.875rem" }}
-                    >
-                        {f === "all" ? "All" : f.replace("_", " ")}
-                    </button>
-                ))}
+            <div style={{ marginBottom: "1.5rem" }}>
+                <PillSelector
+                    options={[
+                        { value: "all", label: "All" },
+                        { value: "SUPER_ADMIN", label: "SUPER ADMIN" },
+                        { value: "ADMIN", label: "ADMIN" },
+                        { value: "DISPATCHER", label: "DISPATCHER" },
+                    ]}
+                    selected={filter}
+                    onChange={(v) => setFilter(v as "all" | "SUPER_ADMIN" | "ADMIN" | "ACCOUNTING" | "DISPATCHER")}
+                    size="md"
+                />
             </div>
 
             {/* Users Table */}

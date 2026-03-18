@@ -39,68 +39,6 @@
     color: var(--text-secondary);
 }
 
-/* Main Section Tabs */
-.mainTabs {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1.5rem;
-    padding: 0.25rem;
-    background: var(--bg-muted);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    width: fit-content;
-}
-
-.mainTab {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.25rem;
-    background: transparent;
-    border: none;
-    border-radius: 10px;
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.mainTab:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-}
-
-.mainTabActive {
-    background: var(--accent);
-    color: white;
-}
-
-.mainTabBadge {
-    background: var(--danger);
-    color: white;
-    padding: 0.125rem 0.5rem;
-    border-radius: 9999px;
-    font-size: 0.7rem;
-    font-weight: 600;
-}
-
-.mainTabActive .mainTabBadge {
-    background: rgba(255, 255, 255, 0.3);
-    color: white;
-}
-
-.mainTabCount {
-    padding: 0.125rem 0.5rem;
-    background: var(--bg-hover);
-    border-radius: 9999px;
-    font-size: 0.7rem;
-}
-
-.mainTabActive .mainTabCount {
-    background: rgba(255, 255, 255, 0.2);
-}
-
 /* Stats Grid */
 .statsGrid {
     display: grid;

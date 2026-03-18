@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Calculator, Flag, DollarSign } from "lucide-react";
+import { Calculator } from "lucide-react";
+import ToggleGroup from "@/components/ui/ToggleGroup";
 import AffiliatePricingTab from "./AffiliatePricingTab";
 import { FlagsSection } from "./components/flags";
 import type { AccountingFlag, Stats } from "./components/flags";
@@ -71,26 +72,14 @@ export default function AccountingClient({
             </header>
 
             {/* Main Section Tabs */}
-            <div className={styles.mainTabs}>
-                <button
-                    className={`${styles.mainTab} ${mainSection === "flags" ? styles.mainTabActive : ""}`}
-                    onClick={() => setMainSection("flags")}
-                >
-                    <Flag size={18} />
-                    <span>Reservation Flags</span>
-                    {initialStats.pending > 0 && (
-                        <span className={styles.mainTabBadge}>{initialStats.pending}</span>
-                    )}
-                </button>
-                <button
-                    className={`${styles.mainTab} ${mainSection === "pricing" ? styles.mainTabActive : ""}`}
-                    onClick={() => setMainSection("pricing")}
-                >
-                    <DollarSign size={18} />
-                    <span>Affiliate Pricing</span>
-                    <span className={styles.mainTabCount}>{affiliates.length}</span>
-                </button>
-            </div>
+            <ToggleGroup
+                options={[
+                    { value: "flags", label: "Reservation Flags" },
+                    { value: "pricing", label: "Affiliate Pricing" },
+                ]}
+                value={mainSection}
+                onChange={(v) => setMainSection(v as "flags" | "pricing")}
+            />
 
             {mainSection === "flags" ? (
                 <FlagsSection

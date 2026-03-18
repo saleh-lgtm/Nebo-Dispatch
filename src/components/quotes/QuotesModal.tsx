@@ -17,6 +17,7 @@ import {
 import { Quote, statusColors, formatTimeSince, formatTimeUntilExpiry } from "./types";
 import AddQuoteModal from "./AddQuoteModal";
 import QuoteDetailModal from "./QuoteDetailModal";
+import ToggleGroup from "@/components/ui/ToggleGroup";
 import styles from "./QuotesModal.module.css";
 
 interface Props {
@@ -69,18 +70,15 @@ export default function QuotesModal({ quotes, onClose }: Props) {
 
                     {/* Tabs */}
                     <div className={styles.tabs}>
-                        <button
-                            onClick={() => setActiveTab("active")}
-                            className={`${styles.tab} ${activeTab === "active" ? styles.active : ""}`}
-                        >
-                            Active ({activeQuotes.length})
-                        </button>
-                        <button
-                            onClick={() => setActiveTab("all")}
-                            className={`${styles.tab} ${activeTab === "all" ? styles.active : ""}`}
-                        >
-                            All ({quotes.length})
-                        </button>
+                        <ToggleGroup
+                            options={[
+                                { value: "active", label: `Active (${activeQuotes.length})` },
+                                { value: "all", label: `All (${quotes.length})` },
+                            ]}
+                            value={activeTab}
+                            onChange={(v) => setActiveTab(v as "active" | "all")}
+                            size="sm"
+                        />
                     </div>
 
                     {/* Content */}

@@ -25,7 +25,7 @@ import { createDetailedRequest } from "@/lib/requestActions";
 import { getCalendarSubscriptionUrl, getCalendarDownloadUrl } from "@/lib/calendarExportActions";
 import TimeOffPanel from "@/components/TimeOffPanel";
 import ShiftSwapPanel from "@/components/ShiftSwapPanel";
-import styles from "./schedule.module.css";
+import ToggleGroup from "@/components/ui/ToggleGroup";
 
 interface Schedule {
     id: string;
@@ -348,20 +348,15 @@ export default function ScheduleClient({
                     {activeView === "shifts" && (
                         <>
                             <div className="content-header">
-                                <div className="filter-tabs">
-                                    <button
-                                        onClick={() => setShiftFilter("upcoming")}
-                                        className={`filter-tab ${shiftFilter === "upcoming" ? "active" : ""}`}
-                                    >
-                                        Upcoming
-                                    </button>
-                                    <button
-                                        onClick={() => setShiftFilter("past")}
-                                        className={`filter-tab ${shiftFilter === "past" ? "active" : ""}`}
-                                    >
-                                        Past
-                                    </button>
-                                </div>
+                                <ToggleGroup
+                                    options={[
+                                        { value: "upcoming", label: "Upcoming" },
+                                        { value: "past", label: "Past" },
+                                    ]}
+                                    value={shiftFilter}
+                                    onChange={(v) => setShiftFilter(v as "upcoming" | "past")}
+                                    size="sm"
+                                />
                             </div>
 
                             <div className="shifts-list">
@@ -970,41 +965,6 @@ export default function ScheduleClient({
 
                 .content-header {
                     margin-bottom: 1rem;
-                }
-
-                .filter-tabs {
-                    display: flex;
-                    gap: 0.5rem;
-                }
-
-                .filter-tab {
-                    padding: 0.5rem 1rem;
-                    font-size: 0.8125rem;
-                    font-weight: 500;
-                    color: var(--text-secondary);
-                    background: transparent;
-                    border: 1px solid var(--border);
-                    border-radius: var(--radius-md);
-                    cursor: pointer;
-                    transition: all 0.15s ease;
-                }
-
-                @media (max-width: 640px) {
-                    .filter-tab {
-                        padding: 0.625rem 0.875rem;
-                        font-size: 0.75rem;
-                    }
-                }
-
-                .filter-tab:hover {
-                    border-color: var(--border-hover);
-                    color: var(--text-primary);
-                }
-
-                .filter-tab.active {
-                    background: var(--primary);
-                    border-color: var(--primary);
-                    color: white;
                 }
 
                 /* Shifts List */

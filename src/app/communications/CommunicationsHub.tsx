@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
 import Modal from "@/components/ui/Modal";
+import PillSelector from "@/components/ui/PillSelector";
 import {
     sendConversationSMS,
     getConversationMessages,
@@ -152,6 +153,7 @@ export default function CommunicationsHub({
     initialPartners,
     initialConversations,
     stats,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     pendingCounts,
     session,
     isAdmin,
@@ -408,32 +410,20 @@ export default function CommunicationsHub({
                     </div>
 
                     {/* Type Filter Pills */}
-                    <div className="filter-pills">
-                        <button
-                            className={`filter-pill ${typeFilter === "all" ? "active" : ""}`}
-                            onClick={() => setTypeFilter("all")}
-                        >
-                            All
-                            <span className="pill-count">{partners.filter(p => p.phone).length}</span>
-                        </button>
-                        {PARTNER_TYPES.map(type => {
-                            const count = partners.filter(p => p.phone && p.type === type.key).length;
-                            const pending = pendingCounts[type.key] || 0;
-                            return (
-                                <button
-                                    key={type.key}
-                                    className={`filter-pill ${typeFilter === type.key ? "active" : ""}`}
-                                    onClick={() => setTypeFilter(type.key)}
-                                    style={{ "--pill-color": type.color } as React.CSSProperties}
-                                >
-                                    <type.icon size={12} />
-                                    {type.shortLabel}
-                                    <span className="pill-count">{count}</span>
-                                    {pending > 0 && <span className="pill-pending">{pending}</span>}
-                                </button>
-                            );
-                        })}
-                    </div>
+                    <PillSelector
+                        options={[
+                            { value: "all", label: "All", count: partners.filter(p => p.phone).length },
+                            ...PARTNER_TYPES.map(type => ({
+                                value: type.key,
+                                label: type.shortLabel,
+                                icon: <type.icon size={12} />,
+                                color: type.color,
+                                count: partners.filter(p => p.phone && p.type === type.key).length,
+                            })),
+                        ]}
+                        selected={typeFilter}
+                        onChange={(v) => setTypeFilter(v as PartnerType | "all")}
+                    />
 
                     {/* Contact List */}
                     <div className="contact-list">
@@ -840,66 +830,6 @@ export default function CommunicationsHub({
 
                 .search-clear:hover {
                     color: var(--text-primary);
-                }
-
-                /* Filter Pills */
-                .filter-pills {
-                    display: flex;
-                    gap: 0.5rem;
-                    padding: 0.75rem 1rem;
-                    overflow-x: auto;
-                    border-bottom: 1px solid var(--border);
-                }
-
-                .filter-pills::-webkit-scrollbar {
-                    display: none;
-                }
-
-                .filter-pill {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.375rem;
-                    padding: 0.5rem 0.75rem;
-                    background: var(--bg-elevated);
-                    border: 1px solid var(--border);
-                    border-radius: var(--radius-sm);
-                    font-size: 0.75rem;
-                    font-weight: 600;
-                    color: var(--text-secondary);
-                    cursor: pointer;
-                    transition: var(--transition-fast);
-                    white-space: nowrap;
-                }
-
-                .filter-pill:hover {
-                    background: var(--bg-active);
-                    color: var(--text-primary);
-                }
-
-                .filter-pill.active {
-                    background: var(--accent-soft);
-                    border-color: var(--accent-border);
-                    color: var(--accent);
-                }
-
-                .pill-count {
-                    padding: 0.125rem 0.375rem;
-                    background: var(--bg-active);
-                    border-radius: 9999px;
-                    font-size: 0.6875rem;
-                }
-
-                .filter-pill.active .pill-count {
-                    background: var(--accent);
-                    color: white;
-                }
-
-                .pill-pending {
-                    padding: 0.125rem 0.375rem;
-                    background: var(--warning);
-                    color: var(--text-inverse);
-                    border-radius: 9999px;
-                    font-size: 0.6875rem;
                 }
 
                 /* Contact List */
