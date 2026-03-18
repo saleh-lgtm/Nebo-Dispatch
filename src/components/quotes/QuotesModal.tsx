@@ -111,6 +111,11 @@ export default function QuotesModal({ quotes, onClose }: Props) {
                                                     <span className={styles.statusBadge} style={{ background: statusColors[quote.status].bg, color: statusColors[quote.status].color }}>
                                                         {statusColors[quote.status].label}
                                                     </span>
+                                                    {quote.shiftId && (
+                                                        <span className={styles.statusBadge} style={{ background: "rgba(168, 85, 247, 0.1)", color: "#c084fc", fontSize: "0.65rem" }}>
+                                                            From Shift
+                                                        </span>
+                                                    )}
                                                     {showExpiryWarning && (
                                                         <span className={`${styles.expiryBadge} ${expiry.expired ? styles.expired : ""}`}>
                                                             <Hourglass size={10} />

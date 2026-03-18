@@ -96,7 +96,19 @@ export async function getPendingQuotes(): Promise<QuoteWithComputedFlag[]> {
 export async function getShiftQuotes(shiftId: string) {
   return prisma.quote.findMany({
     where: { shiftId },
-    include: {
+    select: {
+      id: true,
+      clientName: true,
+      clientEmail: true,
+      clientPhone: true,
+      serviceType: true,
+      estimatedAmount: true,
+      notes: true,
+      status: true,
+      outcome: true,
+      nextFollowUp: true,
+      followUpCount: true,
+      shiftId: true,
       createdBy: { select: { id: true, name: true } },
     },
     orderBy: { createdAt: "asc" },

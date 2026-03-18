@@ -445,7 +445,7 @@ export default function ReportsClient({
                                                 <Mail size={14} /> {report.emailsSent}
                                             </span>
                                         </td>
-                                        <td style={tdStyle}>{report.quotesGiven}</td>
+                                        <td style={tdStyle}>{report.shift.quotes ? report.shift.quotes.length : report.quotesGiven}</td>
                                         <td style={tdStyle}>
                                             <span
                                                 style={{

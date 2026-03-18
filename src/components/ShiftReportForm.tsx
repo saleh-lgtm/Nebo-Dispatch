@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, ClipboardCheck, Send, AlertCircle, Bookmark, Phone, Mail, FileText, TrendingUp, Clock, X, DollarSign, User, Cloud, CloudOff, RefreshCw, StickyNote, Bell } from "lucide-react";
+import { Plus, ClipboardCheck, Send, AlertCircle, Bookmark, Phone, Mail, FileText, TrendingUp, Clock, X, DollarSign, User, Cloud, CloudOff, RefreshCw, StickyNote, Bell, CheckCircle, XCircle } from "lucide-react";
 import { toggleTask, saveShiftReport, saveShiftReportDraft, deleteShiftReportDraft, type ShiftReportDraft } from "@/lib/actions";
-import { createQuote } from "@/lib/domains/quotes";
+import { createQuote, setQuoteOutcome, recordFollowUp } from "@/lib/domains/quotes";
 import { createBillingReviews } from "@/lib/billingReviewActions";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import AffiliateAuditSection, { type AffiliateAuditEntry } from "./shift-report/AffiliateAuditSection";
@@ -43,6 +43,10 @@ interface Quote {
     estimatedAmount: number | null;
     notes: string | null;
     status: string;
+    outcome: string | null;
+    nextFollowUp: Date | null;
+    followUpCount: number;
+    shiftId: string | null;
     createdBy: { id: string; name: string | null };
 }
 
@@ -240,12 +244,37 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
                 estimatedAmount: newQuote.estimatedAmount,
                 notes: newQuote.notes,
                 status: newQuote.status,
+                outcome: null,
+                nextFollowUp: null,
+                followUpCount: 0,
+                shiftId: activeShift.id,
                 createdBy: { id: session.user.id, name: session.user.name || null },
             };
             setQuotes([...quotes, quoteForDisplay]);
             setShowQuoteModal(false);
         } catch (e) {
             console.error(e);
+        }
+    };
+
+    const handleQuoteOutcome = async (quoteId: string, outcome: "WON" | "LOST") => {
+        try {
+            await setQuoteOutcome(quoteId, outcome);
+            setQuotes(quotes.map(q => q.id === quoteId ? { ...q, outcome, status: outcome === "WON" ? "CONVERTED" : "LOST" } : q));
+        } catch (e) {
+            console.error("Failed to set quote outcome:", e);
+        }
+    };
+
+    const handleScheduleFollowUp = async (quoteId: string) => {
+        try {
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            tomorrow.setHours(9, 0, 0, 0);
+            await recordFollowUp(quoteId, "Follow-up scheduled from shift report", "FOLLOW_UP", tomorrow);
+            setQuotes(quotes.map(q => q.id === quoteId ? { ...q, nextFollowUp: tomorrow, status: "FOLLOWING_UP", followUpCount: q.followUpCount + 1 } : q));
+        } catch (e) {
+            console.error("Failed to schedule follow-up:", e);
         }
     };
 
@@ -572,19 +601,34 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
                             </div>
                         ) : (
                             <div className="quotes-list">
-                                {quotes.map((quote) => (
+                                {quotes.map((quote) => {
+                                    const isClosed = quote.status === "CONVERTED" || quote.status === "LOST" || quote.status === "EXPIRED";
+                                    return (
                                     <div key={quote.id} className="quote-item">
                                         <div className="quote-item-header">
                                             <div className="quote-client">
                                                 <User size={14} />
                                                 <span>{quote.clientName}</span>
                                             </div>
-                                            {quote.estimatedAmount && (
-                                                <span className="quote-amount">
-                                                    <DollarSign size={12} />
-                                                    {quote.estimatedAmount}
+                                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                                {/* Follow-up status badge */}
+                                                <span style={{
+                                                    fontSize: "0.7rem",
+                                                    fontWeight: 600,
+                                                    padding: "0.2rem 0.5rem",
+                                                    borderRadius: "9999px",
+                                                    background: quote.outcome === "WON" ? "rgba(34, 197, 94, 0.1)" : quote.outcome === "LOST" ? "rgba(239, 68, 68, 0.1)" : quote.nextFollowUp ? "rgba(59, 130, 246, 0.1)" : "rgba(245, 158, 11, 0.1)",
+                                                    color: quote.outcome === "WON" ? "#4ade80" : quote.outcome === "LOST" ? "#f87171" : quote.nextFollowUp ? "#60a5fa" : "#fbbf24",
+                                                }}>
+                                                    {quote.outcome === "WON" ? "Won" : quote.outcome === "LOST" ? "Lost" : quote.nextFollowUp ? `Follow-up ${new Date(quote.nextFollowUp).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : "New"}
                                                 </span>
-                                            )}
+                                                {quote.estimatedAmount != null && (
+                                                    <span className="quote-amount">
+                                                        <DollarSign size={12} />
+                                                        {quote.estimatedAmount}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                         <div className="quote-details">
                                             <span className="quote-service">{quote.serviceType}</span>
@@ -604,8 +648,38 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
                                         {quote.notes && (
                                             <p className="quote-notes">{quote.notes}</p>
                                         )}
+                                        {/* Follow-up actions — only for open quotes */}
+                                        {!isClosed && (
+                                            <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleScheduleFollowUp(quote.id)}
+                                                    style={{ display: "flex", alignItems: "center", gap: "0.25rem", padding: "0.25rem 0.5rem", fontSize: "0.7rem", fontWeight: 500, fontFamily: "inherit", background: "rgba(59, 130, 246, 0.1)", border: "1px solid rgba(59, 130, 246, 0.2)", borderRadius: "6px", color: "#60a5fa", cursor: "pointer" }}
+                                                >
+                                                    <Clock size={12} />
+                                                    Schedule Follow-up
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleQuoteOutcome(quote.id, "WON")}
+                                                    style={{ display: "flex", alignItems: "center", gap: "0.25rem", padding: "0.25rem 0.5rem", fontSize: "0.7rem", fontWeight: 500, fontFamily: "inherit", background: "rgba(34, 197, 94, 0.1)", border: "1px solid rgba(34, 197, 94, 0.2)", borderRadius: "6px", color: "#4ade80", cursor: "pointer" }}
+                                                >
+                                                    <CheckCircle size={12} />
+                                                    Won
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleQuoteOutcome(quote.id, "LOST")}
+                                                    style={{ display: "flex", alignItems: "center", gap: "0.25rem", padding: "0.25rem 0.5rem", fontSize: "0.7rem", fontWeight: 500, fontFamily: "inherit", background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.2)", borderRadius: "6px", color: "#f87171", cursor: "pointer" }}
+                                                >
+                                                    <XCircle size={12} />
+                                                    Lost
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </section>

@@ -33,6 +33,7 @@ export interface Quote {
     followUpNotes: string | null;
     createdBy: { id: string; name: string | null };
     assignedTo: { id: string; name: string | null } | null;
+    shiftId?: string | null;
     createdAt: Date;
     actions?: QuoteAction[];
 }
