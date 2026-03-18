@@ -1,10 +1,10 @@
 /**
  * Admin Domain
  *
- * Unified export for admin functions: audit, analytics, dashboard, requests.
+ * Unified export for admin functions: audit, dashboard, requests.
  *
  * Usage:
- *   import { getAuditLogs, getPerformanceMetrics } from "@/lib/domains/admin";
+ *   import { getAuditLogs, getAdminDashboardStats } from "@/lib/domains/admin";
  */
 
 // ============================================
@@ -23,19 +23,6 @@ export {
   getAuditLogs,
   getAuditStats,
 } from "../../auditActions";
-
-// ============================================
-// ANALYTICS ACTIONS (analyticsActions.ts)
-// ============================================
-
-export {
-  // Performance metrics
-  getPerformanceMetrics,
-  getDispatcherComparison,
-  getDailyTrend,
-  getDispatcherList,
-  getConfirmationAccountabilityTrend,
-} from "../../analyticsActions";
 
 // ============================================
 // ADMIN DASHBOARD (adminDashboardActions.ts)

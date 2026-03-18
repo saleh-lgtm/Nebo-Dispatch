@@ -1,0 +1,152 @@
+/* ============================================
+   Trends & Volume Tab
+   ============================================ */
+
+/* Summary Cards */
+.summaryGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.summaryCard {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-primary);
+    padding: 1rem 1.25rem;
+}
+
+.cardLabel {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    margin: 0 0 0.375rem;
+}
+
+.cardValue {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.cardValueGreen {
+    composes: cardValue;
+    color: #059669;
+}
+
+/* Chart Sections */
+.chartSection {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-primary);
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.chartTitle {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 1rem;
+}
+
+.chartWrap {
+    width: 100%;
+}
+
+/* Empty state */
+.emptyChart {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 280px;
+    color: var(--text-secondary);
+    font-style: italic;
+    font-size: 0.875rem;
+}
+
+/* Skeleton loading */
+.skeletonCard {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-primary);
+    padding: 1rem 1.25rem;
+    min-height: 80px;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeletonChart {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-primary);
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    min-height: 340px;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Tooltip */
+.chartTooltip {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.625rem 0.75rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.tooltipLabel {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 0.375rem;
+}
+
+.tooltipRow {
+    font-size: 0.8125rem;
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* Legend */
+.chartLegend {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    margin-top: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.legendItem {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.legendDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .summaryGrid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .chartLegend {
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+}

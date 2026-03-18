@@ -12,7 +12,7 @@ function ScorecardLoading() {
     return (
         <div className="page-container">
             <div className="page-header">
-                <h1 className="page-title">Dispatcher Scorecard</h1>
+                <h1 className="page-title">Performance Dashboard</h1>
             </div>
             <div className="skeleton-grid">
                 <div className="skeleton-card" style={{ height: "60px" }} />
@@ -24,7 +24,14 @@ function ScorecardLoading() {
     );
 }
 
-export default async function ScorecardPage() {
+const VALID_TABS = ["scorecard", "trends", "hours"] as const;
+type TabValue = (typeof VALID_TABS)[number];
+
+export default async function ScorecardPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ tab?: string }>;
+}) {
     const session = await getServerSession(authOptions);
 
     if (!session) {
@@ -35,6 +42,11 @@ export default async function ScorecardPage() {
         redirect("/dashboard");
     }
 
+    const params = await searchParams;
+    const tab: TabValue = VALID_TABS.includes(params.tab as TabValue)
+        ? (params.tab as TabValue)
+        : "scorecard";
+
     // Default to this month
     const now = new Date();
     const from = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -42,11 +54,18 @@ export default async function ScorecardPage() {
     const to = new Date();
     to.setHours(23, 59, 59, 999);
 
-    const result = await getTeamScorecard({ from, to });
+    // Only scorecard tab needs SSR data — trends and hours fetch client-side
+    let scorecardData: Awaited<ReturnType<typeof getTeamScorecard>>["data"] = undefined;
+
+    if (tab === "scorecard") {
+        const result = await getTeamScorecard({ from, to });
+        scorecardData = result.data;
+    }
 
     return (
         <ScorecardClient
-            initialData={result.data ?? []}
+            initialTab={tab}
+            initialScorecardData={scorecardData ?? []}
             initialFrom={from.toISOString()}
             initialTo={to.toISOString()}
         />

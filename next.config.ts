@@ -59,6 +59,17 @@ const nextConfig: NextConfig = {
     ];
   },
 
+  // Redirects — old routes to new locations
+  async redirects() {
+    return [
+      {
+        source: '/admin/analytics',
+        destination: '/admin/scorecard',
+        permanent: true,
+      },
+    ];
+  },
+
   // Optimize package imports - tree-shakes barrel exports
   experimental: {
     optimizePackageImports: [

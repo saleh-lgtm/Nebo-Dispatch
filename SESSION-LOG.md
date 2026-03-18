@@ -4,6 +4,159 @@ Permanent session history. Newest entries at top.
 
 ---
 
+### Session — 2026-03-19 ~Early Morning
+**Focus:** Merge /admin/analytics into /admin/scorecard — unified 3-tab performance dashboard
+**Changes:**
+- Deleted: src/lib/analyticsActions.ts — all 5 functions removed (3 ShiftReport-based, 2 dead code)
+- Deleted: src/app/admin/analytics/ — entire route (page.tsx + AnalyticsClient.tsx)
+- Created: src/lib/trendsActions.ts — 2 new functions: getDailyActivityTrend (SMSLog + Quote + TripConfirmation), getDispatcherActivityComparison (top 8 dispatchers by SMS + quotes)
+- Created: src/components/scorecard/TrendsTabClient.tsx + trendsTab.module.css — 4 summary cards, Recharts AreaChart (daily SMS/quotes/confirmations), horizontal BarChart (dispatcher comparison)
+- Created: src/components/scorecard/HoursTabClient.tsx + hoursTab.module.css — 4 summary cards, grouped BarChart (scheduled/worked/overtime), hours summary table with efficiency %
+- Modified: src/app/admin/scorecard/page.tsx — accepts ?tab= URL param (scorecard|trends|hours), SSR-fetches only active tab's data
+- Modified: src/app/admin/scorecard/ScorecardClient.tsx — added TabBar with 3 tabs (Scorecard, Trends & Volume, Hours), shared date range controls, URL-based tab switching
+- Modified: src/app/admin/scorecard/scorecard.module.css — added .tabPlaceholder class
+- Modified: src/lib/domains/admin/index.ts — removed analyticsActions re-exports
+- Modified: src/lib/actions/admin/index.ts — removed analyticsActions re-export
+- Modified: src/config/navigation.ts — removed Analytics nav item + unused BarChart3 import
+- Modified: src/components/SuperAdminSidebar.tsx — removed Analytics NavItem + unused BarChart3 import
+- Modified: next.config.ts — added permanent redirect /admin/analytics → /admin/scorecard
+- Audited src/app/admin/confirmations/ — confirmed Phase 2 extraction (AnalyticsTab, DispatchersTab, AccountabilityTab) is already complete
+- No commits (uncommitted work)
+**Decisions:**
+- Trends & Hours tabs fetch data client-side (not SSR) — only Scorecard tab uses SSR initial data for fast first paint
+- Chart colors use hardcoded hex matching CSS variable values from globals.css (Recharts can't consume CSS vars at render time)
+- getConfirmationStatsOptimized used instead of getConfirmationStats (count-based queries, faster)
+- ConfirmationsClient Phase 2 is already done — 3 sub-components already extracted with own CSS Modules
+- /admin/analytics gets permanent 301 redirect to /admin/scorecard via next.config.ts
+**Issues Found:**
+- scorecard.module.css uses --border-color but globals.css defines --border (no --border-color). Works due to fallback but inconsistent naming
+- EngagementLeaderboard component is now orphaned — was only used on deleted analytics page's Engagement tab
+- hoursActions.ts HoursSummary interface is not exported — HoursTabClient duplicates the interface locally
+
+---
+
+### Session — 2026-03-18 ~Late Night (2)
+**Focus:** Audit analytics + scorecard pages for merge into unified performance dashboard
+**Changes:**
+- No files created/modified/deleted — read-only audit session
+- No commits
+**Decisions:**
+- Merge /admin/analytics and /admin/scorecard into one page at /admin/scorecard (stronger brand name)
+- Proposed 3-tab layout: Scorecard (leaderboard) | Trends & Volume (charts) | Hours (tracking)
+- Drop Engagement tab (points-based gamification conflicts with weighted scoring)
+- Kill ShiftReport-based metrics in merged page — use SMSLog, Quote model, Front API exclusively (scorecard approach is more accurate)
+- Analytics page uses inline styles + Tailwind-like utility classes — must migrate to CSS Modules
+- analyticsActions.ts can be pruned; keep getConfirmationAccountabilityTrend and getDailyTrend (rewrite to use real data sources)
+**Issues Found:**
+- Analytics page reads from ShiftReport (self-reported callsReceived/emailsSent/quotesGiven) — less accurate than scorecard which reads from actual source models (SMSLog, Quote, TripConfirmation, Front API)
+- Analytics page uses Tailwind-like utility classes (glass-card, flex, btn, etc.) and heavy inline styles — violates CSS Modules convention
+- EngagementLeaderboard is a separate gamification concept that doesn't integrate with scorecard's weighted scoring
+
+---
+
+### Session — 2026-03-18 ~Late Night
+**Focus:** Front email integration into Dispatcher Scorecard + scorecard data bug fixes
+**Changes:**
+- Created: prisma/schema.prisma — added FrontTeammateMapping model (userId unique, frontTeammateId unique, onDelete Cascade)
+- Created: src/lib/frontApiClient.ts — Front API fetch wrapper with Bearer auth, rate limiting (50 req/min delay), cursor pagination, 5-min in-memory cache
+- Created: src/lib/frontActions.ts — 7 server actions: getFrontEmailMetrics, getFrontTeamOverview, getFrontOpenConversations, getFrontTeammateMappings, getFrontTeammatesFromApi, createFrontMapping, deleteFrontMapping, checkFrontApiStatus
+- Created: scripts/seed-front-mappings.ts — seeds 7 Front teammates to NeboOps users (uses PrismaPg adapter)
+- Created: src/app/admin/settings/page.tsx — admin settings server component
+- Created: src/app/admin/settings/SettingsClient.tsx — Front API status display, teammate mapping table with add/remove
+- Created: src/app/admin/settings/settings.module.css — settings page styles
+- Modified: src/lib/scorecardActions.ts — added EmailMetrics type, email category in scoring, new weights (25/15/15/20/15/10), SMS now queries SMSLog directly (not ShiftReport.autoSmsSent), stale shifts >24h filtered out, report compliance capped at 100%, N/A handling for no-data categories with weight redistribution
+- Modified: src/app/admin/scorecard/ScorecardClient.tsx — added Email column, N/A display for null scores
+- Modified: src/app/admin/scorecard/scorecard.module.css — added .scoreNA style
+- Modified: src/app/admin/scorecard/[userId]/ScorecardDetailClient.tsx — added Email metric card with inbox breakdown, "Not connected to Front" fallback, N/A display, clamped "Shifts Without Report" to max(0,...)
+- Modified: src/app/admin/scorecard/[userId]/scorecardDetail.module.css — added .notConnected, .colorNA styles
+- Modified: src/config/navigation.ts — added Settings nav item under System group (collapsedByDefault)
+- Remapped 4 FrontTeammateMappings from inactive nebo.com accounts to active accounts (gmail.com/hotmail.com)
+- Commits:
+  - 6cffc57 feat: Front email integration — teammate mapping, email metrics in scorecard, admin settings
+  - 746433f fix: scorecard data bugs — SMS from live data, cap compliance, exclude stale shifts, handle N/A
+**Decisions:**
+- Front API: analytics endpoints return 403 (plan limitation), teammate messages 403 — all metrics computed from /events endpoint (outbound/inbound types) with author filtering
+- Scorecard weights updated: Confirmations 25%, Comms 15%, Email 15%, Punctuality 20%, Quotes 15%, Reports 10%
+- N/A categories excluded from overall score — weight redistributed proportionally to categories with data
+- SMS counts from SMSLog directly, not ShiftReport auto fields (ShiftReport only captures at submission time)
+- Shifts >24h excluded as data errors (4 stale shifts: 224h, 74h, 43h, 24h from missed clock-outs)
+- Front teammate mappings point to active user accounts (personal emails), not inactive nebo.com accounts
+**Issues Found:**
+- ShiftReport.autoSmsSent was always 0 for dispatchers who sent SMS outside of report submission flow
+- Report compliance showed 200% (2 reports / 1 shift, uncapped)
+- 4 stale shifts >24h corrupting averages (from force-logout bug)
+- Front teammates were mapped to inactive nebo.com accounts; dispatchers use personal email accounts
+
+---
+
+### Session — 2026-03-18 ~Night
+**Focus:** Build Unified Dispatcher Scorecard — team leaderboard + per-dispatcher detail views
+**Changes:**
+- Created: src/lib/scorecardActions.ts — 3 server actions: getDispatcherScorecard(), getTeamScorecard(), getDispatcherRecentActivity(). Weighted composite scoring across 5 categories (confirmations 30%, comms 20%, punctuality 20%, quotes 15%, reports 15%). SMS response time calculated from SMSLog conversation threading.
+- Created: src/app/admin/scorecard/page.tsx — Server component with auth check, default this-month range
+- Created: src/app/admin/scorecard/ScorecardClient.tsx — Leaderboard table with ToggleGroup date presets (Today/Week/Month/Custom), color-coded scores, click-through to detail
+- Created: src/app/admin/scorecard/scorecard.module.css — Team view styles with responsive tablet support
+- Created: src/app/admin/scorecard/[userId]/page.tsx — Detail view server component, parallel fetch of scorecard + activity
+- Created: src/app/admin/scorecard/[userId]/ScorecardDetailClient.tsx — 5 metric cards (confirmations with breakdown bar, comms, punctuality, quotes with funnel, report compliance), recent activity log
+- Created: src/app/admin/scorecard/[userId]/scorecardDetail.module.css — Detail view styles
+- Modified: src/config/navigation.ts — Added Trophy icon import, added "Scorecard" item under "Reports & Analytics" group
+- Commits:
+  - e6a03cd feat: add Unified Dispatcher Scorecard — team leaderboard + individual detail views
+**Decisions:**
+- No schema changes — all data sourced from existing models (TripConfirmation, MissedConfirmationAccountability, Shift, ShiftReport, Quote, SMSLog, User.accountabilityScore)
+- Team scorecard uses batch groupBy queries (not N individual scorecard calls) for performance
+- SMS response time skipped in team view (too expensive per-user); only computed in individual detail view
+- Communications score normalized against team SMS average; no-data categories get neutral scores (50 or 100) to avoid unfair penalties
+- Letter grades: A (90+), B (80+), C (70+), D (60+), F (<60)
+**Issues Found:** None — all 3 checks pass (TypeScript, ESLint 0 errors, Build)
+
+---
+
+### Session — 2026-03-18 ~Evening
+**Focus:** Fix 3 production trip confirmation bugs — duplicates, cross-dispatcher sync, race condition UX
+**Changes:**
+- Modified: prisma/schema.prisma — changed @@unique([tripNumber, manifestDate]) to @@unique([tripNumber, pickupAt]), added @@index([updatedAt]) on TripConfirmation
+- Modified: src/lib/tripConfirmationActions.ts — replaced findFirst+create with atomic upsert in ingestManifestTrips; added cleanupDuplicateConfirmations() server action; rewrote getNewConfirmationsSince() to return both newTrips and updatedTrips; added getConfirmationById() for race condition recovery
+- Modified: src/app/admin/confirmations/ConfirmationsClient.tsx — poll handler merges status updates (not just new trips), poll interval 30s→15s, handleQuickAction removes confirmed trips from list, race condition fetches real state + shows "Already confirmed by [name]", added "info" toast type
+- Modified: src/app/admin/confirmations/Confirmations.module.css — added .toastInfo style
+- Modified: src/components/confirmations/DashboardConfirmationWidget.tsx — race condition fetches real state via getConfirmationById, shows confirmer name
+- Created: scripts/cleanup-duplicate-confirmations.ts — one-time SQL cleanup script (deleted 339 duplicates from 338 groups)
+- Commits:
+  - b4ee05b fix: dedup trips with upsert, sync confirmations across dispatchers, handle race condition UX
+**Decisions:**
+- Unique constraint on [tripNumber, pickupAt] (not manifestDate) — trip+pickup is truly unique regardless of when manifest arrived
+- Upsert is atomic — eliminates both cross-day duplicates and race conditions from concurrent webhook calls
+- Poll returns newTrips + updatedTrips separately so client can add vs merge
+- On race condition, fetch real trip state from server instead of reverting to stale PENDING
+- Front API key added to .env for upcoming email integration
+**Issues Found:**
+- 338 duplicate groups (339 records) existed in production — caused by manifestDate being set to server's "today" which differed across midnight boundary
+- getNewConfirmationsSince only queried createdAt, completely blind to status changes — other dispatchers never saw confirmations until page reload
+- Race condition UX reverted trip to PENDING state and showed "Failed to update" — misleading when trip was actually confirmed by another dispatcher
+
+---
+
+### Session — 2026-03-17 ~Evening
+**Focus:** Roll out ToggleGroup and PillSelector shared components to all 8 remaining instances
+**Changes:**
+- Modified: src/app/accounting/AccountingClient.tsx — replaced manual section tabs with ToggleGroup, removed Flag/DollarSign imports
+- Modified: src/app/accounting/Accounting.module.css — removed 60 lines of orphaned mainTab CSS
+- Modified: src/app/schedule/ScheduleClient.tsx — replaced filter-tab buttons with ToggleGroup, removed filter-tab CSS from style jsx, removed unused styles import
+- Modified: src/components/quotes/QuotesModal.tsx — replaced tab buttons with ToggleGroup size="sm"
+- Modified: src/components/quotes/QuotesModal.module.css — removed .tab, .tab:hover, .tab.active CSS
+- Modified: src/components/quotes/QuoteDetailModal.tsx — replaced tab buttons with ToggleGroup size="sm", removed unused History/FileText imports
+- Modified: src/components/quotes/QuoteDetailModal.module.css — removed .tabs button CSS rules
+- Modified: src/components/NotificationPanel.tsx — replaced filter-btn buttons with ToggleGroup size="sm", removed filter CSS from style jsx
+- Modified: src/app/admin/users/UsersClient.tsx — replaced role filter buttons with PillSelector size="md"
+- Modified: src/app/affiliates/AffiliateClient.tsx — replaced type tabs + status tabs with two PillSelector instances
+- Modified: src/app/communications/CommunicationsHub.tsx — replaced filter pills with PillSelector (icons, colors, counts preserved), removed unused PillOption import, suppressed pendingCounts warning
+- Commits:
+  - e68e178 refactor: roll out ToggleGroup and PillSelector to 8 remaining pages
+**Decisions:** ToggleGroup/PillSelector don't support inline icons — accepted tradeoff for consistency. CommunicationsHub PillSelector preserves icons/colors/counts via component props. pendingCounts prop suppressed with eslint-disable (can't remove without parent change).
+**Issues Found:** Three new lint warnings from migration (unused PillOption type import, unused styles import, unused pendingCounts) — all fixed before commit. All checks pass (TypeScript ✅, ESLint ✅, Build ✅).
+
+---
+
 ### Session — 2026-03-17 ~Afternoon
 **Focus:** Shift report system audit + 4 enhancements — draft fix, handoff notes, billing tasks, Twilio metrics, quote sync
 **Changes:**

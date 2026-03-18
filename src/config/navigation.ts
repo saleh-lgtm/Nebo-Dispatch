@@ -29,7 +29,6 @@ import {
     DollarSign,
     FileSearch,
     FileText,
-    BarChart3,
     Trophy,
     UserCog,
     Cog,
@@ -346,12 +345,6 @@ export const ADMIN_NAV: NavGroup[] = [
                 label: "Shift Reports",
                 href: "/admin/reports",
                 icon: FileText,
-            },
-            {
-                id: "analytics",
-                label: "Analytics",
-                href: "/admin/analytics",
-                icon: BarChart3,
             },
             {
                 id: "scorecard",

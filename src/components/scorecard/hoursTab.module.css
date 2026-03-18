@@ -1,0 +1,270 @@
+/* ============================================
+   Hours Tracking Tab
+   ============================================ */
+
+/* Summary Cards */
+.summaryGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.summaryCard {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-primary);
+    padding: 1rem 1.25rem;
+}
+
+.cardLabel {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    margin: 0 0 0.375rem;
+}
+
+.cardValue {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.cardValueWarning {
+    composes: cardValue;
+    color: #d97706;
+}
+
+/* Chart Section */
+.chartSection {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-primary);
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.chartTitle {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 1rem;
+}
+
+.chartWrap {
+    width: 100%;
+}
+
+/* Empty state */
+.emptyChart {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 320px;
+    color: var(--text-secondary);
+    font-style: italic;
+    font-size: 0.875rem;
+}
+
+/* Tooltip */
+.chartTooltip {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.625rem 0.75rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.tooltipLabel {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 0.375rem;
+}
+
+.tooltipRow {
+    font-size: 0.8125rem;
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* Legend */
+.chartLegend {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    margin-top: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.legendItem {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.legendDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+/* Table */
+.tableSection {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-primary);
+    overflow: hidden;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.table thead {
+    background: var(--bg-secondary);
+}
+
+.table th {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.thRight {
+    text-align: right !important;
+}
+
+.table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.tdName {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.tdRight {
+    text-align: right;
+}
+
+.tdScheduled {
+    composes: tdRight;
+    color: #3b82f6;
+}
+
+.tdWorked {
+    composes: tdRight;
+    color: #10b981;
+}
+
+.tdOvertime {
+    composes: tdRight;
+}
+
+.tdOvertimeActive {
+    composes: tdRight;
+    color: #d97706;
+}
+
+/* Efficiency badge */
+.efficiencyBadge {
+    display: inline-block;
+    padding: 0.1875rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.efficiencyHigh {
+    composes: efficiencyBadge;
+    background: rgba(16, 185, 129, 0.15);
+    color: #059669;
+}
+
+.efficiencyMid {
+    composes: efficiencyBadge;
+    background: rgba(245, 158, 11, 0.15);
+    color: #d97706;
+}
+
+.efficiencyLow {
+    composes: efficiencyBadge;
+    background: rgba(239, 68, 68, 0.15);
+    color: #dc2626;
+}
+
+.emptyRow {
+    text-align: center;
+    padding: 3rem 1rem !important;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* Skeleton loading */
+.skeletonCard {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-primary);
+    padding: 1rem 1.25rem;
+    min-height: 80px;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeletonChart {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-primary);
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    min-height: 380px;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeletonTable {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-primary);
+    min-height: 300px;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .summaryGrid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .chartLegend {
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+
+    .tableSection {
+        overflow-x: auto;
+    }
+}

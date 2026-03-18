@@ -11,7 +11,6 @@ import {
     UserCog,
     UserPlus,
     FileText,
-    BarChart3,
     History,
     Settings,
     LogOut,
@@ -210,7 +209,6 @@ export default function SuperAdminSidebar({ user }: Props) {
                         {isAdmin && (
                             <>
                                 <NavItem href="/admin/reports" icon={<FileText size={18} />} label="Shift Reports" collapsed={collapsed} />
-                                <NavItem href="/admin/analytics" icon={<BarChart3 size={18} />} label="Analytics" collapsed={collapsed} />
                             </>
                         )}
                         {hasAccountingAccess && (
