@@ -4,6 +4,87 @@ Permanent session history. Newest entries at top.
 
 ---
 
+### Session — 2026-03-17 ~Afternoon
+**Focus:** Shift report system audit + 4 enhancements — draft fix, handoff notes, billing tasks, Twilio metrics, quote sync
+**Changes:**
+- Modified: src/hooks/useAutoSave.ts — dismissDraft uses localStorage (not sessionStorage), added hasMeaningfulChanges() to prevent phantom drafts, debounced save skips trivial data
+- Modified: src/components/ShiftReportForm.tsx — clear draft before redirect on submit, replaced manual calls counter with auto-tracked Twilio display, added quote follow-up status badges + Won/Lost/Schedule actions, expanded Quote interface with outcome/nextFollowUp/followUpCount/shiftId
+- Created: src/components/dashboard/HandoffNoteBanner.tsx + .module.css — amber banner showing previous shift's handoff notes with "Mark as Read" dismiss
+- Modified: src/lib/clockActions.ts — added getActiveHandoffNote() (12h expiry, most recent SUBMITTED report)
+- Modified: src/app/dashboard/page.tsx — fetches handoff note + passes to DashboardClient
+- Modified: src/app/dashboard/DashboardClient.tsx — renders HandoffNoteBanner above stats grid, removed unused useCallback import
+- Modified: prisma/schema.prisma — added BillingTask model, CallLog model, auto-tracked fields on ShiftReport (autoSmsSent/Received, autoCallsMade/Received, autoCallMinutes), User relations for BillingTask + CallLog
+- Modified: src/lib/actions.ts — saveShiftReport creates BillingTask per AccountingFlag (switched to transaction for IDs), persists auto Twilio metrics
+- Modified: src/lib/billingReviewActions.ts — createBillingReview and createBillingReviews create linked BillingTask, resolveBillingReview auto-completes linked BillingTask
+- Modified: src/lib/accountingActions.ts — resolveAccountingFlag auto-completes linked BillingTask, getAccountingStats includes pendingBillingTasks count
+- Modified: src/config/navigation.ts — added pendingBillingTasks to BadgeCounts, added badgeKey to Accounting nav items
+- Modified: src/lib/navCountsActions.ts — queries BillingTask count for nav badge
+- Modified: src/components/Sidebar.tsx — pendingBillingTasks in initial badge state
+- Modified: src/app/accounting/components/flags/FlagsList.tsx — resolved flags show "Resolved by [Name] on [date]"
+- Modified: src/lib/shiftReportActions.ts — added getShiftCommunicationMetrics() (single integration point for Twilio data), exports CommunicationMetrics interface
+- Modified: src/app/reports/shift/page.tsx — fetches auto metrics in parallel, passes autoMetrics prop
+- Modified: src/app/admin/reports/ReportsClient.tsx — added auto Twilio metrics to Report interface, shows "Twilio Activity" banner in detail modal, quotes column uses live relation count
+- Modified: src/components/quotes/types.ts — added shiftId (optional) to Quote type
+- Modified: src/components/quotes/QuotesModal.tsx — shows purple "From Shift" badge on quotes with shiftId
+- Modified: src/lib/domains/quotes/service.ts — getShiftQuotes returns follow-up fields via select
+- Commits:
+  - 7a759a2 fix: draft popup persistence + add handoff notes to dashboard
+  - d27ad8a feat: auto-create billing tasks from shift report flags and reviews
+  - 3939b6d feat: auto-populate call and SMS metrics from Twilio in shift reports
+  - 9693bfa feat: enhance quote sync — live count, source badge, follow-up in report
+**Decisions:**
+- Draft dismiss uses localStorage (persists across sessions) not sessionStorage. hasMeaningfulChanges() prevents phantom drafts from empty/default state.
+- Handoff notes use 12h expiry — auto-disappear, no cleanup needed. "Mark as Read" dismiss uses sessionStorage (per-session).
+- BillingTask is a separate model (not reusing Task/AdminTask which have required userId/adminId). Both AccountingFlag and BillingReview create BillingTasks. Resolving either auto-completes the linked task.
+- getShiftCommunicationMetrics() is the single integration point for Twilio data — when switching to RingCentral, only this function changes.
+- CallLog model created for Twilio Voice (reuses SMSDirection enum). Auto metrics saved as frozen snapshots on ShiftReport.
+- Quote follow-up actions in shift report use existing server actions (setQuoteOutcome, recordFollowUp) — no new server actions needed.
+- Admin reports show live quote count (shift.quotes.length) as primary, quotesGiven kept as historical snapshot.
+**Issues Found:** None — TypeScript, ESLint, and production build all pass clean (0 errors, 18 pre-existing warnings).
+
+---
+
+### Session — 2026-03-17 ~Post-Midnight (Late)
+**Focus:** Server action hardening — final batch, all 46 files now hardened (45/45 + 2 re-export proxies skipped)
+**Changes:**
+- Modified: src/lib/schemas.ts — added 12 Zod schemas (network partner, trip confirmation, shift report, route pricing)
+- Modified: src/lib/networkActions.ts — Zod validation on 4 mutations, try/catch + return shape on all 13 functions
+- Modified: src/lib/tripConfirmationActions.ts — Zod on 3 mutations, try/catch + return shape on all 17 functions
+- Modified: src/lib/storageActions.ts — try/catch + return shape on all 4 functions
+- Modified: src/lib/shiftReportActions.ts — Zod on 2 mutations, try/catch + return shape on all 7 functions
+- Modified: src/lib/routePricingActions.ts — Zod on 3 lookups, try/catch + return shape on all 10 functions, moved MAX_BATCH_SIZE inside function
+- Modified: src/lib/userActions.ts — Zod validation, try/catch + return shape on changePassword
+- Modified: src/lib/signupActions.ts — try/catch + return shape on getPendingUsers, getPendingUserCount
+- Modified: src/lib/passwordResetActions.ts — try/catch on cleanupExpiredTokens, moved TOKEN_EXPIRY_HOURS inside function
+- Modified: src/lib/twilioActions.ts — try/catch + return shape on 4 read functions (getSMSHistory, getSMSStats, getConversations, getConversationMessages)
+- Modified: src/lib/navCountsActions.ts — standard { success, data } return shape
+- Modified: src/lib/schedulerActions.ts — try/catch + return shape on 7 read functions
+- Updated 30 caller files across src/app/ and src/components/ to unwrap .data and check .success
+- Commits:
+  - 65f48b4 fix: harden 5 server action files (35/45)
+  - 72730a7 fix: harden final 10 server action files (45/45 complete)
+**Decisions:** Re-export proxy files (quoteActions.ts, tbrTripActions.ts) skipped — no logic to harden. navCountsActions always returns { success: true, data: emptyCounts } on error — badge counts degrade gracefully. createAuditLog silently returns {success: false} on failure — never crashes caller.
+**Issues Found:** None — TypeScript, ESLint, and production build all pass clean.
+
+---
+
+### Session — 2026-03-17 ~Post-Midnight
+**Focus:** Server action hardening batch — 5 more files hardened (30/45 total)
+**Changes:**
+- Modified: src/lib/schemas.ts — added 12 Zod schemas (audit log, billing review, shift swap, time off, user management)
+- Modified: src/lib/auditActions.ts — added Zod validation, try/catch, `{ success, data?, error? }` return shape to all 3 functions
+- Modified: src/lib/billingReviewActions.ts — added Zod validation, try/catch, return shape to all 11 functions
+- Modified: src/lib/shiftSwapActions.ts — added Zod validation, try/catch, return shape to all 9 functions
+- Modified: src/lib/timeOffActions.ts — added Zod validation, try/catch, return shape to all 9 functions
+- Modified: src/lib/userManagementActions.ts — added Zod validation, try/catch, return shape to all 9 functions
+- Updated 11 caller files to check .success and use .data
+- Commits:
+  - e42c3ce fix: harden 5 server action files (30/45)
+**Decisions:** createAuditLog now silently returns `{success: false}` on failure instead of throwing — audit logging should never crash the main operation.
+**Issues Found:** None — TypeScript, ESLint, and production build all pass clean.
+
+---
+
 ### Session — 2026-03-17 ~Late Night
 **Focus:** Server action hardening batch — 5 files hardened (25/45 total)
 **Changes:**
