@@ -317,11 +317,12 @@ export default function CommunicationsHub({
     // Handle partner actions
     const handleApprovePartner = async (partner: Partner) => {
         try {
-            await approveNetworkPartner(partner.id);
+            const result = await approveNetworkPartner(partner.id);
+            if (!result.success) throw new Error(result.error);
             addToast(`${partner.name} approved`, "success");
             router.refresh();
-        } catch {
-            addToast("Failed to approve partner", "error");
+        } catch (err) {
+            addToast(err instanceof Error ? err.message : "Failed to approve partner", "error");
         }
     };
 
@@ -329,11 +330,12 @@ export default function CommunicationsHub({
     const handleDeletePartner = async (partner: Partner) => {
         if (!confirm(`Delete ${partner.name}?`)) return;
         try {
-            await deleteNetworkPartner(partner.id);
+            const result = await deleteNetworkPartner(partner.id);
+            if (!result.success) throw new Error(result.error);
             addToast(`${partner.name} deleted`, "info");
             router.refresh();
-        } catch {
-            addToast("Failed to delete partner", "error");
+        } catch (err) {
+            addToast(err instanceof Error ? err.message : "Failed to delete partner", "error");
         }
     };
 
@@ -659,15 +661,16 @@ export default function CommunicationsHub({
                 <QuickAddForm
                     onSubmit={async (data) => {
                         try {
-                            await createNetworkPartner({
+                            const result = await createNetworkPartner({
                                 ...data,
                                 submittedById: session.user.id,
                             });
+                            if (!result.success) throw new Error(result.error);
                             setShowAddModal(false);
                             addToast("Contact added!", "success");
                             router.refresh();
-                        } catch {
-                            addToast("Failed to add contact", "error");
+                        } catch (err) {
+                            addToast(err instanceof Error ? err.message : "Failed to add contact", "error");
                         }
                     }}
                     onCancel={() => setShowAddModal(false)}

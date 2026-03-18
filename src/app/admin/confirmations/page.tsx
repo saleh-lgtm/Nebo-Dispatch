@@ -29,11 +29,15 @@ export default async function ConfirmationsPage() {
 
     // Only fetch essential data for initial page load (Trips tab)
     // Other tabs load their data on-demand via client-side fetch
-    const [stats, allConfirmationsData, dispatchers] = await Promise.all([
+    const [statsResult, allConfirmationsResult, dispatchersResult] = await Promise.all([
         getConfirmationStatsOptimized(7), // Use 7 days for header stats (fast)
         getAllConfirmations({ limit: 100 }),
         getConfirmationDispatchers(),
     ]);
+
+    const stats = statsResult.data ?? { total: 0, completed: 0, pending: 0, expired: 0, onTime: 0, late: 0, avgLeadTime: 0, onTimeRate: 0, completionRate: 0, byStatus: {} };
+    const allConfirmationsData = allConfirmationsResult.data ?? { confirmations: [], total: 0, hasMore: false };
+    const dispatchers = dispatchersResult.data ?? [];
 
     return (
         <ConfirmationsClient

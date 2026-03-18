@@ -40,12 +40,19 @@ export async function POST(request: NextRequest) {
 
     try {
         const result = await markExpiredConfirmations();
+        if (!result.success) {
+            return NextResponse.json(
+                { error: result.error ?? "Failed to process expirations" },
+                { status: 500 }
+            );
+        }
+        const data = result.data ?? { count: 0, accountabilityRecords: 0 };
 
         return NextResponse.json({
             success: true,
-            message: `Processed ${result.count} expired confirmations`,
-            expired: result.count,
-            accountabilityRecords: result.accountabilityRecords,
+            message: `Processed ${data.count} expired confirmations`,
+            expired: data.count,
+            accountabilityRecords: data.accountabilityRecords,
             timestamp: new Date().toISOString(),
         });
     } catch (error) {
@@ -75,12 +82,19 @@ export async function GET(request: NextRequest) {
     // In development, allow GET for easy testing
     try {
         const result = await markExpiredConfirmations();
+        if (!result.success) {
+            return NextResponse.json(
+                { error: result.error ?? "Failed to process expirations" },
+                { status: 500 }
+            );
+        }
+        const data = result.data ?? { count: 0, accountabilityRecords: 0 };
 
         return NextResponse.json({
             success: true,
-            message: `Processed ${result.count} expired confirmations`,
-            expired: result.count,
-            accountabilityRecords: result.accountabilityRecords,
+            message: `Processed ${data.count} expired confirmations`,
+            expired: data.count,
+            accountabilityRecords: data.accountabilityRecords,
             timestamp: new Date().toISOString(),
         });
     } catch (error) {

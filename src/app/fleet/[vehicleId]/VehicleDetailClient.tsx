@@ -241,7 +241,9 @@ export default function VehicleDetailClient({ vehicle }: Props) {
                 `vehicles/${vehicle.id}`
             );
 
-            return { url: result.url, name: result.fileName, size: result.fileSize };
+            if (!result.success) throw new Error(result.error ?? "Upload failed");
+            const uploadResult = result.data!;
+            return { url: uploadResult.url, name: uploadResult.fileName, size: uploadResult.fileSize };
         } catch (error) {
             addToast(error instanceof Error ? error.message : "Failed to upload file", "error");
             return null;

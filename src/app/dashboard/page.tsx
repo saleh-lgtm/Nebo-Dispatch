@@ -177,7 +177,7 @@ export default async function DashboardPage() {
         safePromise(isAdmin ? getTaskProgress().then(r => r.success ? r.data : []) : Promise.resolve([]), []),
 
         // Upcoming confirmations (next 10 trips within 24 hours)
-        safePromise(getUpcomingConfirmations(10), []),
+        safePromise(getUpcomingConfirmations(10).then(r => r.data ?? []), []),
 
         // Accountability score for dispatchers/admins
         safePromise(

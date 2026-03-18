@@ -17,38 +17,46 @@ export async function uploadFile(
     bucket: StorageBucket,
     file: File,
     folder: string
-): Promise<UploadResult> {
+): Promise<{ success: boolean; data?: UploadResult; error?: string }> {
     await requireAuth();
 
-    // Generate unique file path
-    const timestamp = Date.now();
-    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const filePath = `${folder}/${timestamp}-${sanitizedName}`;
+    try {
+        // Generate unique file path
+        const timestamp = Date.now();
+        const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const filePath = `${folder}/${timestamp}-${sanitizedName}`;
 
-    // Upload to Supabase Storage
-    const { data, error } = await supabaseAdmin.storage
-        .from(bucket)
-        .upload(filePath, file, {
-            cacheControl: '3600',
-            upsert: false,
-        });
+        // Upload to Supabase Storage
+        const { data, error } = await supabaseAdmin.storage
+            .from(bucket)
+            .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: false,
+            });
 
-    if (error) {
-        console.error('Upload error:', error);
-        throw new Error(`Failed to upload file: ${error.message}`);
+        if (error) {
+            console.error('Upload error:', error);
+            return { success: false, error: `Failed to upload file: ${error.message}` };
+        }
+
+        // Get public URL
+        const { data: urlData } = supabaseAdmin.storage
+            .from(bucket)
+            .getPublicUrl(data.path);
+
+        return {
+            success: true,
+            data: {
+                url: urlData.publicUrl,
+                fileName: file.name,
+                fileSize: file.size,
+                mimeType: file.type,
+            },
+        };
+    } catch (error) {
+        console.error("uploadFile error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Upload failed" };
     }
-
-    // Get public URL
-    const { data: urlData } = supabaseAdmin.storage
-        .from(bucket)
-        .getPublicUrl(data.path);
-
-    return {
-        url: urlData.publicUrl,
-        fileName: file.name,
-        fileSize: file.size,
-        mimeType: file.type,
-    };
 }
 
 /**
@@ -58,33 +66,40 @@ export async function uploadFileFromFormData(
     bucket: StorageBucket,
     formData: FormData,
     folder: string
-): Promise<UploadResult> {
+): Promise<{ success: boolean; data?: UploadResult; error?: string }> {
     await requireAuth();
 
-    const file = formData.get('file') as File;
-    if (!file) {
-        throw new Error('No file provided');
-    }
+    try {
+        const file = formData.get('file') as File;
+        if (!file) {
+            return { success: false, error: "No file provided" };
+        }
 
-    // Validate file size (max 10MB)
-    const maxSize = 10 * 1024 * 1024;
-    if (file.size > maxSize) {
-        throw new Error('File size exceeds 10MB limit');
-    }
+        // Validate file size (max 10MB)
+        const maxSize = 10 * 1024 * 1024;
+        if (file.size > maxSize) {
+            return { success: false, error: "File size exceeds 10MB limit" };
+        }
 
-    // Validate file type
-    const allowedTypes = [
-        'application/pdf',
-        'image/jpeg',
-        'image/png',
-        'image/gif',
-        'image/webp',
-    ];
-    if (!allowedTypes.includes(file.type)) {
-        throw new Error('File type not allowed. Allowed types: PDF, JPEG, PNG, GIF, WebP');
-    }
+        // Validate file type
+        const allowedTypes = [
+            'application/pdf',
+            'image/jpeg',
+            'image/png',
+            'image/gif',
+            'image/webp',
+        ];
+        if (!allowedTypes.includes(file.type)) {
+            return { success: false, error: "File type not allowed. Allowed types: PDF, JPEG, PNG, GIF, WebP" };
+        }
 
-    return uploadFile(bucket, file, folder);
+        const uploadResult = await uploadFile(bucket, file, folder);
+        if (!uploadResult.success) return uploadResult;
+        return uploadResult;
+    } catch (error) {
+        console.error("uploadFileFromFormData error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Upload failed" };
+    }
 }
 
 /**
@@ -93,24 +108,31 @@ export async function uploadFileFromFormData(
 export async function deleteFile(
     bucket: StorageBucket,
     fileUrl: string
-): Promise<void> {
+): Promise<{ success: boolean; error?: string }> {
     await requireAuth();
 
-    // Extract path from URL
-    const url = new URL(fileUrl);
-    const pathParts = url.pathname.split(`/storage/v1/object/public/${bucket}/`);
-    if (pathParts.length < 2) {
-        throw new Error('Invalid file URL');
-    }
-    const filePath = decodeURIComponent(pathParts[1]);
+    try {
+        // Extract path from URL
+        const url = new URL(fileUrl);
+        const pathParts = url.pathname.split(`/storage/v1/object/public/${bucket}/`);
+        if (pathParts.length < 2) {
+            return { success: false, error: "Invalid file URL" };
+        }
+        const filePath = decodeURIComponent(pathParts[1]);
 
-    const { error } = await supabaseAdmin.storage
-        .from(bucket)
-        .remove([filePath]);
+        const { error } = await supabaseAdmin.storage
+            .from(bucket)
+            .remove([filePath]);
 
-    if (error) {
-        console.error('Delete error:', error);
-        throw new Error(`Failed to delete file: ${error.message}`);
+        if (error) {
+            console.error('Delete error:', error);
+            return { success: false, error: `Failed to delete file: ${error.message}` };
+        }
+
+        return { success: true };
+    } catch (error) {
+        console.error("deleteFile error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Delete failed" };
     }
 }
 
@@ -121,16 +143,21 @@ export async function getSignedUrl(
     bucket: StorageBucket,
     filePath: string,
     expiresIn: number = 3600 // 1 hour default
-): Promise<string> {
+): Promise<{ success: boolean; data?: string; error?: string }> {
     await requireAuth();
 
-    const { data, error } = await supabaseAdmin.storage
-        .from(bucket)
-        .createSignedUrl(filePath, expiresIn);
+    try {
+        const { data, error } = await supabaseAdmin.storage
+            .from(bucket)
+            .createSignedUrl(filePath, expiresIn);
 
-    if (error) {
-        throw new Error(`Failed to create signed URL: ${error.message}`);
+        if (error) {
+            return { success: false, error: `Failed to create signed URL: ${error.message}` };
+        }
+
+        return { success: true, data: data.signedUrl };
+    } catch (error) {
+        console.error("getSignedUrl error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Failed to create signed URL" };
     }
-
-    return data.signedUrl;
 }

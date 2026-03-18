@@ -175,11 +175,13 @@ export default function ReportsClient({
     const handleFilter = async () => {
         setLoading(true);
         try {
-            const { reports: filtered, total: filteredTotal } = await getAllShiftReports({
+            const result = await getAllShiftReports({
                 userId: filterDispatcher || undefined,
                 status: filterStatus || undefined,
                 limit: 50,
             });
+            if (!result.success) throw new Error(result.error);
+            const { reports: filtered, total: filteredTotal } = result.data ?? { reports: [], total: 0 };
             setReports(filtered as Report[]);
             setTotal(filteredTotal);
         } catch (error) {
@@ -194,11 +196,12 @@ export default function ReportsClient({
         setLoading(true);
 
         try {
-            await reviewShiftReport(reviewModal.id, {
+            const result = await reviewShiftReport(reviewModal.id, {
                 performanceScore,
                 adminFeedback,
                 status: reviewStatus,
             });
+            if (!result.success) throw new Error(result.error);
 
             // Update local state
             setReports(prev =>
@@ -223,8 +226,9 @@ export default function ReportsClient({
     const handleViewDispatcherPerformance = async (dispatcherId: string) => {
         setLoading(true);
         try {
-            const performance = await getDispatcherPerformance(dispatcherId);
-            setDispatcherPerformance(performance);
+            const perfResult = await getDispatcherPerformance(dispatcherId);
+            if (!perfResult.success) throw new Error(perfResult.error);
+            setDispatcherPerformance(perfResult.data ?? null);
             setSelectedDispatcher(dispatcherId);
         } catch (error) {
             console.error("Failed to load performance:", error);

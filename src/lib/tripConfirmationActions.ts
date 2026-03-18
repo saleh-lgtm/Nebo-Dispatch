@@ -6,6 +6,13 @@ import { authOptions } from "@/lib/auth";
 import { createAuditLog } from "./auditActions";
 import { revalidatePath } from "next/cache";
 import { ConfirmationStatus } from "@prisma/client";
+import {
+    completeConfirmationSchema,
+    confirmationFiltersSchema,
+    confirmationTabDataSchema,
+    limitParamSchema,
+    daysParamSchema,
+} from "@/lib/schemas";
 
 /**
  * Get upcoming confirmations sorted by when call is due
@@ -15,33 +22,40 @@ import { ConfirmationStatus } from "@prisma/client";
 export async function getUpcomingConfirmations(limit: number = 10) {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-        throw new Error("Unauthorized");
+        return { success: false as const, error: "Unauthorized" };
     }
 
-    const now = new Date();
-    const twentyFourHoursFromNow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const parsed = limitParamSchema.safeParse({ limit });
+    const safeLimit = parsed.success ? (parsed.data.limit ?? 10) : 10;
 
-    const confirmations = await prisma.tripConfirmation.findMany({
-        where: {
-            status: "PENDING",
-            archivedAt: null,
-            pickupAt: {
-                gte: now,
-                lte: twentyFourHoursFromNow,
-            },
-        },
-        orderBy: {
-            dueAt: "asc",
-        },
-        take: limit,
-        include: {
-            completedBy: {
-                select: { id: true, name: true },
-            },
-        },
-    });
+    try {
+        const now = new Date();
+        const twentyFourHoursFromNow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-    return confirmations;
+        const confirmations = await prisma.tripConfirmation.findMany({
+            where: {
+                status: "PENDING",
+                archivedAt: null,
+                pickupAt: {
+                    gte: now,
+                    lte: twentyFourHoursFromNow,
+                },
+            },
+            orderBy: {
+                dueAt: "asc",
+            },
+            take: safeLimit,
+            include: {
+                completedBy: {
+                    select: { id: true, name: true },
+                },
+            },
+        });
+
+        return { success: true as const, data: confirmations };
+    } catch (error) {
+        return { success: false as const, error: error instanceof Error ? error.message : "Failed to fetch upcoming confirmations" };
+    }
 }
 
 /**
@@ -50,33 +64,37 @@ export async function getUpcomingConfirmations(limit: number = 10) {
 export async function getTodayConfirmations() {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-        throw new Error("Unauthorized");
+        return { success: false as const, error: "Unauthorized" };
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const confirmations = await prisma.tripConfirmation.findMany({
-        where: {
-            manifestDate: {
-                gte: today,
-                lt: tomorrow,
+        const confirmations = await prisma.tripConfirmation.findMany({
+            where: {
+                manifestDate: {
+                    gte: today,
+                    lt: tomorrow,
+                },
+                archivedAt: null,
             },
-            archivedAt: null,
-        },
-        orderBy: {
-            dueAt: "asc",
-        },
-        include: {
-            completedBy: {
-                select: { id: true, name: true },
+            orderBy: {
+                dueAt: "asc",
             },
-        },
-    });
+            include: {
+                completedBy: {
+                    select: { id: true, name: true },
+                },
+            },
+        });
 
-    return confirmations;
+        return { success: true as const, data: confirmations };
+    } catch (error) {
+        return { success: false as const, error: error instanceof Error ? error.message : "Failed to fetch today's confirmations" };
+    }
 }
 
 /**
@@ -91,94 +109,103 @@ export async function completeConfirmation(
 ) {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-        throw new Error("Unauthorized");
+        return { success: false as const, error: "Unauthorized" };
+    }
+
+    const parsed = completeConfirmationSchema.safeParse({ confirmationId, status, notes });
+    if (!parsed.success) {
+        return { success: false as const, error: parsed.error.issues[0]?.message || "Invalid input" };
     }
 
     const isAdmin = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"].includes(
         session.user.role || ""
     );
 
-    // Fetch confirmation first to calculate minutesBeforeDue and get tripNumber
-    const confirmation = await prisma.tripConfirmation.findUnique({
-        where: { id: confirmationId },
-    });
-
-    if (!confirmation) {
-        throw new Error("Confirmation not found");
-    }
-
-    const now = new Date();
-    const minutesBeforeDue = Math.round(
-        (confirmation.dueAt.getTime() - now.getTime()) / (1000 * 60)
-    );
-
-    const previousStatus = confirmation.status;
-
-    // Admins can update any status; dispatchers can only complete PENDING trips
-    if (isAdmin) {
-        // Admin: direct update, can change any status
-        await prisma.tripConfirmation.update({
+    try {
+        // Fetch confirmation first to calculate minutesBeforeDue and get tripNumber
+        const confirmation = await prisma.tripConfirmation.findUnique({
             where: { id: confirmationId },
-            data: {
-                status,
-                completedAt: confirmation.completedAt || now,
-                completedById: confirmation.completedById || session.user.id,
-                minutesBeforeDue: confirmation.minutesBeforeDue ?? minutesBeforeDue,
-                notes: notes || confirmation.notes || null,
-                archivedAt: confirmation.archivedAt || now,
+        });
+
+        if (!confirmation) {
+            return { success: false as const, error: "Confirmation not found" };
+        }
+
+        const now = new Date();
+        const minutesBeforeDue = Math.round(
+            (confirmation.dueAt.getTime() - now.getTime()) / (1000 * 60)
+        );
+
+        const previousStatus = confirmation.status;
+
+        // Admins can update any status; dispatchers can only complete PENDING trips
+        if (isAdmin) {
+            // Admin: direct update, can change any status
+            await prisma.tripConfirmation.update({
+                where: { id: confirmationId },
+                data: {
+                    status,
+                    completedAt: confirmation.completedAt || now,
+                    completedById: confirmation.completedById || session.user.id,
+                    minutesBeforeDue: confirmation.minutesBeforeDue ?? minutesBeforeDue,
+                    notes: notes || confirmation.notes || null,
+                    archivedAt: confirmation.archivedAt || now,
+                },
+            });
+        } else {
+            // Dispatcher: atomic update, only if still PENDING
+            const updateResult = await prisma.tripConfirmation.updateMany({
+                where: {
+                    id: confirmationId,
+                    status: "PENDING",
+                },
+                data: {
+                    status,
+                    completedAt: now,
+                    completedById: session.user.id,
+                    minutesBeforeDue,
+                    notes: notes || null,
+                    archivedAt: now,
+                },
+            });
+
+            if (updateResult.count === 0) {
+                return { success: false as const, error: "Confirmation already completed by another user" };
+            }
+        }
+
+        // Fetch the updated record for return
+        const updated = await prisma.tripConfirmation.findUnique({
+            where: { id: confirmationId },
+            include: {
+                completedBy: {
+                    select: { id: true, name: true },
+                },
             },
         });
-    } else {
-        // Dispatcher: atomic update, only if still PENDING
-        const updateResult = await prisma.tripConfirmation.updateMany({
-            where: {
-                id: confirmationId,
-                status: "PENDING",
-            },
-            data: {
-                status,
-                completedAt: now,
-                completedById: session.user.id,
+
+        // Create audit log
+        await createAuditLog(
+            session.user.id,
+            "UPDATE",
+            "TripConfirmation",
+            confirmationId,
+            {
+                tripNumber: confirmation.tripNumber,
+                previousStatus,
+                newStatus: status,
                 minutesBeforeDue,
-                notes: notes || null,
-                archivedAt: now,
-            },
-        });
+                editedByAdmin: isAdmin,
+            }
+        );
 
-        if (updateResult.count === 0) {
-            throw new Error("Confirmation already completed by another user");
-        }
+        revalidatePath("/dashboard");
+        revalidatePath("/admin/confirmations");
+
+        return { success: true as const, data: updated };
+    } catch (error) {
+        return { success: false as const, error: error instanceof Error ? error.message : "Failed to complete confirmation" };
     }
-
-    // Fetch the updated record for return
-    const updated = await prisma.tripConfirmation.findUnique({
-        where: { id: confirmationId },
-        include: {
-            completedBy: {
-                select: { id: true, name: true },
-            },
-        },
-    });
-
-    // Create audit log
-    await createAuditLog(
-        session.user.id,
-        "UPDATE",
-        "TripConfirmation",
-        confirmationId,
-        {
-            tripNumber: confirmation.tripNumber,
-            previousStatus,
-            newStatus: status,
-            minutesBeforeDue,
-            editedByAdmin: isAdmin,
-        }
-    );
-
-    revalidatePath("/dashboard");
-    revalidatePath("/admin/confirmations");
-
-    return updated;
 }
 
 /**
@@ -188,62 +215,72 @@ export async function completeConfirmation(
 export async function getConfirmationStatsOptimized(days: number = 7) {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-        throw new Error("Unauthorized");
+        return { success: false as const, error: "Unauthorized" };
     }
 
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-    startDate.setHours(0, 0, 0, 0);
+    const parsed = daysParamSchema.safeParse({ days });
+    const safeDays = parsed.success ? (parsed.data.days ?? 7) : 7;
 
-    const baseWhere = { createdAt: { gte: startDate } };
+    try {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - safeDays);
+        startDate.setHours(0, 0, 0, 0);
 
-    // Run all counts in parallel - much faster than fetching all records
-    const [
-        total,
-        completed,
-        pending,
-        expired,
-        onTime,
-        late,
-        statusCounts,
-    ] = await Promise.all([
-        prisma.tripConfirmation.count({ where: baseWhere }),
-        prisma.tripConfirmation.count({ where: { ...baseWhere, completedAt: { not: null } } }),
-        prisma.tripConfirmation.count({ where: { ...baseWhere, status: "PENDING" } }),
-        prisma.tripConfirmation.count({ where: { ...baseWhere, status: "EXPIRED" } }),
-        prisma.tripConfirmation.count({ where: { ...baseWhere, minutesBeforeDue: { gt: 0 } } }),
-        prisma.tripConfirmation.count({
-            where: {
-                ...baseWhere,
-                minutesBeforeDue: { lte: 0 },
-                completedAt: { not: null },
-            }
-        }),
-        prisma.tripConfirmation.groupBy({
-            by: ["status"],
-            where: baseWhere,
-            _count: { status: true },
-        }),
-    ]);
+        const baseWhere = { createdAt: { gte: startDate } };
 
-    // Convert status counts to object
-    const byStatus: Record<string, number> = {};
-    statusCounts.forEach((s) => {
-        byStatus[s.status] = s._count.status;
-    });
+        // Run all counts in parallel - much faster than fetching all records
+        const [
+            total,
+            completed,
+            pending,
+            expired,
+            onTime,
+            late,
+            statusCounts,
+        ] = await Promise.all([
+            prisma.tripConfirmation.count({ where: baseWhere }),
+            prisma.tripConfirmation.count({ where: { ...baseWhere, completedAt: { not: null } } }),
+            prisma.tripConfirmation.count({ where: { ...baseWhere, status: "PENDING" } }),
+            prisma.tripConfirmation.count({ where: { ...baseWhere, status: "EXPIRED" } }),
+            prisma.tripConfirmation.count({ where: { ...baseWhere, minutesBeforeDue: { gt: 0 } } }),
+            prisma.tripConfirmation.count({
+                where: {
+                    ...baseWhere,
+                    minutesBeforeDue: { lte: 0 },
+                    completedAt: { not: null },
+                }
+            }),
+            prisma.tripConfirmation.groupBy({
+                by: ["status"],
+                where: baseWhere,
+                _count: { status: true },
+            }),
+        ]);
 
-    return {
-        total,
-        completed,
-        pending,
-        expired,
-        onTime,
-        late,
-        avgLeadTime: 0, // Skip for header stats - not critical
-        onTimeRate: total > 0 ? Math.round((onTime / total) * 100) : 0,
-        completionRate: total > 0 ? Math.round((completed / total) * 100) : 0,
-        byStatus,
-    };
+        // Convert status counts to object
+        const byStatus: Record<string, number> = {};
+        statusCounts.forEach((s) => {
+            byStatus[s.status] = s._count.status;
+        });
+
+        return {
+            success: true as const,
+            data: {
+                total,
+                completed,
+                pending,
+                expired,
+                onTime,
+                late,
+                avgLeadTime: 0, // Skip for header stats - not critical
+                onTimeRate: total > 0 ? Math.round((onTime / total) * 100) : 0,
+                completionRate: total > 0 ? Math.round((completed / total) * 100) : 0,
+                byStatus,
+            },
+        };
+    } catch (error) {
+        return { success: false as const, error: error instanceof Error ? error.message : "Failed to fetch confirmation stats" };
+    }
 }
 
 /**
@@ -253,75 +290,85 @@ export async function getConfirmationStatsOptimized(days: number = 7) {
 export async function getConfirmationStats(days: number = 30) {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-        throw new Error("Unauthorized");
+        return { success: false as const, error: "Unauthorized" };
     }
 
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-    startDate.setHours(0, 0, 0, 0);
+    const parsed = daysParamSchema.safeParse({ days });
+    const safeDays = parsed.success ? (parsed.data.days ?? 30) : 30;
 
-    const confirmations = await prisma.tripConfirmation.findMany({
-        where: {
-            createdAt: { gte: startDate },
-        },
-        select: {
-            id: true,
-            status: true,
-            completedAt: true,
-            completedById: true,
-            minutesBeforeDue: true,
-            dueAt: true,
-            pickupAt: true,
-        },
-    });
+    try {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - safeDays);
+        startDate.setHours(0, 0, 0, 0);
 
-    const total = confirmations.length;
-    const completed = confirmations.filter((c) => c.completedAt !== null).length;
-    const pending = confirmations.filter((c) => c.status === "PENDING").length;
-    const expired = confirmations.filter((c) => c.status === "EXPIRED").length;
+        const confirmations = await prisma.tripConfirmation.findMany({
+            where: {
+                createdAt: { gte: startDate },
+            },
+            select: {
+                id: true,
+                status: true,
+                completedAt: true,
+                completedById: true,
+                minutesBeforeDue: true,
+                dueAt: true,
+                pickupAt: true,
+            },
+        });
 
-    // On-time = completed before dueAt (minutesBeforeDue > 0)
-    const onTime = confirmations.filter(
-        (c) => c.minutesBeforeDue !== null && c.minutesBeforeDue > 0
-    ).length;
+        const total = confirmations.length;
+        const completed = confirmations.filter((c) => c.completedAt !== null).length;
+        const pending = confirmations.filter((c) => c.status === "PENDING").length;
+        const expired = confirmations.filter((c) => c.status === "EXPIRED").length;
 
-    // Late = completed after dueAt but before pickup
-    const late = confirmations.filter(
-        (c) =>
-            c.minutesBeforeDue !== null &&
-            c.minutesBeforeDue <= 0 &&
-            c.completedAt !== null &&
-            c.completedAt < c.pickupAt
-    ).length;
+        // On-time = completed before dueAt (minutesBeforeDue > 0)
+        const onTime = confirmations.filter(
+            (c) => c.minutesBeforeDue !== null && c.minutesBeforeDue > 0
+        ).length;
 
-    // Average minutes before due (for completed ones)
-    const completedWithTime = confirmations.filter(
-        (c) => c.minutesBeforeDue !== null
-    );
-    const avgLeadTime =
-        completedWithTime.length > 0
-            ? completedWithTime.reduce((sum, c) => sum + (c.minutesBeforeDue || 0), 0) /
-              completedWithTime.length
-            : 0;
+        // Late = completed after dueAt but before pickup
+        const late = confirmations.filter(
+            (c) =>
+                c.minutesBeforeDue !== null &&
+                c.minutesBeforeDue <= 0 &&
+                c.completedAt !== null &&
+                c.completedAt < c.pickupAt
+        ).length;
 
-    // Status breakdown
-    const byStatus: Record<string, number> = {};
-    confirmations.forEach((c) => {
-        byStatus[c.status] = (byStatus[c.status] || 0) + 1;
-    });
+        // Average minutes before due (for completed ones)
+        const completedWithTime = confirmations.filter(
+            (c) => c.minutesBeforeDue !== null
+        );
+        const avgLeadTime =
+            completedWithTime.length > 0
+                ? completedWithTime.reduce((sum, c) => sum + (c.minutesBeforeDue || 0), 0) /
+                  completedWithTime.length
+                : 0;
 
-    return {
-        total,
-        completed,
-        pending,
-        expired,
-        onTime,
-        late,
-        avgLeadTime: Math.round(avgLeadTime),
-        onTimeRate: total > 0 ? Math.round((onTime / total) * 100) : 0,
-        completionRate: total > 0 ? Math.round((completed / total) * 100) : 0,
-        byStatus,
-    };
+        // Status breakdown
+        const byStatus: Record<string, number> = {};
+        confirmations.forEach((c) => {
+            byStatus[c.status] = (byStatus[c.status] || 0) + 1;
+        });
+
+        return {
+            success: true as const,
+            data: {
+                total,
+                completed,
+                pending,
+                expired,
+                onTime,
+                late,
+                avgLeadTime: Math.round(avgLeadTime),
+                onTimeRate: total > 0 ? Math.round((onTime / total) * 100) : 0,
+                completionRate: total > 0 ? Math.round((completed / total) * 100) : 0,
+                byStatus,
+            },
+        };
+    } catch (error) {
+        return { success: false as const, error: error instanceof Error ? error.message : "Failed to fetch confirmation stats" };
+    }
 }
 
 /**
@@ -333,8 +380,11 @@ export async function getDispatcherConfirmationMetrics(
 ) {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-        throw new Error("Unauthorized");
+        return { success: false as const, error: "Unauthorized" };
     }
+
+    const parsed = daysParamSchema.safeParse({ days });
+    const safeDays = parsed.success ? (parsed.data.days ?? 30) : 30;
 
     // Only admins can view other users' metrics
     const isAdmin = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"].includes(
@@ -342,57 +392,64 @@ export async function getDispatcherConfirmationMetrics(
     );
     const targetUserId = isAdmin && userId ? userId : session.user.id;
 
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    try {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - safeDays);
 
-    const confirmations = await prisma.tripConfirmation.findMany({
-        where: {
-            completedById: targetUserId,
-            completedAt: { gte: startDate },
-        },
-        select: {
-            status: true,
-            minutesBeforeDue: true,
-            completedAt: true,
-            dueAt: true,
-            pickupAt: true,
-        },
-    });
+        const confirmations = await prisma.tripConfirmation.findMany({
+            where: {
+                completedById: targetUserId,
+                completedAt: { gte: startDate },
+            },
+            select: {
+                status: true,
+                minutesBeforeDue: true,
+                completedAt: true,
+                dueAt: true,
+                pickupAt: true,
+            },
+        });
 
-    const total = confirmations.length;
-    const onTime = confirmations.filter(
-        (c) => c.minutesBeforeDue !== null && c.minutesBeforeDue > 0
-    ).length;
-    const late = confirmations.filter(
-        (c) =>
-            c.minutesBeforeDue !== null &&
-            c.minutesBeforeDue <= 0 &&
-            c.completedAt !== null &&
-            c.completedAt < c.pickupAt
-    ).length;
+        const total = confirmations.length;
+        const onTime = confirmations.filter(
+            (c) => c.minutesBeforeDue !== null && c.minutesBeforeDue > 0
+        ).length;
+        const late = confirmations.filter(
+            (c) =>
+                c.minutesBeforeDue !== null &&
+                c.minutesBeforeDue <= 0 &&
+                c.completedAt !== null &&
+                c.completedAt < c.pickupAt
+        ).length;
 
-    // Average lead time
-    const withLeadTime = confirmations.filter((c) => c.minutesBeforeDue !== null);
-    const avgLeadTime =
-        withLeadTime.length > 0
-            ? withLeadTime.reduce((sum, c) => sum + (c.minutesBeforeDue || 0), 0) /
-              withLeadTime.length
-            : 0;
+        // Average lead time
+        const withLeadTime = confirmations.filter((c) => c.minutesBeforeDue !== null);
+        const avgLeadTime =
+            withLeadTime.length > 0
+                ? withLeadTime.reduce((sum, c) => sum + (c.minutesBeforeDue || 0), 0) /
+                  withLeadTime.length
+                : 0;
 
-    // Status breakdown
-    const byStatus: Record<string, number> = {};
-    confirmations.forEach((c) => {
-        byStatus[c.status] = (byStatus[c.status] || 0) + 1;
-    });
+        // Status breakdown
+        const byStatus: Record<string, number> = {};
+        confirmations.forEach((c) => {
+            byStatus[c.status] = (byStatus[c.status] || 0) + 1;
+        });
 
-    return {
-        total,
-        onTime,
-        late,
-        onTimeRate: total > 0 ? Math.round((onTime / total) * 100) : 0,
-        avgLeadTimeMinutes: Math.round(avgLeadTime),
-        byStatus,
-    };
+        return {
+            success: true as const,
+            data: {
+                total,
+                onTime,
+                late,
+                onTimeRate: total > 0 ? Math.round((onTime / total) * 100) : 0,
+                avgLeadTimeMinutes: Math.round(avgLeadTime),
+                byStatus,
+            },
+        };
+    } catch (error) {
+        return { success: false as const, error: error instanceof Error ? error.message : "Failed to fetch dispatcher metrics" };
+    }
 }
 
 /**
@@ -401,77 +458,87 @@ export async function getDispatcherConfirmationMetrics(
 export async function getAllDispatcherMetrics(days: number = 30) {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-        throw new Error("Unauthorized");
+        return { success: false as const, error: "Unauthorized" };
     }
 
     const isAdmin = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"].includes(
         session.user.role || ""
     );
     if (!isAdmin) {
-        throw new Error("Admin access required");
+        return { success: false as const, error: "Admin access required" };
     }
 
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    const parsed = daysParamSchema.safeParse({ days });
+    const safeDays = parsed.success ? (parsed.data.days ?? 30) : 30;
 
-    const confirmations = await prisma.tripConfirmation.findMany({
-        where: {
-            completedAt: { gte: startDate },
-            completedById: { not: null },
-        },
-        select: {
-            completedById: true,
-            status: true,
-            minutesBeforeDue: true,
-            completedBy: {
-                select: { id: true, name: true },
+    try {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - safeDays);
+
+        const confirmations = await prisma.tripConfirmation.findMany({
+            where: {
+                completedAt: { gte: startDate },
+                completedById: { not: null },
             },
-        },
-    });
+            select: {
+                completedById: true,
+                status: true,
+                minutesBeforeDue: true,
+                completedBy: {
+                    select: { id: true, name: true },
+                },
+            },
+        });
 
-    // Group by dispatcher
-    const byDispatcher: Record<
-        string,
-        {
-            id: string;
-            name: string;
-            total: number;
-            onTime: number;
-            late: number;
-            byStatus: Record<string, number>;
-        }
-    > = {};
+        // Group by dispatcher
+        const byDispatcher: Record<
+            string,
+            {
+                id: string;
+                name: string;
+                total: number;
+                onTime: number;
+                late: number;
+                byStatus: Record<string, number>;
+            }
+        > = {};
 
-    confirmations.forEach((c) => {
-        if (!c.completedById || !c.completedBy) return;
+        confirmations.forEach((c) => {
+            if (!c.completedById || !c.completedBy) return;
 
-        if (!byDispatcher[c.completedById]) {
-            byDispatcher[c.completedById] = {
-                id: c.completedById,
-                name: c.completedBy.name || "Unknown",
-                total: 0,
-                onTime: 0,
-                late: 0,
-                byStatus: {},
-            };
-        }
+            if (!byDispatcher[c.completedById]) {
+                byDispatcher[c.completedById] = {
+                    id: c.completedById,
+                    name: c.completedBy.name || "Unknown",
+                    total: 0,
+                    onTime: 0,
+                    late: 0,
+                    byStatus: {},
+                };
+            }
 
-        const d = byDispatcher[c.completedById];
-        d.total++;
-        if (c.minutesBeforeDue !== null && c.minutesBeforeDue > 0) {
-            d.onTime++;
-        } else if (c.minutesBeforeDue !== null && c.minutesBeforeDue <= 0) {
-            d.late++;
-        }
-        d.byStatus[c.status] = (d.byStatus[c.status] || 0) + 1;
-    });
+            const d = byDispatcher[c.completedById];
+            d.total++;
+            if (c.minutesBeforeDue !== null && c.minutesBeforeDue > 0) {
+                d.onTime++;
+            } else if (c.minutesBeforeDue !== null && c.minutesBeforeDue <= 0) {
+                d.late++;
+            }
+            d.byStatus[c.status] = (d.byStatus[c.status] || 0) + 1;
+        });
 
-    return Object.values(byDispatcher)
-        .map((d) => ({
-            ...d,
-            onTimeRate: d.total > 0 ? Math.round((d.onTime / d.total) * 100) : 0,
-        }))
-        .sort((a, b) => b.total - a.total);
+        return {
+            success: true as const,
+            data: Object.values(byDispatcher)
+                .map((d) => ({
+                    ...d,
+                    onTimeRate: d.total > 0 ? Math.round((d.onTime / d.total) * 100) : 0,
+                }))
+                .sort((a, b) => b.total - a.total),
+        };
+    } catch (error) {
+        return { success: false as const, error: error instanceof Error ? error.message : "Failed to fetch dispatcher metrics" };
+    }
 }
 
 /**
@@ -481,51 +548,61 @@ export async function getAllDispatcherMetrics(days: number = 30) {
 export async function getMissedConfirmationReport(days: number = 30) {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-        throw new Error("Unauthorized");
+        return { success: false as const, error: "Unauthorized" };
     }
 
     const isAdmin = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"].includes(
         session.user.role || ""
     );
     if (!isAdmin) {
-        throw new Error("Admin access required");
+        return { success: false as const, error: "Admin access required" };
     }
 
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    const parsed = daysParamSchema.safeParse({ days });
+    const safeDays = parsed.success ? (parsed.data.days ?? 30) : 30;
 
-    const missedConfirmations = await prisma.tripConfirmation.findMany({
-        where: {
-            status: "EXPIRED",
-            archivedAt: { gte: startDate },
-        },
-        include: {
-            accountableDispatchers: {
-                include: {
-                    dispatcher: { select: { id: true, name: true, role: true } },
-                    shift: { select: { clockIn: true, clockOut: true } },
+    try {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - safeDays);
+
+        const missedConfirmations = await prisma.tripConfirmation.findMany({
+            where: {
+                status: "EXPIRED",
+                archivedAt: { gte: startDate },
+            },
+            include: {
+                accountableDispatchers: {
+                    include: {
+                        dispatcher: { select: { id: true, name: true, role: true } },
+                        shift: { select: { clockIn: true, clockOut: true } },
+                    },
                 },
             },
-        },
-        orderBy: { archivedAt: "desc" },
-    });
+            orderBy: { archivedAt: "desc" },
+        });
 
-    return missedConfirmations.map((conf) => ({
-        id: conf.id,
-        tripNumber: conf.tripNumber,
-        passengerName: conf.passengerName,
-        driverName: conf.driverName,
-        dueAt: conf.dueAt,
-        pickupAt: conf.pickupAt,
-        expiredAt: conf.archivedAt,
-        onDutyDispatchers: conf.accountableDispatchers.map((a) => ({
-            id: a.dispatcher.id,
-            name: a.dispatcher.name,
-            role: a.dispatcher.role,
-            shiftStart: a.shift.clockIn,
-            shiftEnd: a.shift.clockOut,
-        })),
-    }));
+        return {
+            success: true as const,
+            data: missedConfirmations.map((conf) => ({
+                id: conf.id,
+                tripNumber: conf.tripNumber,
+                passengerName: conf.passengerName,
+                driverName: conf.driverName,
+                dueAt: conf.dueAt,
+                pickupAt: conf.pickupAt,
+                expiredAt: conf.archivedAt,
+                onDutyDispatchers: conf.accountableDispatchers.map((a) => ({
+                    id: a.dispatcher.id,
+                    name: a.dispatcher.name,
+                    role: a.dispatcher.role,
+                    shiftStart: a.shift.clockIn,
+                    shiftEnd: a.shift.clockOut,
+                })),
+            })),
+        };
+    } catch (error) {
+        return { success: false as const, error: error instanceof Error ? error.message : "Failed to fetch missed confirmation report" };
+    }
 }
 
 /**
@@ -535,84 +612,94 @@ export async function getMissedConfirmationReport(days: number = 30) {
 export async function getDispatcherAccountabilityMetrics(days: number = 30) {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-        throw new Error("Unauthorized");
+        return { success: false as const, error: "Unauthorized" };
     }
 
     const isAdmin = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"].includes(
         session.user.role || ""
     );
     if (!isAdmin) {
-        throw new Error("Admin access required");
+        return { success: false as const, error: "Admin access required" };
     }
 
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    const parsed = daysParamSchema.safeParse({ days });
+    const safeDays = parsed.success ? (parsed.data.days ?? 30) : 30;
 
-    // Get missed confirmation counts per dispatcher
-    const accountabilityRecords =
-        await prisma.missedConfirmationAccountability.groupBy({
-            by: ["dispatcherId"],
-            _count: { confirmationId: true },
+    try {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - safeDays);
+
+        // Get missed confirmation counts per dispatcher
+        const accountabilityRecords =
+            await prisma.missedConfirmationAccountability.groupBy({
+                by: ["dispatcherId"],
+                _count: { confirmationId: true },
+                where: {
+                    createdAt: { gte: startDate },
+                    dispatcher: {
+                        role: { in: ["DISPATCHER", "ADMIN"] },
+                    },
+                },
+            });
+
+        // Get dispatcher info and their confirmation completions
+        const dispatchers = await prisma.user.findMany({
             where: {
-                createdAt: { gte: startDate },
-                dispatcher: {
-                    role: { in: ["DISPATCHER", "ADMIN"] },
+                role: { in: ["DISPATCHER", "ADMIN"] },
+                isActive: true,
+            },
+            select: {
+                id: true,
+                name: true,
+                role: true,
+                shifts: {
+                    where: { clockIn: { gte: startDate } },
+                    select: { id: true },
+                },
+                confirmationsCompleted: {
+                    where: { completedAt: { gte: startDate } },
+                    select: { id: true, minutesBeforeDue: true },
                 },
             },
         });
 
-    // Get dispatcher info and their confirmation completions
-    const dispatchers = await prisma.user.findMany({
-        where: {
-            role: { in: ["DISPATCHER", "ADMIN"] },
-            isActive: true,
-        },
-        select: {
-            id: true,
-            name: true,
-            role: true,
-            shifts: {
-                where: { clockIn: { gte: startDate } },
-                select: { id: true },
-            },
-            confirmationsCompleted: {
-                where: { completedAt: { gte: startDate } },
-                select: { id: true, minutesBeforeDue: true },
-            },
-        },
-    });
+        return {
+            success: true as const,
+            data: dispatchers
+                .map((d) => {
+                    const missedCount =
+                        accountabilityRecords.find((a) => a.dispatcherId === d.id)
+                            ?._count.confirmationId || 0;
 
-    return dispatchers
-        .map((d) => {
-            const missedCount =
-                accountabilityRecords.find((a) => a.dispatcherId === d.id)
-                    ?._count.confirmationId || 0;
+                    const completedCount = d.confirmationsCompleted.length;
+                    const onTimeCount = d.confirmationsCompleted.filter(
+                        (c) => c.minutesBeforeDue !== null && c.minutesBeforeDue > 0
+                    ).length;
 
-            const completedCount = d.confirmationsCompleted.length;
-            const onTimeCount = d.confirmationsCompleted.filter(
-                (c) => c.minutesBeforeDue !== null && c.minutesBeforeDue > 0
-            ).length;
-
-            return {
-                id: d.id,
-                name: d.name || "Unknown",
-                role: d.role,
-                totalShifts: d.shifts.length,
-                confirmationsCompleted: completedCount,
-                confirmationsOnTime: onTimeCount,
-                confirmationsMissedWhileOnDuty: missedCount,
-                accountabilityRate:
-                    completedCount + missedCount > 0
-                        ? Math.round(
-                              (completedCount / (completedCount + missedCount)) * 100
-                          )
-                        : 100,
-            };
-        })
-        .sort(
-            (a, b) =>
-                b.confirmationsMissedWhileOnDuty - a.confirmationsMissedWhileOnDuty
-        );
+                    return {
+                        id: d.id,
+                        name: d.name || "Unknown",
+                        role: d.role,
+                        totalShifts: d.shifts.length,
+                        confirmationsCompleted: completedCount,
+                        confirmationsOnTime: onTimeCount,
+                        confirmationsMissedWhileOnDuty: missedCount,
+                        accountabilityRate:
+                            completedCount + missedCount > 0
+                                ? Math.round(
+                                      (completedCount / (completedCount + missedCount)) * 100
+                                  )
+                                : 100,
+                    };
+                })
+                .sort(
+                    (a, b) =>
+                        b.confirmationsMissedWhileOnDuty - a.confirmationsMissedWhileOnDuty
+                ),
+        };
+    } catch (error) {
+        return { success: false as const, error: error instanceof Error ? error.message : "Failed to fetch accountability metrics" };
+    }
 }
 
 /**
@@ -621,150 +708,154 @@ export async function getDispatcherAccountabilityMetrics(days: number = 30) {
  * Records which dispatchers were on duty when confirmations expired
  */
 export async function markExpiredConfirmations() {
-    const now = new Date();
+    try {
+        const now = new Date();
 
-    // Find confirmations that should be expired
-    const toExpire = await prisma.tripConfirmation.findMany({
-        where: {
-            status: "PENDING",
-            pickupAt: { lt: now },
-            archivedAt: null,
-        },
-        select: {
-            id: true,
-            dueAt: true,
-            pickupAt: true,
-            tripNumber: true,
-            passengerName: true,
-        },
-    });
-
-    if (toExpire.length === 0) {
-        return { count: 0, accountabilityRecords: 0 };
-    }
-
-    // OPTIMIZATION: Fetch ALL active shifts once instead of per confirmation
-    // Find the date range that covers all confirmation windows
-    const earliestDue = new Date(Math.min(...toExpire.map(c => c.dueAt.getTime())));
-    const latestPickup = new Date(Math.max(...toExpire.map(c => c.pickupAt.getTime())));
-
-    const activeShifts = await prisma.shift.findMany({
-        where: {
-            // Shift started before the latest pickup
-            clockIn: { lte: latestPickup },
-            OR: [
-                { clockOut: null }, // Still active
-                { clockOut: { gte: earliestDue } }, // Ended after earliest due time
-            ],
-            // Only include DISPATCHER and ADMIN roles (exclude SUPER_ADMIN)
-            user: {
-                role: { in: ["DISPATCHER", "ADMIN"] },
-                isActive: true,
+        // Find confirmations that should be expired
+        const toExpire = await prisma.tripConfirmation.findMany({
+            where: {
+                status: "PENDING",
+                pickupAt: { lt: now },
+                archivedAt: null,
             },
-        },
-        select: {
-            id: true,
-            userId: true,
-            clockIn: true,
-            clockOut: true, // Need this to check overlap per confirmation
-        },
-    });
+            select: {
+                id: true,
+                dueAt: true,
+                pickupAt: true,
+                tripNumber: true,
+                passengerName: true,
+            },
+        });
 
-    // Build all accountability records in memory
-    const accountabilityData: Array<{
-        confirmationId: string;
-        dispatcherId: string;
-        shiftId: string;
-        shiftStartedAt: Date;
-        confirmationDueAt: Date;
-        confirmationExpiredAt: Date;
-    }> = [];
+        if (toExpire.length === 0) {
+            return { success: true as const, data: { count: 0, accountabilityRecords: 0 } };
+        }
 
-    for (const confirmation of toExpire) {
-        for (const shift of activeShifts) {
-            // Check if this shift was active during this specific confirmation window
-            const shiftWasActive =
-                shift.clockIn <= confirmation.pickupAt &&
-                (!shift.clockOut || shift.clockOut >= confirmation.dueAt);
+        // OPTIMIZATION: Fetch ALL active shifts once instead of per confirmation
+        // Find the date range that covers all confirmation windows
+        const earliestDue = new Date(Math.min(...toExpire.map(c => c.dueAt.getTime())));
+        const latestPickup = new Date(Math.max(...toExpire.map(c => c.pickupAt.getTime())));
 
-            if (shiftWasActive) {
-                accountabilityData.push({
-                    confirmationId: confirmation.id,
-                    dispatcherId: shift.userId,
-                    shiftId: shift.id,
-                    shiftStartedAt: shift.clockIn,
-                    confirmationDueAt: confirmation.dueAt,
-                    confirmationExpiredAt: now,
+        const activeShifts = await prisma.shift.findMany({
+            where: {
+                // Shift started before the latest pickup
+                clockIn: { lte: latestPickup },
+                OR: [
+                    { clockOut: null }, // Still active
+                    { clockOut: { gte: earliestDue } }, // Ended after earliest due time
+                ],
+                // Only include DISPATCHER and ADMIN roles (exclude SUPER_ADMIN)
+                user: {
+                    role: { in: ["DISPATCHER", "ADMIN"] },
+                    isActive: true,
+                },
+            },
+            select: {
+                id: true,
+                userId: true,
+                clockIn: true,
+                clockOut: true, // Need this to check overlap per confirmation
+            },
+        });
+
+        // Build all accountability records in memory
+        const accountabilityData: Array<{
+            confirmationId: string;
+            dispatcherId: string;
+            shiftId: string;
+            shiftStartedAt: Date;
+            confirmationDueAt: Date;
+            confirmationExpiredAt: Date;
+        }> = [];
+
+        for (const confirmation of toExpire) {
+            for (const shift of activeShifts) {
+                // Check if this shift was active during this specific confirmation window
+                const shiftWasActive =
+                    shift.clockIn <= confirmation.pickupAt &&
+                    (!shift.clockOut || shift.clockOut >= confirmation.dueAt);
+
+                if (shiftWasActive) {
+                    accountabilityData.push({
+                        confirmationId: confirmation.id,
+                        dispatcherId: shift.userId,
+                        shiftId: shift.id,
+                        shiftStartedAt: shift.clockIn,
+                        confirmationDueAt: confirmation.dueAt,
+                        confirmationExpiredAt: now,
+                    });
+                }
+            }
+        }
+
+        // OPTIMIZATION: Create all accountability records in parallel
+        let accountabilityRecords = 0;
+        if (accountabilityData.length > 0) {
+            const createPromises = accountabilityData.map(data =>
+                prisma.missedConfirmationAccountability.create({ data }).catch(() => null)
+            );
+            const results = await Promise.all(createPromises);
+            accountabilityRecords = results.filter(r => r !== null).length;
+        }
+
+        // Deduct accountability points (1 per missed confirmation per dispatcher, floor at 0)
+        if (accountabilityData.length > 0) {
+            const deductionsByDispatcher = new Map<string, number>();
+            for (const record of accountabilityData) {
+                deductionsByDispatcher.set(
+                    record.dispatcherId,
+                    (deductionsByDispatcher.get(record.dispatcherId) || 0) + 1
+                );
+            }
+
+            for (const [dispatcherId, points] of deductionsByDispatcher) {
+                const user = await prisma.user.findUnique({
+                    where: { id: dispatcherId },
+                    select: { accountabilityScore: true },
+                });
+                const currentScore = user?.accountabilityScore ?? 100;
+                const newScore = Math.max(0, currentScore - points);
+                await prisma.user.update({
+                    where: { id: dispatcherId },
+                    data: { accountabilityScore: newScore },
+                });
+            }
+
+            // Create MISSED_CONFIRMATION notification per dispatcher per missed trip
+            const tripMap = new Map(toExpire.map(c => [c.id, c]));
+            for (const record of accountabilityData) {
+                const trip = tripMap.get(record.confirmationId);
+                if (!trip) continue;
+
+                await prisma.notification.create({
+                    data: {
+                        userId: record.dispatcherId,
+                        type: "MISSED_CONFIRMATION",
+                        title: "Missed Confirmation",
+                        message: `Missed confirmation: Trip #${trip.tripNumber} for ${trip.passengerName} — -1 point`,
+                        entityType: "TripConfirmation",
+                        entityId: record.confirmationId,
+                        actionUrl: "/admin/confirmations",
+                    },
                 });
             }
         }
+
+        // OPTIMIZATION: Update all confirmations in a single query
+        await prisma.tripConfirmation.updateMany({
+            where: {
+                id: { in: toExpire.map(c => c.id) },
+            },
+            data: {
+                status: "EXPIRED",
+                archivedAt: now,
+            },
+        });
+
+        return { success: true as const, data: { count: toExpire.length, accountabilityRecords } };
+    } catch (error) {
+        return { success: false as const, error: error instanceof Error ? error.message : "Failed to mark expired confirmations" };
     }
-
-    // OPTIMIZATION: Create all accountability records in parallel
-    let accountabilityRecords = 0;
-    if (accountabilityData.length > 0) {
-        const createPromises = accountabilityData.map(data =>
-            prisma.missedConfirmationAccountability.create({ data }).catch(() => null)
-        );
-        const results = await Promise.all(createPromises);
-        accountabilityRecords = results.filter(r => r !== null).length;
-    }
-
-    // Deduct accountability points (1 per missed confirmation per dispatcher, floor at 0)
-    if (accountabilityData.length > 0) {
-        const deductionsByDispatcher = new Map<string, number>();
-        for (const record of accountabilityData) {
-            deductionsByDispatcher.set(
-                record.dispatcherId,
-                (deductionsByDispatcher.get(record.dispatcherId) || 0) + 1
-            );
-        }
-
-        for (const [dispatcherId, points] of deductionsByDispatcher) {
-            const user = await prisma.user.findUnique({
-                where: { id: dispatcherId },
-                select: { accountabilityScore: true },
-            });
-            const currentScore = user?.accountabilityScore ?? 100;
-            const newScore = Math.max(0, currentScore - points);
-            await prisma.user.update({
-                where: { id: dispatcherId },
-                data: { accountabilityScore: newScore },
-            });
-        }
-
-        // Create MISSED_CONFIRMATION notification per dispatcher per missed trip
-        const tripMap = new Map(toExpire.map(c => [c.id, c]));
-        for (const record of accountabilityData) {
-            const trip = tripMap.get(record.confirmationId);
-            if (!trip) continue;
-
-            await prisma.notification.create({
-                data: {
-                    userId: record.dispatcherId,
-                    type: "MISSED_CONFIRMATION",
-                    title: "Missed Confirmation",
-                    message: `Missed confirmation: Trip #${trip.tripNumber} for ${trip.passengerName} — -1 point`,
-                    entityType: "TripConfirmation",
-                    entityId: record.confirmationId,
-                    actionUrl: "/admin/confirmations",
-                },
-            });
-        }
-    }
-
-    // OPTIMIZATION: Update all confirmations in a single query
-    await prisma.tripConfirmation.updateMany({
-        where: {
-            id: { in: toExpire.map(c => c.id) },
-        },
-        data: {
-            status: "EXPIRED",
-            archivedAt: now,
-        },
-    });
-
-    return { count: toExpire.length, accountabilityRecords };
 }
 
 /**
@@ -859,15 +950,20 @@ function isDaylightSavingTime(date: Date): boolean {
  * Parse manifest email and extract trips
  * Supports LimoAnywhere manifest format
  */
-export async function parseManifestEmail(emailBody: string): Promise<Array<{
-    tripNumber: string;
-    reservationNumber?: string;
-    pickupAt: Date;
-    passengerName: string;
-    driverName: string;
-    accountName?: string;
-    accountNumber?: string;
-}>> {
+export async function parseManifestEmail(emailBody: string): Promise<{
+    success: boolean;
+    data?: Array<{
+        tripNumber: string;
+        reservationNumber?: string;
+        pickupAt: Date;
+        passengerName: string;
+        driverName: string;
+        accountName?: string;
+        accountNumber?: string;
+    }>;
+    error?: string;
+}> {
+    try {
     const trips: Array<{
         tripNumber: string;
         reservationNumber?: string;
@@ -1034,7 +1130,10 @@ export async function parseManifestEmail(emailBody: string): Promise<Array<{
     }
 
     console.log("[parseManifestEmail] Total trips parsed:", trips.length);
-    return trips;
+    return { success: true as const, data: trips };
+    } catch (error) {
+        return { success: false as const, error: error instanceof Error ? error.message : "Failed to parse manifest email" };
+    }
 }
 
 /**
@@ -1055,79 +1154,86 @@ export async function ingestManifestTrips(
     fromEmail?: string,
     subject?: string
 ) {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    try {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    let created = 0;
-    let duplicate = 0;
-    const errors: string[] = [];
+        let created = 0;
+        let duplicate = 0;
+        const errors: string[] = [];
 
-    for (const trip of trips) {
-        try {
-            // Calculate dueAt (2 hours before pickup)
-            const dueAt = new Date(trip.pickupAt.getTime() - 2 * 60 * 60 * 1000);
+        for (const trip of trips) {
+            try {
+                // Calculate dueAt (2 hours before pickup)
+                const dueAt = new Date(trip.pickupAt.getTime() - 2 * 60 * 60 * 1000);
 
-            // Skip if pickup is in the past
-            if (trip.pickupAt < now) {
-                continue;
+                // Skip if pickup is in the past
+                if (trip.pickupAt < now) {
+                    continue;
+                }
+
+                // Check for duplicate
+                const existing = await prisma.tripConfirmation.findFirst({
+                    where: {
+                        tripNumber: trip.tripNumber,
+                        manifestDate: today,
+                    },
+                });
+
+                if (existing) {
+                    duplicate++;
+                    continue;
+                }
+
+                // Create new confirmation
+                await prisma.tripConfirmation.create({
+                    data: {
+                        tripNumber: trip.tripNumber,
+                        reservationNumber: trip.reservationNumber,
+                        pickupAt: trip.pickupAt,
+                        dueAt,
+                        passengerName: trip.passengerName,
+                        driverName: trip.driverName,
+                        accountName: trip.accountName,
+                        accountNumber: trip.accountNumber,
+                        manifestDate: today,
+                        sourceEmail: sourceEmail,
+                    },
+                });
+
+                created++;
+            } catch (error) {
+                errors.push(
+                    `Trip ${trip.tripNumber}: ${error instanceof Error ? error.message : "Unknown error"}`
+                );
             }
-
-            // Check for duplicate
-            const existing = await prisma.tripConfirmation.findFirst({
-                where: {
-                    tripNumber: trip.tripNumber,
-                    manifestDate: today,
-                },
-            });
-
-            if (existing) {
-                duplicate++;
-                continue;
-            }
-
-            // Create new confirmation
-            await prisma.tripConfirmation.create({
-                data: {
-                    tripNumber: trip.tripNumber,
-                    reservationNumber: trip.reservationNumber,
-                    pickupAt: trip.pickupAt,
-                    dueAt,
-                    passengerName: trip.passengerName,
-                    driverName: trip.driverName,
-                    accountName: trip.accountName,
-                    accountNumber: trip.accountNumber,
-                    manifestDate: today,
-                    sourceEmail: sourceEmail,
-                },
-            });
-
-            created++;
-        } catch (error) {
-            errors.push(
-                `Trip ${trip.tripNumber}: ${error instanceof Error ? error.message : "Unknown error"}`
-            );
         }
+
+        // Log the manifest ingestion
+        await prisma.manifestLog.create({
+            data: {
+                fromEmail: fromEmail,
+                subject: subject,
+                tripsExtracted: trips.length,
+                tripsCreated: created,
+                tripsDuplicate: duplicate,
+                rawContent: sourceEmail,
+                parseErrors: errors.length > 0 ? errors.join("\n") : null,
+            },
+        });
+
+        return {
+            success: true as const,
+            data: {
+                extracted: trips.length,
+                created,
+                duplicate,
+                errors,
+            },
+        };
+    } catch (error) {
+        return { success: false as const, error: error instanceof Error ? error.message : "Failed to ingest manifest trips" };
     }
-
-    // Log the manifest ingestion
-    await prisma.manifestLog.create({
-        data: {
-            fromEmail: fromEmail,
-            subject: subject,
-            tripsExtracted: trips.length,
-            tripsCreated: created,
-            tripsDuplicate: duplicate,
-            rawContent: sourceEmail,
-            parseErrors: errors.length > 0 ? errors.join("\n") : null,
-        },
-    });
-
-    return {
-        extracted: trips.length,
-        created,
-        duplicate,
-        errors,
-    };
 }
 
 /**
@@ -1136,22 +1242,26 @@ export async function ingestManifestTrips(
 export async function getPendingConfirmationCount() {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-        return 0;
+        return { success: true as const, data: 0 };
     }
 
-    const now = new Date();
+    try {
+        const now = new Date();
 
-    const count = await prisma.tripConfirmation.count({
-        where: {
-            status: "PENDING",
-            archivedAt: null,
-            pickupAt: {
-                gte: now,
+        const count = await prisma.tripConfirmation.count({
+            where: {
+                status: "PENDING",
+                archivedAt: null,
+                pickupAt: {
+                    gte: now,
+                },
             },
-        },
-    });
+        });
 
-    return count;
+        return { success: true as const, data: count };
+    } catch (error) {
+        return { success: false as const, error: error instanceof Error ? error.message : "Failed to fetch pending confirmation count" };
+    }
 }
 
 /**
@@ -1162,7 +1272,7 @@ export async function getPendingConfirmationCount() {
 export async function getNewConfirmationsSince(since: Date) {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-        throw new Error("Unauthorized");
+        return { success: false as const, error: "Unauthorized" };
     }
 
     // Role check — only admin roles can view confirmations
@@ -1170,32 +1280,39 @@ export async function getNewConfirmationsSince(since: Date) {
         session.user.role || ""
     );
     if (!isAdmin) {
-        throw new Error("Admin access required");
+        return { success: false as const, error: "Admin access required" };
     }
 
     // Validate input
     const sinceDate = new Date(since);
     if (isNaN(sinceDate.getTime())) {
-        throw new Error("Invalid date parameter");
+        return { success: false as const, error: "Invalid date parameter" };
     }
 
-    const newConfirmations = await prisma.tripConfirmation.findMany({
-        where: {
-            createdAt: { gt: sinceDate },
-        },
-        orderBy: { dueAt: "asc" },
-        include: {
-            completedBy: {
-                select: { id: true, name: true },
+    try {
+        const newConfirmations = await prisma.tripConfirmation.findMany({
+            where: {
+                createdAt: { gt: sinceDate },
             },
-        },
-        take: 50,
-    });
+            orderBy: { dueAt: "asc" },
+            include: {
+                completedBy: {
+                    select: { id: true, name: true },
+                },
+            },
+            take: 50,
+        });
 
-    return {
-        confirmations: newConfirmations,
-        timestamp: new Date(),
-    };
+        return {
+            success: true as const,
+            data: {
+                confirmations: newConfirmations,
+                timestamp: new Date(),
+            },
+        };
+    } catch (error) {
+        return { success: false as const, error: error instanceof Error ? error.message : "Failed to fetch new confirmations" };
+    }
 }
 
 /**
@@ -1214,82 +1331,94 @@ export async function getAllConfirmations(options?: {
 }) {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-        throw new Error("Unauthorized");
+        return { success: false as const, error: "Unauthorized" };
     }
 
     const isAdmin = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"].includes(
         session.user.role || ""
     );
     if (!isAdmin) {
-        throw new Error("Admin access required");
+        return { success: false as const, error: "Admin access required" };
     }
 
-    const {
-        status = "ALL",
-        dateFrom,
-        dateTo,
-        dispatcherId,
-        search,
-        limit = 100,
-        offset = 0,
-    } = options || {};
-
-    // Build where clause
-    const where: Record<string, unknown> = {};
-
-    if (status && status !== "ALL") {
-        where.status = status;
+    const parsed = confirmationFiltersSchema.safeParse(options ?? {});
+    if (!parsed.success) {
+        return { success: false as const, error: parsed.error.issues[0]?.message || "Invalid filter options" };
     }
 
-    if (dateFrom || dateTo) {
-        where.pickupAt = {};
-        if (dateFrom) {
-            (where.pickupAt as Record<string, Date>).gte = dateFrom;
+    try {
+        const {
+            status = "ALL",
+            dateFrom,
+            dateTo,
+            dispatcherId,
+            search,
+            limit = 100,
+            offset = 0,
+        } = options || {};
+
+        // Build where clause
+        const where: Record<string, unknown> = {};
+
+        if (status && status !== "ALL") {
+            where.status = status;
         }
-        if (dateTo) {
-            (where.pickupAt as Record<string, Date>).lte = dateTo;
+
+        if (dateFrom || dateTo) {
+            where.pickupAt = {};
+            if (dateFrom) {
+                (where.pickupAt as Record<string, Date>).gte = dateFrom;
+            }
+            if (dateTo) {
+                (where.pickupAt as Record<string, Date>).lte = dateTo;
+            }
         }
+
+        if (dispatcherId) {
+            where.completedById = dispatcherId;
+        }
+
+        if (search) {
+            where.OR = [
+                { tripNumber: { contains: search, mode: "insensitive" } },
+                { passengerName: { contains: search, mode: "insensitive" } },
+                { driverName: { contains: search, mode: "insensitive" } },
+                { accountName: { contains: search, mode: "insensitive" } },
+            ];
+        }
+
+        const includeOpts = {
+            completedBy: {
+                select: { id: true, name: true },
+            },
+        };
+
+        // Simplified query: single findMany with pagination + one count
+        // Sort by pickupAt descending to show most recent/upcoming first
+        const [confirmations, total] = await Promise.all([
+            prisma.tripConfirmation.findMany({
+                where,
+                orderBy: { pickupAt: "desc" },
+                skip: offset,
+                take: limit,
+                include: includeOpts,
+            }),
+            prisma.tripConfirmation.count({ where }),
+        ]);
+
+        return {
+            success: true as const,
+            data: {
+                confirmations,
+                total,
+                hasMore: offset + confirmations.length < total,
+                upcomingCount: 0, // Deprecated - remove client usage
+                pastCount: 0,     // Deprecated - remove client usage
+            },
+        };
+    } catch (error) {
+        return { success: false as const, error: error instanceof Error ? error.message : "Failed to fetch confirmations" };
     }
-
-    if (dispatcherId) {
-        where.completedById = dispatcherId;
-    }
-
-    if (search) {
-        where.OR = [
-            { tripNumber: { contains: search, mode: "insensitive" } },
-            { passengerName: { contains: search, mode: "insensitive" } },
-            { driverName: { contains: search, mode: "insensitive" } },
-            { accountName: { contains: search, mode: "insensitive" } },
-        ];
-    }
-
-    const includeOpts = {
-        completedBy: {
-            select: { id: true, name: true },
-        },
-    };
-
-    // Simplified query: single findMany with pagination + one count
-    // Sort by pickupAt descending to show most recent/upcoming first
-    const [confirmations, total] = await Promise.all([
-        prisma.tripConfirmation.findMany({
-            where,
-            orderBy: { pickupAt: "desc" },
-            skip: offset,
-            take: limit,
-            include: includeOpts,
-        }),
-        prisma.tripConfirmation.count({ where }),
-    ]);
-
-    return {
-        confirmations,
-        total,
-        hasMore: offset + confirmations.length < total,
-        upcomingCount: 0, // Deprecated - remove client usage
-        pastCount: 0,     // Deprecated - remove client usage
-    };
 }
 
 /**
@@ -1299,34 +1428,41 @@ export async function getAllConfirmations(options?: {
 export async function getConfirmationDispatchers() {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-        throw new Error("Unauthorized");
+        return { success: false as const, error: "Unauthorized" };
     }
 
-    const dispatchers = await prisma.user.findMany({
-        where: {
-            confirmationsCompleted: {
-                some: {},
+    try {
+        const dispatchers = await prisma.user.findMany({
+            where: {
+                confirmationsCompleted: {
+                    some: {},
+                },
             },
-        },
-        select: {
-            id: true,
-            name: true,
-            _count: {
-                select: { confirmationsCompleted: true },
+            select: {
+                id: true,
+                name: true,
+                _count: {
+                    select: { confirmationsCompleted: true },
+                },
             },
-        },
-        orderBy: {
-            confirmationsCompleted: {
-                _count: "desc",
+            orderBy: {
+                confirmationsCompleted: {
+                    _count: "desc",
+                },
             },
-        },
-    });
+        });
 
-    return dispatchers.map((d) => ({
-        id: d.id,
-        name: d.name || "Unknown",
-        count: d._count.confirmationsCompleted,
-    }));
+        return {
+            success: true as const,
+            data: dispatchers.map((d) => ({
+                id: d.id,
+                name: d.name || "Unknown",
+                count: d._count.confirmationsCompleted,
+            })),
+        };
+    } catch (error) {
+        return { success: false as const, error: error instanceof Error ? error.message : "Failed to fetch confirmation dispatchers" };
+    }
 }
 
 /**
@@ -1336,16 +1472,22 @@ export async function getConfirmationDispatchers() {
 export async function getConfirmationTabData(tab: "overview" | "dispatchers" | "accountability", days: number = 7) {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-        throw new Error("Unauthorized");
+        return { success: false as const, error: "Unauthorized" };
     }
 
     const isAdmin = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"].includes(
         session.user.role || ""
     );
     if (!isAdmin) {
-        throw new Error("Admin access required");
+        return { success: false as const, error: "Admin access required" };
     }
 
+    const parsed = confirmationTabDataSchema.safeParse({ tab, days });
+    if (!parsed.success) {
+        return { success: false as const, error: parsed.error.issues[0]?.message || "Invalid tab or days parameter" };
+    }
+
+    try {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
     startDate.setHours(0, 0, 0, 0);
@@ -1368,7 +1510,7 @@ export async function getConfirmationTabData(tab: "overview" | "dispatchers" | "
             },
         });
 
-        return { todayConfirmations };
+        return { success: true as const, data: { todayConfirmations } };
     }
 
     if (tab === "dispatchers") {
@@ -1424,7 +1566,7 @@ export async function getConfirmationTabData(tab: "overview" | "dispatchers" | "
             }))
             .sort((a, b) => b.total - a.total);
 
-        return { dispatcherMetrics };
+        return { success: true as const, data: { dispatcherMetrics } };
     }
 
     if (tab === "accountability") {
@@ -1504,8 +1646,11 @@ export async function getConfirmationTabData(tab: "overview" | "dispatchers" | "
             })),
         }));
 
-        return { accountabilityMetrics, missedConfirmations: missedReport };
+        return { success: true as const, data: { accountabilityMetrics, missedConfirmations: missedReport } };
     }
 
-    return {};
+    return { success: true as const, data: {} };
+    } catch (error) {
+        return { success: false as const, error: error instanceof Error ? error.message : "Failed to fetch confirmation tab data" };
+    }
 }

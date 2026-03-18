@@ -343,10 +343,9 @@ export async function deleteAffiliateAttachment(id: string) {
         }
 
         // Delete file from storage
-        try {
-            await deleteFile(STORAGE_BUCKETS.AFFILIATE_ATTACHMENTS, attachment.fileUrl);
-        } catch (storageError) {
-            console.error("Failed to delete attachment file:", storageError);
+        const deleteResult = await deleteFile(STORAGE_BUCKETS.AFFILIATE_ATTACHMENTS, attachment.fileUrl);
+        if (!deleteResult.success) {
+            console.error("Failed to delete attachment file:", deleteResult.error);
         }
 
         await prisma.affiliateAttachment.delete({

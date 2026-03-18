@@ -26,10 +26,13 @@ export default async function PricingAdminPage() {
         redirect("/dashboard");
     }
 
-    const [stats, importHistory] = await Promise.all([
+    const [statsResult, historyResult] = await Promise.all([
         getRoutePricingStats(),
         getImportHistory(5),
     ]);
+
+    const stats = statsResult.data ?? { totalRoutes: 0, vehicleCodes: 0, uniqueZones: 0, lastImport: null, priceRange: { min: 0, max: 0 } };
+    const importHistory = historyResult.data ?? [];
 
     return <PricingAdminClient initialStats={stats} importHistory={importHistory} />;
 }

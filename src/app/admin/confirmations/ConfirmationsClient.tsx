@@ -95,10 +95,11 @@ export default function ConfirmationsClient({
 
             try {
                 const result = await getNewConfirmationsSince(lastRefreshRef.current);
-                if (result.confirmations.length > 0) {
+                const pollData = result.data ?? { confirmations: [], timestamp: lastRefreshRef.current };
+                if (pollData.confirmations.length > 0) {
                     setConfirmations(prev => {
                         const existingIds = new Set(prev.map(c => c.id));
-                        const newTrips = result.confirmations.filter(c => !existingIds.has(c.id));
+                        const newTrips = pollData.confirmations.filter(c => !existingIds.has(c.id));
 
                         if (newTrips.length > 0) {
                             setTotalCount(prevCount => prevCount + newTrips.length);
@@ -108,7 +109,7 @@ export default function ConfirmationsClient({
 
                         return prev;
                     });
-                    lastRefreshRef.current = result.timestamp;
+                    lastRefreshRef.current = pollData.timestamp;
                 }
             } catch (err) {
                 console.error("Auto-refresh failed:", err);
@@ -140,7 +141,8 @@ export default function ConfirmationsClient({
 
         setTabLoading(tab);
         try {
-            const data = await getConfirmationTabData(tab === "overview" ? "overview" : tab === "dispatchers" ? "dispatchers" : "accountability", 30);
+            const result = await getConfirmationTabData(tab === "overview" ? "overview" : tab === "dispatchers" ? "dispatchers" : "accountability", 30);
+            const data = result.data ?? {};
 
             if (tab === "overview") {
                 setLazyTodayConfirmations(data.todayConfirmations || []);
@@ -300,8 +302,9 @@ export default function ConfirmationsClient({
                 search: searchQuery || undefined,
                 limit: 100,
             });
-            setConfirmations(result.confirmations as TripConfirmation[]);
-            setTotalCount(result.total);
+            const resultData = result.data ?? { confirmations: [], total: 0 };
+            setConfirmations(resultData.confirmations as TripConfirmation[]);
+            setTotalCount(resultData.total);
             setCurrentPage(1);
         } catch (error) {
             console.error("Failed to fetch confirmations:", error);
@@ -324,7 +327,8 @@ export default function ConfirmationsClient({
     const handleStatusChange = async (tripId: string, newStatus: "PENDING" | "CONFIRMED" | "NO_ANSWER" | "CANCELLED" | "RESCHEDULED", notes?: string) => {
         setCompleting(tripId);
         try {
-            await completeConfirmation(tripId, newStatus, notes || "");
+            const result = await completeConfirmation(tripId, newStatus, notes || "");
+            if (!result.success) throw new Error(result.error);
             setSelectedTrip(null);
             router.refresh();
             await fetchConfirmations();
@@ -357,7 +361,8 @@ export default function ConfirmationsClient({
         setCompleting(tripId);
 
         try {
-            await completeConfirmation(tripId, newStatus);
+            const result = await completeConfirmation(tripId, newStatus);
+            if (!result.success) throw new Error(result.error);
         } catch {
             setConfirmations(prevConfirmations);
             setTotalCount(prevTotalCount);

@@ -62,12 +62,13 @@ export default function ContactBookView({ partners, onStartChat }: Props) {
 
         setQuickAddLoading(true);
         try {
-            await createQuickContact({
+            const result = await createQuickContact({
                 name: quickAddData.name.trim(),
                 phone: quickAddData.phone.trim(),
                 email: quickAddData.email.trim() || undefined,
                 notes: quickAddData.notes.trim() || undefined,
             });
+            if (!result.success) throw new Error(result.error);
             addToast("Contact added successfully!", "success");
             setShowQuickAdd(false);
             setQuickAddData({ name: "", phone: "", email: "", notes: "" });

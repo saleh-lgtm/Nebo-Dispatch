@@ -4,6 +4,12 @@ import prisma from "@/lib/prisma";
 import { requireAdmin, requireAuth } from "./auth-helpers";
 import { createAuditLog } from "./auditActions";
 import { revalidatePath } from "next/cache";
+import {
+    routePriceSearchParamsSchema,
+    zoneSuggestionsSchema,
+    routePriceBatchSchema,
+    limitParamSchema,
+} from "@/lib/schemas";
 
 // ============================================
 // TYPES
@@ -74,86 +80,103 @@ function normalizeZone(zone: string): string {
 /**
  * Clear all route prices - call before batch import
  */
-export async function clearRoutePrices(): Promise<{ success: boolean; deleted: number }> {
+export async function clearRoutePrices(): Promise<{ success: boolean; deleted: number; error?: string }> {
     await requireAdmin();
 
-    const result = await prisma.routePrice.deleteMany({});
-
-    return { success: true, deleted: result.count };
+    try {
+        const result = await prisma.routePrice.deleteMany({});
+        return { success: true, deleted: result.count };
+    } catch (error) {
+        console.error("clearRoutePrices error:", error);
+        return { success: false, deleted: 0, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }
 
 /**
  * Import a batch of route prices (for large imports that exceed serverless timeout)
  * Call clearRoutePrices() first, then call this for each batch
  */
-const MAX_BATCH_SIZE = 15000;
-
 export async function importRoutePricesBatch(
     rows: RoutePriceRow[],
     batchNumber: number
-): Promise<{ success: boolean; imported: number; errors: Array<{ row: number; message: string }> }> {
+): Promise<{ success: boolean; imported: number; errors: Array<{ row: number; message: string }>; error?: string }> {
     await requireAdmin();
 
-    // Validate batch size to prevent memory/connection issues
-    if (rows.length > MAX_BATCH_SIZE) {
-        throw new Error(
-            `Batch size ${rows.length} exceeds maximum of ${MAX_BATCH_SIZE} rows. Split into smaller batches.`
-        );
+    const parsed = routePriceBatchSchema.safeParse({ batchNumber });
+    if (!parsed.success) {
+        return { success: false, imported: 0, errors: [], error: parsed.error.issues[0]?.message ?? "Invalid batch number" };
     }
 
-    const errors: Array<{ row: number; message: string }> = [];
-    const validRows: Array<{
-        vehicleCode: string;
-        zoneFrom: string;
-        zoneTo: string;
-        zoneFromNorm: string;
-        zoneToNorm: string;
-        rate: number;
-    }> = [];
+    try {
+        const MAX_BATCH_SIZE = 15000;
 
-    // Validate and normalize each row
-    rows.forEach((row, index) => {
-        const rowNum = (batchNumber * 10000) + index + 2; // Approximate Excel row
-
-        if (!row.vehicleCode?.trim()) {
-            errors.push({ row: rowNum, message: "Missing vehicle code" });
-            return;
-        }
-        if (!row.zoneFrom?.trim()) {
-            errors.push({ row: rowNum, message: "Missing zone from" });
-            return;
-        }
-        if (!row.zoneTo?.trim()) {
-            errors.push({ row: rowNum, message: "Missing zone to" });
-            return;
-        }
-        if (typeof row.rate !== "number" || isNaN(row.rate) || row.rate < 0) {
-            errors.push({ row: rowNum, message: `Invalid rate: ${row.rate}` });
-            return;
+        // Validate batch size to prevent memory/connection issues
+        if (rows.length > MAX_BATCH_SIZE) {
+            return {
+                success: false,
+                imported: 0,
+                errors: [],
+                error: `Batch size ${rows.length} exceeds maximum of ${MAX_BATCH_SIZE} rows. Split into smaller batches.`,
+            };
         }
 
-        validRows.push({
-            vehicleCode: row.vehicleCode.trim().toUpperCase(),
-            zoneFrom: row.zoneFrom.trim(),
-            zoneTo: row.zoneTo.trim(),
-            zoneFromNorm: normalizeZone(row.zoneFrom),
-            zoneToNorm: normalizeZone(row.zoneTo),
-            rate: row.rate,
+        const errors: Array<{ row: number; message: string }> = [];
+        const validRows: Array<{
+            vehicleCode: string;
+            zoneFrom: string;
+            zoneTo: string;
+            zoneFromNorm: string;
+            zoneToNorm: string;
+            rate: number;
+        }> = [];
+
+        // Validate and normalize each row
+        rows.forEach((row, index) => {
+            const rowNum = (batchNumber * 10000) + index + 2; // Approximate Excel row
+
+            if (!row.vehicleCode?.trim()) {
+                errors.push({ row: rowNum, message: "Missing vehicle code" });
+                return;
+            }
+            if (!row.zoneFrom?.trim()) {
+                errors.push({ row: rowNum, message: "Missing zone from" });
+                return;
+            }
+            if (!row.zoneTo?.trim()) {
+                errors.push({ row: rowNum, message: "Missing zone to" });
+                return;
+            }
+            if (typeof row.rate !== "number" || isNaN(row.rate) || row.rate < 0) {
+                errors.push({ row: rowNum, message: `Invalid rate: ${row.rate}` });
+                return;
+            }
+
+            validRows.push({
+                vehicleCode: row.vehicleCode.trim().toUpperCase(),
+                zoneFrom: row.zoneFrom.trim(),
+                zoneTo: row.zoneTo.trim(),
+                zoneFromNorm: normalizeZone(row.zoneFrom),
+                zoneToNorm: normalizeZone(row.zoneTo),
+                rate: row.rate,
+            });
         });
-    });
 
-    if (validRows.length > 0) {
-        await prisma.routePrice.createMany({
-            data: validRows,
-            skipDuplicates: true,
-        });
+        if (validRows.length > 0) {
+            await prisma.routePrice.createMany({
+                data: validRows,
+                skipDuplicates: true,
+            });
+        }
+
+        return {
+            success: true,
+            imported: validRows.length,
+            errors: errors.slice(0, 20),
+        };
+    } catch (error) {
+        console.error("importRoutePricesBatch error:", error);
+        return { success: false, imported: 0, errors: [], error: error instanceof Error ? error.message : "Operation failed" };
     }
-
-    return {
-        success: true,
-        imported: validRows.length,
-        errors: errors.slice(0, 20),
-    };
 }
 
 /**
@@ -166,35 +189,42 @@ export async function logRoutePriceImport(
     rowsSkipped: number,
     durationMs: number,
     errors: Array<{ row: number; message: string }>
-): Promise<void> {
+): Promise<{ success: boolean; error?: string }> {
     const session = await requireAdmin();
 
-    await prisma.routePriceImport.create({
-        data: {
-            importedById: session.user.id,
-            fileName,
-            fileSize,
-            rowsImported,
-            rowsSkipped,
-            errors: errors.length > 0 ? JSON.stringify(errors.slice(0, 100)) : null,
-            durationMs,
-        },
-    });
+    try {
+        await prisma.routePriceImport.create({
+            data: {
+                importedById: session.user.id,
+                fileName,
+                fileSize,
+                rowsImported,
+                rowsSkipped,
+                errors: errors.length > 0 ? JSON.stringify(errors.slice(0, 100)) : null,
+                durationMs,
+            },
+        });
 
-    await createAuditLog(
-        session.user.id,
-        "CREATE",
-        "RoutePrice",
-        undefined,
-        {
-            action: "bulk_import",
-            rowsImported,
-            rowsSkipped,
-            fileName,
-        }
-    );
+        await createAuditLog(
+            session.user.id,
+            "CREATE",
+            "RoutePrice",
+            undefined,
+            {
+                action: "bulk_import",
+                rowsImported,
+                rowsSkipped,
+                fileName,
+            }
+        );
 
-    revalidatePath("/admin/pricing");
+        revalidatePath("/admin/pricing");
+
+        return { success: true };
+    } catch (error) {
+        console.error("logRoutePriceImport error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }
 
 /**
@@ -208,98 +238,109 @@ export async function importRoutePrices(
     const session = await requireAdmin();
     const startTime = Date.now();
 
-    const errors: Array<{ row: number; message: string }> = [];
-    const validRows: Array<{
-        vehicleCode: string;
-        zoneFrom: string;
-        zoneTo: string;
-        zoneFromNorm: string;
-        zoneToNorm: string;
-        rate: number;
-    }> = [];
+    try {
+        const errors: Array<{ row: number; message: string }> = [];
+        const validRows: Array<{
+            vehicleCode: string;
+            zoneFrom: string;
+            zoneTo: string;
+            zoneFromNorm: string;
+            zoneToNorm: string;
+            rate: number;
+        }> = [];
 
-    rows.forEach((row, index) => {
-        const rowNum = index + 2;
+        rows.forEach((row, index) => {
+            const rowNum = index + 2;
 
-        if (!row.vehicleCode?.trim()) {
-            errors.push({ row: rowNum, message: "Missing vehicle code" });
-            return;
-        }
-        if (!row.zoneFrom?.trim()) {
-            errors.push({ row: rowNum, message: "Missing zone from" });
-            return;
-        }
-        if (!row.zoneTo?.trim()) {
-            errors.push({ row: rowNum, message: "Missing zone to" });
-            return;
-        }
-        if (typeof row.rate !== "number" || isNaN(row.rate) || row.rate < 0) {
-            errors.push({ row: rowNum, message: `Invalid rate: ${row.rate}` });
-            return;
-        }
+            if (!row.vehicleCode?.trim()) {
+                errors.push({ row: rowNum, message: "Missing vehicle code" });
+                return;
+            }
+            if (!row.zoneFrom?.trim()) {
+                errors.push({ row: rowNum, message: "Missing zone from" });
+                return;
+            }
+            if (!row.zoneTo?.trim()) {
+                errors.push({ row: rowNum, message: "Missing zone to" });
+                return;
+            }
+            if (typeof row.rate !== "number" || isNaN(row.rate) || row.rate < 0) {
+                errors.push({ row: rowNum, message: `Invalid rate: ${row.rate}` });
+                return;
+            }
 
-        validRows.push({
-            vehicleCode: row.vehicleCode.trim().toUpperCase(),
-            zoneFrom: row.zoneFrom.trim(),
-            zoneTo: row.zoneTo.trim(),
-            zoneFromNorm: normalizeZone(row.zoneFrom),
-            zoneToNorm: normalizeZone(row.zoneTo),
-            rate: row.rate,
+            validRows.push({
+                vehicleCode: row.vehicleCode.trim().toUpperCase(),
+                zoneFrom: row.zoneFrom.trim(),
+                zoneTo: row.zoneTo.trim(),
+                zoneFromNorm: normalizeZone(row.zoneFrom),
+                zoneToNorm: normalizeZone(row.zoneTo),
+                rate: row.rate,
+            });
         });
-    });
 
-    if (validRows.length === 0) {
+        if (validRows.length === 0) {
+            return {
+                success: false,
+                rowsImported: 0,
+                rowsSkipped: rows.length,
+                errors,
+                durationMs: Date.now() - startTime,
+            };
+        }
+
+        // Delete and insert
+        await prisma.routePrice.deleteMany({});
+        await prisma.routePrice.createMany({
+            data: validRows,
+            skipDuplicates: true,
+        });
+
+        // Log
+        await prisma.routePriceImport.create({
+            data: {
+                importedById: session.user.id,
+                fileName,
+                fileSize,
+                rowsImported: validRows.length,
+                rowsSkipped: errors.length,
+                errors: errors.length > 0 ? JSON.stringify(errors.slice(0, 100)) : null,
+                durationMs: Date.now() - startTime,
+            },
+        });
+
+        await createAuditLog(
+            session.user.id,
+            "CREATE",
+            "RoutePrice",
+            undefined,
+            {
+                action: "bulk_import",
+                rowsImported: validRows.length,
+                rowsSkipped: errors.length,
+                fileName,
+            }
+        );
+
+        revalidatePath("/admin/pricing");
+
+        return {
+            success: true,
+            rowsImported: validRows.length,
+            rowsSkipped: errors.length,
+            errors: errors.slice(0, 100),
+            durationMs: Date.now() - startTime,
+        };
+    } catch (error) {
+        console.error("importRoutePrices error:", error);
         return {
             success: false,
             rowsImported: 0,
             rowsSkipped: rows.length,
-            errors,
+            errors: [{ row: 0, message: error instanceof Error ? error.message : "Operation failed" }],
             durationMs: Date.now() - startTime,
         };
     }
-
-    // Delete and insert
-    await prisma.routePrice.deleteMany({});
-    await prisma.routePrice.createMany({
-        data: validRows,
-        skipDuplicates: true,
-    });
-
-    // Log
-    await prisma.routePriceImport.create({
-        data: {
-            importedById: session.user.id,
-            fileName,
-            fileSize,
-            rowsImported: validRows.length,
-            rowsSkipped: errors.length,
-            errors: errors.length > 0 ? JSON.stringify(errors.slice(0, 100)) : null,
-            durationMs: Date.now() - startTime,
-        },
-    });
-
-    await createAuditLog(
-        session.user.id,
-        "CREATE",
-        "RoutePrice",
-        undefined,
-        {
-            action: "bulk_import",
-            rowsImported: validRows.length,
-            rowsSkipped: errors.length,
-            fileName,
-        }
-    );
-
-    revalidatePath("/admin/pricing");
-
-    return {
-        success: true,
-        rowsImported: validRows.length,
-        rowsSkipped: errors.length,
-        errors: errors.slice(0, 100),
-        durationMs: Date.now() - startTime,
-    };
 }
 
 // ============================================
@@ -312,46 +353,56 @@ export async function importRoutePrices(
  */
 export async function searchRoutePrices(
     params: RoutePriceSearchParams
-): Promise<RoutePriceResult[]> {
+): Promise<{ success: boolean; data?: RoutePriceResult[]; error?: string }> {
     await requireAuth();
 
-    const { zoneFrom, zoneTo, vehicleCode, limit = 50 } = params;
-
-    // Build WHERE clause
-    const where: {
-        zoneFromNorm?: { contains: string; mode: "insensitive" };
-        zoneToNorm?: { contains: string; mode: "insensitive" };
-        vehicleCode?: string;
-    } = {};
-
-    if (zoneFrom && zoneFrom.trim()) {
-        const normalizedFrom = normalizeZone(zoneFrom);
-        where.zoneFromNorm = { contains: normalizedFrom, mode: "insensitive" };
+    const parsed = routePriceSearchParamsSchema.safeParse(params);
+    if (!parsed.success) {
+        return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid search parameters" };
     }
 
-    if (zoneTo && zoneTo.trim()) {
-        const normalizedTo = normalizeZone(zoneTo);
-        where.zoneToNorm = { contains: normalizedTo, mode: "insensitive" };
+    try {
+        const { zoneFrom, zoneTo, vehicleCode, limit = 50 } = parsed.data;
+
+        // Build WHERE clause
+        const where: {
+            zoneFromNorm?: { contains: string; mode: "insensitive" };
+            zoneToNorm?: { contains: string; mode: "insensitive" };
+            vehicleCode?: string;
+        } = {};
+
+        if (zoneFrom && zoneFrom.trim()) {
+            const normalizedFrom = normalizeZone(zoneFrom);
+            where.zoneFromNorm = { contains: normalizedFrom, mode: "insensitive" };
+        }
+
+        if (zoneTo && zoneTo.trim()) {
+            const normalizedTo = normalizeZone(zoneTo);
+            where.zoneToNorm = { contains: normalizedTo, mode: "insensitive" };
+        }
+
+        if (vehicleCode && vehicleCode.trim()) {
+            where.vehicleCode = vehicleCode.toUpperCase();
+        }
+
+        const results = await prisma.routePrice.findMany({
+            where,
+            select: {
+                id: true,
+                vehicleCode: true,
+                zoneFrom: true,
+                zoneTo: true,
+                rate: true,
+            },
+            orderBy: [{ rate: "asc" }], // Cheapest first
+            take: Math.min(limit, 100), // Cap at 100 results
+        });
+
+        return { success: true, data: results };
+    } catch (error) {
+        console.error("searchRoutePrices error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
     }
-
-    if (vehicleCode && vehicleCode.trim()) {
-        where.vehicleCode = vehicleCode.toUpperCase();
-    }
-
-    const results = await prisma.routePrice.findMany({
-        where,
-        select: {
-            id: true,
-            vehicleCode: true,
-            zoneFrom: true,
-            zoneTo: true,
-            rate: true,
-        },
-        orderBy: [{ rate: "asc" }], // Cheapest first
-        take: Math.min(limit, 100), // Cap at 100 results
-    });
-
-    return results;
 }
 
 /**
@@ -362,42 +413,52 @@ export async function getExactRoutePrice(
     vehicleCode: string,
     zoneFrom: string,
     zoneTo: string
-): Promise<RoutePriceResult | null> {
+): Promise<{ success: boolean; data?: RoutePriceResult | null; error?: string }> {
     await requireAuth();
 
-    const result = await prisma.routePrice.findUnique({
-        where: {
-            vehicleCode_zoneFrom_zoneTo: {
-                vehicleCode: vehicleCode.toUpperCase(),
-                zoneFrom: zoneFrom.trim(),
-                zoneTo: zoneTo.trim(),
+    try {
+        const result = await prisma.routePrice.findUnique({
+            where: {
+                vehicleCode_zoneFrom_zoneTo: {
+                    vehicleCode: vehicleCode.toUpperCase(),
+                    zoneFrom: zoneFrom.trim(),
+                    zoneTo: zoneTo.trim(),
+                },
             },
-        },
-        select: {
-            id: true,
-            vehicleCode: true,
-            zoneFrom: true,
-            zoneTo: true,
-            rate: true,
-        },
-    });
+            select: {
+                id: true,
+                vehicleCode: true,
+                zoneFrom: true,
+                zoneTo: true,
+                rate: true,
+            },
+        });
 
-    return result;
+        return { success: true, data: result };
+    } catch (error) {
+        console.error("getExactRoutePrice error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }
 
 /**
  * Get distinct vehicle codes for filter dropdown
  */
-export async function getVehicleCodes(): Promise<string[]> {
+export async function getVehicleCodes(): Promise<{ success: boolean; data?: string[]; error?: string }> {
     await requireAuth();
 
-    const results = await prisma.routePrice.findMany({
-        distinct: ["vehicleCode"],
-        select: { vehicleCode: true },
-        orderBy: { vehicleCode: "asc" },
-    });
+    try {
+        const results = await prisma.routePrice.findMany({
+            distinct: ["vehicleCode"],
+            select: { vehicleCode: true },
+            orderBy: { vehicleCode: "asc" },
+        });
 
-    return results.map((r) => r.vehicleCode);
+        return { success: true, data: results.map((r) => r.vehicleCode) };
+    } catch (error) {
+        console.error("getVehicleCodes error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }
 
 /**
@@ -409,36 +470,46 @@ export async function getZoneSuggestions(
     query: string,
     type: "from" | "to",
     limit: number = 20
-): Promise<string[]> {
+): Promise<{ success: boolean; data?: string[]; error?: string }> {
     await requireAuth();
 
-    if (!query || query.length < 2) return [];
+    const parsed = zoneSuggestionsSchema.safeParse({ query, type, limit });
+    if (!parsed.success) {
+        return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid parameters" };
+    }
 
-    const normalizedQuery = normalizeZone(query);
+    try {
+        if (!query || query.length < 2) return { success: true, data: [] };
 
-    // Use startsWith for short queries (index-friendly)
-    // Use contains only for 4+ character queries (user expects substring match)
-    const useStartsWith = normalizedQuery.length < 4;
-    const matchMode = useStartsWith
-        ? { startsWith: normalizedQuery, mode: "insensitive" as const }
-        : { contains: normalizedQuery, mode: "insensitive" as const };
+        const normalizedQuery = normalizeZone(query);
 
-    if (type === "from") {
-        const results = await prisma.routePrice.findMany({
-            where: { zoneFromNorm: matchMode },
-            distinct: ["zoneFrom"],
-            select: { zoneFrom: true },
-            take: limit,
-        });
-        return results.map((r) => r.zoneFrom);
-    } else {
-        const results = await prisma.routePrice.findMany({
-            where: { zoneToNorm: matchMode },
-            distinct: ["zoneTo"],
-            select: { zoneTo: true },
-            take: limit,
-        });
-        return results.map((r) => r.zoneTo);
+        // Use startsWith for short queries (index-friendly)
+        // Use contains only for 4+ character queries (user expects substring match)
+        const useStartsWith = normalizedQuery.length < 4;
+        const matchMode = useStartsWith
+            ? { startsWith: normalizedQuery, mode: "insensitive" as const }
+            : { contains: normalizedQuery, mode: "insensitive" as const };
+
+        if (type === "from") {
+            const results = await prisma.routePrice.findMany({
+                where: { zoneFromNorm: matchMode },
+                distinct: ["zoneFrom"],
+                select: { zoneFrom: true },
+                take: limit,
+            });
+            return { success: true, data: results.map((r) => r.zoneFrom) };
+        } else {
+            const results = await prisma.routePrice.findMany({
+                where: { zoneToNorm: matchMode },
+                distinct: ["zoneTo"],
+                select: { zoneTo: true },
+                take: limit,
+            });
+            return { success: true, data: results.map((r) => r.zoneTo) };
+        }
+    } catch (error) {
+        console.error("getZoneSuggestions error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
     }
 }
 
@@ -450,65 +521,73 @@ export async function getZoneSuggestions(
  * Get pricing statistics for admin dashboard
  * OPTIMIZED: Uses single raw SQL query instead of 6 separate queries
  */
-export async function getRoutePricingStats(): Promise<RoutePricingStats> {
+export async function getRoutePricingStats(): Promise<{ success: boolean; data?: RoutePricingStats; error?: string }> {
     await requireAdmin();
 
-    // Single query for all RoutePrice stats (was 6 queries, now 1)
-    const statsResult = await prisma.$queryRaw<
-        Array<{
-            totalRoutes: bigint;
-            vehicleCodes: bigint;
-            fromZones: bigint;
-            toZones: bigint;
-            minRate: number | null;
-            maxRate: number | null;
-        }>
-    >`
-        SELECT
-            COUNT(*) as "totalRoutes",
-            COUNT(DISTINCT "vehicleCode") as "vehicleCodes",
-            COUNT(DISTINCT "zoneFrom") as "fromZones",
-            COUNT(DISTINCT "zoneTo") as "toZones",
-            MIN(rate) as "minRate",
-            MAX(rate) as "maxRate"
-        FROM "RoutePrice"
-    `;
+    try {
+        // Single query for all RoutePrice stats (was 6 queries, now 1)
+        const statsResult = await prisma.$queryRaw<
+            Array<{
+                totalRoutes: bigint;
+                vehicleCodes: bigint;
+                fromZones: bigint;
+                toZones: bigint;
+                minRate: number | null;
+                maxRate: number | null;
+            }>
+        >`
+            SELECT
+                COUNT(*) as "totalRoutes",
+                COUNT(DISTINCT "vehicleCode") as "vehicleCodes",
+                COUNT(DISTINCT "zoneFrom") as "fromZones",
+                COUNT(DISTINCT "zoneTo") as "toZones",
+                MIN(rate) as "minRate",
+                MAX(rate) as "maxRate"
+            FROM "RoutePrice"
+        `;
 
-    const stats = statsResult[0];
+        const stats = statsResult[0];
 
-    // Last import still needs separate query (different table)
-    const lastImportResult = await prisma.routePriceImport.findFirst({
-        orderBy: { importedAt: "desc" },
-        include: {
-            importedBy: { select: { name: true } },
-        },
-    });
+        // Last import still needs separate query (different table)
+        const lastImportResult = await prisma.routePriceImport.findFirst({
+            orderBy: { importedAt: "desc" },
+            include: {
+                importedBy: { select: { name: true } },
+            },
+        });
 
-    // Estimate unique zones (fromZones + toZones minus overlap approximation)
-    // For exact count we'd need UNION which is more expensive
-    const uniqueZonesEstimate = Math.max(
-        Number(stats.fromZones),
-        Number(stats.toZones),
-        Math.floor((Number(stats.fromZones) + Number(stats.toZones)) * 0.7)
-    );
+        // Estimate unique zones (fromZones + toZones minus overlap approximation)
+        // For exact count we'd need UNION which is more expensive
+        const uniqueZonesEstimate = Math.max(
+            Number(stats.fromZones),
+            Number(stats.toZones),
+            Math.floor((Number(stats.fromZones) + Number(stats.toZones)) * 0.7)
+        );
 
-    return {
-        totalRoutes: Number(stats.totalRoutes),
-        vehicleCodes: Number(stats.vehicleCodes),
-        uniqueZones: uniqueZonesEstimate,
-        lastImport: lastImportResult
-            ? {
-                  importedAt: lastImportResult.importedAt,
-                  importedBy: lastImportResult.importedBy.name || "Unknown",
-                  rowsImported: lastImportResult.rowsImported,
-                  fileName: lastImportResult.fileName,
-              }
-            : null,
-        priceRange: {
-            min: stats.minRate || 0,
-            max: stats.maxRate || 0,
-        },
-    };
+        return {
+            success: true,
+            data: {
+                totalRoutes: Number(stats.totalRoutes),
+                vehicleCodes: Number(stats.vehicleCodes),
+                uniqueZones: uniqueZonesEstimate,
+                lastImport: lastImportResult
+                    ? {
+                          importedAt: lastImportResult.importedAt,
+                          importedBy: lastImportResult.importedBy.name || "Unknown",
+                          rowsImported: lastImportResult.rowsImported,
+                          fileName: lastImportResult.fileName,
+                      }
+                    : null,
+                priceRange: {
+                    min: stats.minRate || 0,
+                    max: stats.maxRate || 0,
+                },
+            },
+        };
+    } catch (error) {
+        console.error("getRoutePricingStats error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }
 
 /**
@@ -517,11 +596,23 @@ export async function getRoutePricingStats(): Promise<RoutePricingStats> {
 export async function getImportHistory(limit: number = 10) {
     await requireAdmin();
 
-    return prisma.routePriceImport.findMany({
-        include: {
-            importedBy: { select: { id: true, name: true } },
-        },
-        orderBy: { importedAt: "desc" },
-        take: limit,
-    });
+    const parsed = limitParamSchema.safeParse({ limit });
+    if (!parsed.success) {
+        return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid limit" };
+    }
+
+    try {
+        const data = await prisma.routePriceImport.findMany({
+            include: {
+                importedBy: { select: { id: true, name: true } },
+            },
+            orderBy: { importedAt: "desc" },
+            take: parsed.data.limit,
+        });
+
+        return { success: true, data };
+    } catch (error) {
+        console.error("getImportHistory error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }

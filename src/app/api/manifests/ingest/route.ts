@@ -156,7 +156,16 @@ export async function POST(request: NextRequest) {
 
     try {
         // Parse the manifest email
-        const trips = await parseManifestEmail(payload.body);
+        const parseResult = await parseManifestEmail(payload.body);
+
+        if (!parseResult.success || !parseResult.data) {
+            return NextResponse.json(
+                { error: parseResult.error ?? "Failed to parse manifest" },
+                { status: 500 }
+            );
+        }
+
+        const trips = parseResult.data;
 
         if (trips.length === 0) {
             return NextResponse.json(
@@ -172,12 +181,21 @@ export async function POST(request: NextRequest) {
         }
 
         // Ingest the trips
-        const result = await ingestManifestTrips(
+        const ingestResult = await ingestManifestTrips(
             trips,
             payload.body,
             payload.from,
             payload.subject
         );
+
+        if (!ingestResult.success || !ingestResult.data) {
+            return NextResponse.json(
+                { error: ingestResult.error ?? "Failed to ingest trips" },
+                { status: 500 }
+            );
+        }
+
+        const result = ingestResult.data;
 
         console.log(
             `Manifest ingested: ${result.created} created, ${result.duplicate} duplicates, ${result.errors.length} errors`

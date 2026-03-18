@@ -77,11 +77,14 @@ export default function AffiliateAttachments({
             const formData = new FormData();
             formData.append("file", selectedFile);
 
-            const uploadResult = await uploadFileFromFormData(
+            const uploadResponse = await uploadFileFromFormData(
                 STORAGE_BUCKETS.AFFILIATE_ATTACHMENTS,
                 formData,
                 `affiliates/${affiliateId}`
             );
+
+            if (!uploadResponse.success) throw new Error(uploadResponse.error ?? "Upload failed");
+            const uploadResult = uploadResponse.data!;
 
             // Create attachment record
             await uploadAffiliateAttachment({

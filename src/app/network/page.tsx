@@ -22,13 +22,13 @@ export default async function NetworkPage() {
     const isAdmin = session.user.role === "ADMIN" || session.user.role === "SUPER_ADMIN";
 
     // Get all partners
-    const partners = await getNetworkPartners({
+    const partnersResult = await getNetworkPartners({
         status: isAdmin ? "all" : "approved",
     });
+    const partners = partnersResult.data ?? [];
 
-    const pendingCounts = isAdmin
-        ? await getPendingPartnerCounts()
-        : { farmInCount: 0, farmOutCount: 0, iosCount: 0, houseChauffeurCount: 0 };
+    const countsResult = isAdmin ? await getPendingPartnerCounts() : null;
+    const pendingCounts = countsResult?.data ?? { farmInCount: 0, farmOutCount: 0, iosCount: 0, houseChauffeurCount: 0 };
 
     return (
         <NetworkClient

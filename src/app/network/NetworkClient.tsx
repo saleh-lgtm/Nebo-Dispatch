@@ -199,15 +199,16 @@ export default function NetworkClient({ initialPartners, session, isAdmin, pendi
     }) => {
         setLoading(true);
         try {
-            await createNetworkPartner({
+            const result = await createNetworkPartner({
                 ...formData,
                 submittedById: session.user.id,
             });
+            if (!result.success) throw new Error(result.error);
             setShowForm(false);
             addToast("Partner submitted for admin approval!", "success");
             router.refresh();
-        } catch {
-            addToast("Failed to submit partner", "error");
+        } catch (err) {
+            addToast(err instanceof Error ? err.message : "Failed to submit partner", "error");
         } finally {
             setLoading(false);
         }
@@ -216,12 +217,13 @@ export default function NetworkClient({ initialPartners, session, isAdmin, pendi
     const handleApprove = async (partner: Partner) => {
         setLoading(true);
         try {
-            await approveNetworkPartner(partner.id);
+            const result = await approveNetworkPartner(partner.id);
+            if (!result.success) throw new Error(result.error);
             addToast(`${partner.name} has been approved`, "success");
             setActionDropdown(null);
             router.refresh();
-        } catch {
-            addToast("Failed to approve partner", "error");
+        } catch (err) {
+            addToast(err instanceof Error ? err.message : "Failed to approve partner", "error");
         } finally {
             setLoading(false);
         }
@@ -231,13 +233,14 @@ export default function NetworkClient({ initialPartners, session, isAdmin, pendi
         if (!rejectModal.partner) return;
         setLoading(true);
         try {
-            await rejectNetworkPartner(rejectModal.partner.id, rejectReason);
+            const result = await rejectNetworkPartner(rejectModal.partner.id, rejectReason);
+            if (!result.success) throw new Error(result.error);
             addToast(`${rejectModal.partner.name} has been rejected`, "info");
             setRejectModal({ open: false, partner: null });
             setRejectReason("");
             router.refresh();
-        } catch {
-            addToast("Failed to reject partner", "error");
+        } catch (err) {
+            addToast(err instanceof Error ? err.message : "Failed to reject partner", "error");
         } finally {
             setLoading(false);
         }
@@ -247,12 +250,13 @@ export default function NetworkClient({ initialPartners, session, isAdmin, pendi
         if (!confirm(`Are you sure you want to delete ${partner.name}?`)) return;
         setLoading(true);
         try {
-            await deleteNetworkPartner(partner.id);
+            const result = await deleteNetworkPartner(partner.id);
+            if (!result.success) throw new Error(result.error);
             addToast(`${partner.name} has been deleted`, "info");
             setActionDropdown(null);
             router.refresh();
-        } catch {
-            addToast("Failed to delete partner", "error");
+        } catch (err) {
+            addToast(err instanceof Error ? err.message : "Failed to delete partner", "error");
         } finally {
             setLoading(false);
         }
@@ -272,12 +276,13 @@ export default function NetworkClient({ initialPartners, session, isAdmin, pendi
         if (!editModal.partner) return;
         setLoading(true);
         try {
-            await updateNetworkPartner(editModal.partner.id, data);
+            const result = await updateNetworkPartner(editModal.partner.id, data);
+            if (!result.success) throw new Error(result.error);
             setEditModal({ open: false, partner: null });
             addToast("Partner updated successfully!", "success");
             router.refresh();
-        } catch {
-            addToast("Failed to update partner", "error");
+        } catch (err) {
+            addToast(err instanceof Error ? err.message : "Failed to update partner", "error");
         } finally {
             setLoading(false);
         }

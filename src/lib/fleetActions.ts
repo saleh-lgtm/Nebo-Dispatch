@@ -232,10 +232,9 @@ export async function deleteVehicle(id: string) {
 
         // Delete files (don't throw on failure, just log)
         for (const fileUrl of filesToDelete) {
-            try {
-                await deleteFile(STORAGE_BUCKETS.FLEET_DOCUMENTS, fileUrl);
-            } catch (error) {
-                console.error(`Failed to delete file: ${fileUrl}`, error);
+            const deleteResult = await deleteFile(STORAGE_BUCKETS.FLEET_DOCUMENTS, fileUrl);
+            if (!deleteResult.success) {
+                console.error(`Failed to delete file: ${fileUrl}`, deleteResult.error);
             }
         }
 
@@ -453,10 +452,9 @@ export async function deletePermit(id: string) {
 
         // Delete file if exists
         if (permit.fileUrl) {
-            try {
-                await deleteFile(STORAGE_BUCKETS.FLEET_DOCUMENTS, permit.fileUrl);
-            } catch (error) {
-                console.error("Failed to delete permit file:", error);
+            const deleteResult = await deleteFile(STORAGE_BUCKETS.FLEET_DOCUMENTS, permit.fileUrl);
+            if (!deleteResult.success) {
+                console.error("Failed to delete permit file:", deleteResult.error);
             }
         }
 
@@ -571,10 +569,9 @@ export async function deleteInsurance(id: string) {
 
         // Delete file if exists
         if (insurance.fileUrl) {
-            try {
-                await deleteFile(STORAGE_BUCKETS.FLEET_DOCUMENTS, insurance.fileUrl);
-            } catch (error) {
-                console.error("Failed to delete insurance file:", error);
+            const deleteResult = await deleteFile(STORAGE_BUCKETS.FLEET_DOCUMENTS, insurance.fileUrl);
+            if (!deleteResult.success) {
+                console.error("Failed to delete insurance file:", deleteResult.error);
             }
         }
 
@@ -689,10 +686,9 @@ export async function deleteRegistration(id: string) {
 
         // Delete file if exists
         if (registration.fileUrl) {
-            try {
-                await deleteFile(STORAGE_BUCKETS.FLEET_DOCUMENTS, registration.fileUrl);
-            } catch (error) {
-                console.error("Failed to delete registration file:", error);
+            const deleteResult = await deleteFile(STORAGE_BUCKETS.FLEET_DOCUMENTS, registration.fileUrl);
+            if (!deleteResult.success) {
+                console.error("Failed to delete registration file:", deleteResult.error);
             }
         }
 
@@ -772,10 +768,9 @@ export async function deleteVehicleDocument(id: string) {
         }
 
         // Delete file from storage
-        try {
-            await deleteFile(STORAGE_BUCKETS.FLEET_DOCUMENTS, document.fileUrl);
-        } catch (error) {
-            console.error("Failed to delete document file:", error);
+        const deleteResult = await deleteFile(STORAGE_BUCKETS.FLEET_DOCUMENTS, document.fileUrl);
+        if (!deleteResult.success) {
+            console.error("Failed to delete document file:", deleteResult.error);
         }
 
         await prisma.vehicleDocument.delete({

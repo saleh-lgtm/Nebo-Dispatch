@@ -41,7 +41,9 @@ export default function RoutePriceLookup({ onClose, onSelectPrice }: Props) {
 
     // Load vehicle codes on mount
     useEffect(() => {
-        getVehicleCodes().then(setVehicleCodes).catch(console.error);
+        getVehicleCodes()
+            .then((res) => setVehicleCodes(res.data ?? []))
+            .catch(console.error);
     }, []);
 
     // Debounced zone suggestions
@@ -53,8 +55,8 @@ export default function RoutePriceLookup({ onClose, onSelectPrice }: Props) {
 
         const timer = setTimeout(async () => {
             try {
-                const suggestions = await getZoneSuggestions(zoneFrom, "from", 10);
-                setFromSuggestions(suggestions);
+                const res = await getZoneSuggestions(zoneFrom, "from", 10);
+                setFromSuggestions(res.data ?? []);
             } catch (error) {
                 console.error("Failed to get suggestions:", error);
             }
@@ -71,8 +73,8 @@ export default function RoutePriceLookup({ onClose, onSelectPrice }: Props) {
 
         const timer = setTimeout(async () => {
             try {
-                const suggestions = await getZoneSuggestions(zoneTo, "to", 10);
-                setToSuggestions(suggestions);
+                const res = await getZoneSuggestions(zoneTo, "to", 10);
+                setToSuggestions(res.data ?? []);
             } catch (error) {
                 console.error("Failed to get suggestions:", error);
             }
@@ -90,13 +92,13 @@ export default function RoutePriceLookup({ onClose, onSelectPrice }: Props) {
 
         setIsSearching(true);
         try {
-            const searchResults = await searchRoutePrices({
+            const res = await searchRoutePrices({
                 zoneFrom: zoneFrom || undefined,
                 zoneTo: zoneTo || undefined,
                 vehicleCode: vehicleCode || undefined,
                 limit: 50,
             });
-            setResults(searchResults);
+            setResults(res.data ?? []);
         } catch (error) {
             console.error("Search failed:", error);
             setResults([]);

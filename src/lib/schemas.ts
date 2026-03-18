@@ -888,6 +888,113 @@ export const adminResetPasswordSchema = z.object({
     newPassword: z.string().min(6, "Password must be at least 6 characters"),
 });
 
+// ===== NETWORK PARTNER SCHEMAS =====
+
+export const createNetworkPartnerSchema = z.object({
+    name: z.string().min(2, "Name must be at least 2 characters").max(100),
+    email: z.string().email("Invalid email"),
+    phone: z.string().max(20).optional(),
+    type: z.enum(["FARM_IN", "FARM_OUT", "IOS", "HOUSE_CHAUFFEUR"]),
+    state: z.string().max(50).optional(),
+    cities: z.array(z.string()).optional(),
+    notes: z.string().max(2000).optional(),
+    cityTransferRate: z.string().max(50).optional(),
+    market: z.string().max(100).optional(),
+    employeeId: z.string().max(50).optional(),
+    submittedById: z.string().min(1, "Submitted by ID is required"),
+});
+
+export const updateNetworkPartnerSchema = z.object({
+    name: z.string().min(2).max(100).optional(),
+    email: z.string().email().optional(),
+    phone: z.string().max(20).optional(),
+    state: z.string().max(50).optional(),
+    cities: z.array(z.string()).optional(),
+    notes: z.string().max(2000).optional(),
+    cityTransferRate: z.string().max(50).optional(),
+    market: z.string().max(100).optional(),
+    employeeId: z.string().max(50).optional(),
+    isActive: z.boolean().optional(),
+});
+
+export const createQuickContactSchema = z.object({
+    name: z.string().min(2, "Name must be at least 2 characters").max(100),
+    phone: z.string().min(10, "Invalid phone number").max(20),
+    email: z.string().email().optional().or(z.literal("")),
+    notes: z.string().max(2000).optional(),
+});
+
+export const createPartnerAttachmentSchema = z.object({
+    affiliateId: z.string().min(1, "Partner ID is required"),
+    title: z.string().min(1, "Title is required").max(200),
+    description: z.string().max(1000).optional(),
+    documentType: z.string().max(100).optional(),
+    fileUrl: z.string().min(1, "File URL is required").max(500),
+    fileName: z.string().min(1, "File name is required").max(200),
+    fileSize: z.number().optional(),
+    mimeType: z.string().max(100).optional(),
+});
+
+// ===== TRIP CONFIRMATION SCHEMAS =====
+
+export const completeConfirmationSchema = z.object({
+    confirmationId: z.string().min(1, "Confirmation ID is required"),
+    status: z.enum(["PENDING", "CONFIRMED", "NO_ANSWER", "CANCELLED", "EXPIRED"]),
+    notes: z.string().max(1000).optional(),
+});
+
+export const confirmationFiltersSchema = z.object({
+    status: z.enum(["PENDING", "CONFIRMED", "NO_ANSWER", "CANCELLED", "EXPIRED", "ALL"]).optional(),
+    dateFrom: z.coerce.date().optional(),
+    dateTo: z.coerce.date().optional(),
+    dispatcherId: z.string().optional(),
+    search: z.string().max(200).optional(),
+    limit: z.number().min(1).max(500).optional(),
+    offset: z.number().min(0).optional(),
+});
+
+export const confirmationTabDataSchema = z.object({
+    tab: z.enum(["overview", "dispatchers", "accountability"]),
+    days: z.number().min(1).max(365).optional(),
+});
+
+// ===== SHIFT REPORT EXTENDED SCHEMAS =====
+
+export const reviewShiftReportSchema = z.object({
+    reportId: z.string().min(1, "Report ID is required"),
+    performanceScore: z.number().min(0).max(10).optional(),
+    adminFeedback: z.string().max(2000).optional(),
+    status: z.enum(["REVIEWED", "FLAGGED"]).optional(),
+});
+
+export const shiftReportFiltersSchema = z.object({
+    userId: z.string().optional(),
+    status: z.string().optional(),
+    startDate: z.coerce.date().optional(),
+    endDate: z.coerce.date().optional(),
+    limit: z.number().min(1).max(500).optional(),
+    offset: z.number().min(0).optional(),
+});
+
+// ===== ROUTE PRICING EXTENDED SCHEMAS =====
+
+export const routePriceSearchParamsSchema = z.object({
+    zoneFrom: z.string().max(200).optional(),
+    zoneTo: z.string().max(200).optional(),
+    vehicleCode: z.string().max(50).optional(),
+    limit: z.number().min(1).max(100).optional(),
+});
+
+export const zoneSuggestionsSchema = z.object({
+    query: z.string().min(2).max(200),
+    type: z.enum(["from", "to"]),
+    limit: z.number().min(1).max(100).optional(),
+});
+
+export const routePriceBatchSchema = z.object({
+    batchNumber: z.number().min(0),
+});
+
 // ===== HELPER FUNCTIONS =====
 
 export type LoginInput = z.infer<typeof loginSchema>;

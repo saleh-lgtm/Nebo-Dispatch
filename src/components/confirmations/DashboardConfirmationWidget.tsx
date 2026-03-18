@@ -48,7 +48,8 @@ export default function DashboardConfirmationWidget({ confirmations }: Props) {
             setError(null);
             setDismissed((prev) => new Set(prev).add(id));
             try {
-                await completeConfirmation(id, status, "");
+                const result = await completeConfirmation(id, status, "");
+                if (!result.success) throw new Error(result.error);
                 router.refresh();
             } catch (err) {
                 setDismissed((prev) => {

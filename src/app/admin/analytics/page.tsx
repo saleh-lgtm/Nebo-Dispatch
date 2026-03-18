@@ -52,11 +52,12 @@ export default async function AnalyticsPage() {
         getConfirmationStats(30),
     ]);
 
+    const confirmationData = confirmationStats.data ?? { total: 0, completed: 0, expired: 0, onTimeRate: 0 };
     const confirmationSummary = {
-        total: confirmationStats.total,
-        completed: confirmationStats.completed,
-        expired: confirmationStats.expired,
-        onTimeRate: confirmationStats.onTimeRate,
+        total: confirmationData.total,
+        completed: confirmationData.completed,
+        expired: confirmationData.expired,
+        onTimeRate: confirmationData.onTimeRate,
     };
 
     const defaultMetrics = { totalCalls: 0, totalEmails: 0, totalQuotes: 0, totalReports: 0, averageCallsPerShift: 0 };

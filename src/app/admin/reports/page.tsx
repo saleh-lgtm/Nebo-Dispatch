@@ -26,7 +26,7 @@ export default async function AdminReportsPage() {
     }
 
     // Get initial data
-    const [{ reports, total }, stats, teamPerformance, dispatchers] = await Promise.all([
+    const [reportsResult, statsResult, teamPerfResult, dispatchers] = await Promise.all([
         getAllShiftReports({ limit: 20 }),
         getReportStats(),
         getTeamPerformance(),
@@ -36,6 +36,10 @@ export default async function AdminReportsPage() {
             orderBy: { name: "asc" },
         }),
     ]);
+
+    const { reports, total } = reportsResult.data ?? { reports: [], total: 0 };
+    const stats = statsResult.data ?? { today: 0, thisWeek: 0, thisMonth: 0, pending: 0, flagged: 0 };
+    const teamPerformance = teamPerfResult.data ?? { dispatchers: [], teamTotals: { totalReports: 0, totalHours: 0, totalCalls: 0, totalEmails: 0, totalQuotes: 0, avgPerformanceScore: 0 } };
 
     return (
         <ReportsClient

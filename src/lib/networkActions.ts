@@ -7,6 +7,13 @@ import { requireAdmin, requireAuth } from "./auth-helpers";
 import { createAuditLog } from "./auditActions";
 import { deleteFile } from "./storageActions";
 import { STORAGE_BUCKETS } from "./supabase";
+import {
+    createNetworkPartnerSchema,
+    updateNetworkPartnerSchema,
+    createQuickContactSchema,
+    createPartnerAttachmentSchema,
+    idParamSchema,
+} from "@/lib/schemas";
 
 // ============================================
 // TYPES
@@ -105,233 +112,290 @@ export async function getNetworkPartners(options?: {
         ];
     }
 
-    return await prisma.affiliate.findMany({
-        where,
-        orderBy: [
-            { isApproved: "asc" },
-            { createdAt: "desc" },
-        ],
-        include: {
-            submittedBy: { select: { id: true, name: true, email: true } },
-            pricingGrid: { orderBy: { serviceType: "asc" } },
-            attachments: {
-                include: { uploadedBy: { select: { id: true, name: true } } },
-                orderBy: { createdAt: "desc" },
-            },
-            vehicleInfo: true,
-            schedulePrefs: true,
-            vehicleAssignments: {
-                include: {
-                    vehicle: { select: { id: true, name: true, make: true, model: true, licensePlate: true } },
+    try {
+        const result = await prisma.affiliate.findMany({
+            where,
+            orderBy: [
+                { isApproved: "asc" },
+                { createdAt: "desc" },
+            ],
+            include: {
+                submittedBy: { select: { id: true, name: true, email: true } },
+                pricingGrid: { orderBy: { serviceType: "asc" } },
+                attachments: {
+                    include: { uploadedBy: { select: { id: true, name: true } } },
+                    orderBy: { createdAt: "desc" },
                 },
+                vehicleInfo: true,
+                schedulePrefs: true,
+                vehicleAssignments: {
+                    include: {
+                        vehicle: { select: { id: true, name: true, make: true, model: true, licensePlate: true } },
+                    },
+                },
+                smsContacts: { select: { id: true, phoneNumber: true } },
             },
-            smsContacts: { select: { id: true, phoneNumber: true } },
-        },
-    });
+        });
+        return { success: true, data: result };
+    } catch (error) {
+        console.error("getNetworkPartners error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }
 
 // Get pending counts by type
 export async function getPendingPartnerCounts() {
     await requireAdmin();
 
-    const [farmInCount, farmOutCount, iosCount, houseChauffeurCount] = await Promise.all([
-        prisma.affiliate.count({ where: { isApproved: false, type: "FARM_IN" } }),
-        prisma.affiliate.count({ where: { isApproved: false, type: "FARM_OUT" } }),
-        prisma.affiliate.count({ where: { isApproved: false, type: "IOS" } }),
-        prisma.affiliate.count({ where: { isApproved: false, type: "HOUSE_CHAUFFEUR" } }),
-    ]);
-
-    return { farmInCount, farmOutCount, iosCount, houseChauffeurCount };
+    try {
+        const [farmInCount, farmOutCount, iosCount, houseChauffeurCount] = await Promise.all([
+            prisma.affiliate.count({ where: { isApproved: false, type: "FARM_IN" } }),
+            prisma.affiliate.count({ where: { isApproved: false, type: "FARM_OUT" } }),
+            prisma.affiliate.count({ where: { isApproved: false, type: "IOS" } }),
+            prisma.affiliate.count({ where: { isApproved: false, type: "HOUSE_CHAUFFEUR" } }),
+        ]);
+        return { success: true, data: { farmInCount, farmOutCount, iosCount, houseChauffeurCount } };
+    } catch (error) {
+        console.error("getPendingPartnerCounts error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }
 
 // Create a new network partner
 export async function createNetworkPartner(data: CreatePartnerData & { submittedById: string }) {
     await requireAuth();
 
-    const partner = await prisma.affiliate.create({
-        data: {
-            name: data.name,
-            email: data.email,
-            phone: data.phone,
-            type: data.type,
-            state: data.state,
-            cities: data.cities || [],
-            notes: data.notes,
-            cityTransferRate: data.cityTransferRate,
-            market: data.market,
-            employeeId: data.employeeId,
-            submittedById: data.submittedById,
-            isApproved: false,
-            isActive: true,
-        },
-    });
-
-    // Auto-create SMS contact if phone provided
-    if (data.phone) {
-        const normalizedPhone = formatPhoneNumber(data.phone);
-        await prisma.sMSContact.upsert({
-            where: { phoneNumber: normalizedPhone },
-            create: {
-                phoneNumber: normalizedPhone,
-                affiliateId: partner.id,
-                name: data.name,
-            },
-            update: {
-                affiliateId: partner.id,
-                name: data.name,
-            },
-        });
+    const parsed = createNetworkPartnerSchema.safeParse(data);
+    if (!parsed.success) {
+        return { success: false, error: parsed.error.issues[0]?.message || "Invalid input" };
     }
 
-    await createAuditLog(
-        data.submittedById,
-        "CREATE",
-        "NetworkPartner",
-        partner.id,
-        { name: data.name, type: data.type }
-    );
+    try {
+        const partner = await prisma.affiliate.create({
+            data: {
+                name: data.name,
+                email: data.email,
+                phone: data.phone,
+                type: data.type,
+                state: data.state,
+                cities: data.cities || [],
+                notes: data.notes,
+                cityTransferRate: data.cityTransferRate,
+                market: data.market,
+                employeeId: data.employeeId,
+                submittedById: data.submittedById,
+                isApproved: false,
+                isActive: true,
+            },
+        });
 
-    revalidatePath("/network");
-    return partner;
+        // Auto-create SMS contact if phone provided
+        if (data.phone) {
+            const normalizedPhone = formatPhoneNumber(data.phone);
+            await prisma.sMSContact.upsert({
+                where: { phoneNumber: normalizedPhone },
+                create: {
+                    phoneNumber: normalizedPhone,
+                    affiliateId: partner.id,
+                    name: data.name,
+                },
+                update: {
+                    affiliateId: partner.id,
+                    name: data.name,
+                },
+            });
+        }
+
+        await createAuditLog(
+            data.submittedById,
+            "CREATE",
+            "NetworkPartner",
+            partner.id,
+            { name: data.name, type: data.type }
+        );
+
+        revalidatePath("/network");
+        return { success: true, data: partner };
+    } catch (error) {
+        console.error("createNetworkPartner error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }
 
 // Update a network partner
 export async function updateNetworkPartner(id: string, data: UpdatePartnerData) {
     const session = await requireAdmin();
 
-    const partner = await prisma.affiliate.update({
-        where: { id },
-        data,
-    });
-
-    // Update SMS contact if phone changed
-    if (data.phone) {
-        const normalizedPhone = formatPhoneNumber(data.phone);
-        await prisma.sMSContact.upsert({
-            where: { phoneNumber: normalizedPhone },
-            create: {
-                phoneNumber: normalizedPhone,
-                affiliateId: id,
-                name: data.name || partner.name,
-            },
-            update: {
-                affiliateId: id,
-                name: data.name || partner.name,
-            },
-        });
+    const idParsed = idParamSchema.safeParse({ id });
+    if (!idParsed.success) {
+        return { success: false, error: idParsed.error.issues[0]?.message || "Invalid ID" };
     }
 
-    await createAuditLog(
-        session.user.id,
-        "UPDATE",
-        "NetworkPartner",
-        id,
-        { ...data }
-    );
+    const parsed = updateNetworkPartnerSchema.safeParse(data);
+    if (!parsed.success) {
+        return { success: false, error: parsed.error.issues[0]?.message || "Invalid input" };
+    }
 
-    revalidatePath("/network");
-    revalidatePath("/affiliates"); // For backwards compatibility
-    return partner;
+    try {
+        const partner = await prisma.affiliate.update({
+            where: { id },
+            data,
+        });
+
+        // Update SMS contact if phone changed
+        if (data.phone) {
+            const normalizedPhone = formatPhoneNumber(data.phone);
+            await prisma.sMSContact.upsert({
+                where: { phoneNumber: normalizedPhone },
+                create: {
+                    phoneNumber: normalizedPhone,
+                    affiliateId: id,
+                    name: data.name || partner.name,
+                },
+                update: {
+                    affiliateId: id,
+                    name: data.name || partner.name,
+                },
+            });
+        }
+
+        await createAuditLog(
+            session.user.id,
+            "UPDATE",
+            "NetworkPartner",
+            id,
+            { ...data }
+        );
+
+        revalidatePath("/network");
+        revalidatePath("/affiliates"); // For backwards compatibility
+        return { success: true, data: partner };
+    } catch (error) {
+        console.error("updateNetworkPartner error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }
 
 // Approve a partner
 export async function approveNetworkPartner(id: string, adminNotes?: string) {
     const session = await requireAdmin();
 
-    const partner = await prisma.affiliate.update({
-        where: { id },
-        data: { isApproved: true },
-    });
+    try {
+        const partner = await prisma.affiliate.update({
+            where: { id },
+            data: { isApproved: true },
+        });
 
-    await createAuditLog(
-        session.user.id,
-        "APPROVE",
-        "NetworkPartner",
-        id,
-        { name: partner.name, type: partner.type, adminNotes }
-    );
+        await createAuditLog(
+            session.user.id,
+            "APPROVE",
+            "NetworkPartner",
+            id,
+            { name: partner.name, type: partner.type, adminNotes }
+        );
 
-    revalidatePath("/network");
-    revalidatePath("/affiliates");
-    return partner;
+        revalidatePath("/network");
+        revalidatePath("/affiliates");
+        return { success: true, data: partner };
+    } catch (error) {
+        console.error("approveNetworkPartner error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }
 
 // Reject/Delete a partner
 export async function rejectNetworkPartner(id: string, reason?: string) {
     const session = await requireAdmin();
 
-    const partner = await prisma.affiliate.findUnique({
-        where: { id },
-        select: { name: true, type: true },
-    });
+    try {
+        const partner = await prisma.affiliate.findUnique({
+            where: { id },
+            select: { name: true, type: true },
+        });
 
-    await prisma.affiliate.delete({
-        where: { id },
-    });
+        await prisma.affiliate.delete({
+            where: { id },
+        });
 
-    await createAuditLog(
-        session.user.id,
-        "REJECT",
-        "NetworkPartner",
-        id,
-        { name: partner?.name, type: partner?.type, reason }
-    );
+        await createAuditLog(
+            session.user.id,
+            "REJECT",
+            "NetworkPartner",
+            id,
+            { name: partner?.name, type: partner?.type, reason }
+        );
 
-    revalidatePath("/network");
-    revalidatePath("/affiliates");
+        revalidatePath("/network");
+        revalidatePath("/affiliates");
+        return { success: true };
+    } catch (error) {
+        console.error("rejectNetworkPartner error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }
 
 // Delete a partner
 export async function deleteNetworkPartner(id: string) {
     const session = await requireAdmin();
 
-    const partner = await prisma.affiliate.findUnique({
-        where: { id },
-        select: { name: true, type: true },
-    });
+    try {
+        const partner = await prisma.affiliate.findUnique({
+            where: { id },
+            select: { name: true, type: true },
+        });
 
-    await prisma.affiliate.delete({
-        where: { id },
-    });
+        await prisma.affiliate.delete({
+            where: { id },
+        });
 
-    await createAuditLog(
-        session.user.id,
-        "DELETE",
-        "NetworkPartner",
-        id,
-        { name: partner?.name, type: partner?.type }
-    );
+        await createAuditLog(
+            session.user.id,
+            "DELETE",
+            "NetworkPartner",
+            id,
+            { name: partner?.name, type: partner?.type }
+        );
 
-    revalidatePath("/network");
-    revalidatePath("/affiliates");
+        revalidatePath("/network");
+        revalidatePath("/affiliates");
+        return { success: true };
+    } catch (error) {
+        console.error("deleteNetworkPartner error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }
 
 // Toggle partner active status
 export async function togglePartnerActive(id: string) {
     const session = await requireAdmin();
 
-    const partner = await prisma.affiliate.findUnique({
-        where: { id },
-        select: { isActive: true, name: true },
-    });
+    try {
+        const partner = await prisma.affiliate.findUnique({
+            where: { id },
+            select: { isActive: true, name: true },
+        });
 
-    if (!partner) throw new Error("Partner not found");
+        if (!partner) return { success: false, error: "Partner not found" };
 
-    const updated = await prisma.affiliate.update({
-        where: { id },
-        data: { isActive: !partner.isActive },
-    });
+        const updated = await prisma.affiliate.update({
+            where: { id },
+            data: { isActive: !partner.isActive },
+        });
 
-    await createAuditLog(
-        session.user.id,
-        updated.isActive ? "ACTIVATE" : "DEACTIVATE",
-        "NetworkPartner",
-        id,
-        { name: partner.name }
-    );
+        await createAuditLog(
+            session.user.id,
+            updated.isActive ? "ACTIVATE" : "DEACTIVATE",
+            "NetworkPartner",
+            id,
+            { name: partner.name }
+        );
 
-    revalidatePath("/network");
-    return updated;
+        revalidatePath("/network");
+        return { success: true, data: updated };
+    } catch (error) {
+        console.error("togglePartnerActive error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }
 
 // ============================================
@@ -370,56 +434,61 @@ export async function getAllNetworkContacts(options?: {
         ];
     }
 
-    const [contacts, total] = await Promise.all([
-        prisma.affiliate.findMany({
-            where,
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                phone: true,
-                type: true,
-                market: true,
-                state: true,
-                isApproved: true,
-                isActive: true,
-                smsContacts: {
-                    select: {
-                        id: true,
-                        phoneNumber: true,
-                        _count: { select: { messages: true } },
+    try {
+        const [contacts, total] = await Promise.all([
+            prisma.affiliate.findMany({
+                where,
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    phone: true,
+                    type: true,
+                    market: true,
+                    state: true,
+                    isApproved: true,
+                    isActive: true,
+                    smsContacts: {
+                        select: {
+                            id: true,
+                            phoneNumber: true,
+                            _count: { select: { messages: true } },
+                        },
                     },
                 },
-            },
-            orderBy: { name: "asc" },
-            take: limit,
-            skip: offset,
-        }),
-        prisma.affiliate.count({ where }),
-    ]);
+                orderBy: { name: "asc" },
+                take: limit,
+                skip: offset,
+            }),
+            prisma.affiliate.count({ where }),
+        ]);
 
-    // Get last message info for each contact
-    const contactsWithLastMessage = await Promise.all(
-        contacts.map(async (contact) => {
-            if (!contact.phone) return { ...contact, lastMessage: null };
+        // Get last message info for each contact
+        const contactsWithLastMessage = await Promise.all(
+            contacts.map(async (contact) => {
+                if (!contact.phone) return { ...contact, lastMessage: null };
 
-            const normalizedPhone = formatPhoneNumber(contact.phone);
-            const lastMessage = await prisma.sMSLog.findFirst({
-                where: { conversationPhone: normalizedPhone },
-                orderBy: { createdAt: "desc" },
-                select: {
-                    message: true,
-                    createdAt: true,
-                    direction: true,
-                    status: true,
-                },
-            });
+                const normalizedPhone = formatPhoneNumber(contact.phone);
+                const lastMessage = await prisma.sMSLog.findFirst({
+                    where: { conversationPhone: normalizedPhone },
+                    orderBy: { createdAt: "desc" },
+                    select: {
+                        message: true,
+                        createdAt: true,
+                        direction: true,
+                        status: true,
+                    },
+                });
 
-            return { ...contact, lastMessage };
-        })
-    );
+                return { ...contact, lastMessage };
+            })
+        );
 
-    return { contacts: contactsWithLastMessage, total };
+        return { success: true, data: { contacts: contactsWithLastMessage, total } };
+    } catch (error) {
+        console.error("getAllNetworkContacts error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }
 
 // ============================================
@@ -440,70 +509,91 @@ export interface CreateAttachmentData {
 export async function getPartnerAttachments(partnerId: string) {
     await requireAuth();
 
-    return await prisma.affiliateAttachment.findMany({
-        where: { affiliateId: partnerId },
-        include: {
-            uploadedBy: { select: { id: true, name: true } },
-        },
-        orderBy: { createdAt: "desc" },
-    });
+    try {
+        const result = await prisma.affiliateAttachment.findMany({
+            where: { affiliateId: partnerId },
+            include: {
+                uploadedBy: { select: { id: true, name: true } },
+            },
+            orderBy: { createdAt: "desc" },
+        });
+        return { success: true, data: result };
+    } catch (error) {
+        console.error("getPartnerAttachments error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }
 
 export async function uploadPartnerAttachment(data: CreateAttachmentData) {
     const session = await requireAdmin();
 
-    const attachment = await prisma.affiliateAttachment.create({
-        data: {
-            affiliateId: data.affiliateId,
-            title: data.title,
-            description: data.description,
-            documentType: data.documentType,
-            fileUrl: data.fileUrl,
-            fileName: data.fileName,
-            fileSize: data.fileSize,
-            mimeType: data.mimeType,
-            uploadedById: session.user.id,
-        },
-    });
+    const parsed = createPartnerAttachmentSchema.safeParse(data);
+    if (!parsed.success) {
+        return { success: false, error: parsed.error.issues[0]?.message || "Invalid input" };
+    }
 
-    await createAuditLog(
-        session.user.id,
-        "CREATE",
-        "PartnerAttachment",
-        attachment.id,
-        { partnerId: data.affiliateId, title: data.title }
-    );
+    try {
+        const attachment = await prisma.affiliateAttachment.create({
+            data: {
+                affiliateId: data.affiliateId,
+                title: data.title,
+                description: data.description,
+                documentType: data.documentType,
+                fileUrl: data.fileUrl,
+                fileName: data.fileName,
+                fileSize: data.fileSize,
+                mimeType: data.mimeType,
+                uploadedById: session.user.id,
+            },
+        });
 
-    revalidatePath("/network");
-    return attachment;
+        await createAuditLog(
+            session.user.id,
+            "CREATE",
+            "PartnerAttachment",
+            attachment.id,
+            { partnerId: data.affiliateId, title: data.title }
+        );
+
+        revalidatePath("/network");
+        return { success: true, data: attachment };
+    } catch (error) {
+        console.error("uploadPartnerAttachment error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }
 
 export async function deletePartnerAttachment(id: string) {
     const session = await requireAdmin();
 
-    const attachment = await prisma.affiliateAttachment.findUnique({
-        where: { id },
-    });
-
-    if (!attachment) throw new Error("Attachment not found");
-
     try {
-        await deleteFile(STORAGE_BUCKETS.AFFILIATE_ATTACHMENTS, attachment.fileUrl);
+        const attachment = await prisma.affiliateAttachment.findUnique({
+            where: { id },
+        });
+
+        if (!attachment) return { success: false, error: "Attachment not found" };
+
+        const deleteResult = await deleteFile(STORAGE_BUCKETS.AFFILIATE_ATTACHMENTS, attachment.fileUrl);
+        if (!deleteResult.success) {
+            console.error("Failed to delete attachment file:", deleteResult.error);
+        }
+
+        await prisma.affiliateAttachment.delete({ where: { id } });
+
+        await createAuditLog(
+            session.user.id,
+            "DELETE",
+            "PartnerAttachment",
+            id,
+            { partnerId: attachment.affiliateId, title: attachment.title }
+        );
+
+        revalidatePath("/network");
+        return { success: true };
     } catch (error) {
-        console.error("Failed to delete attachment file:", error);
+        console.error("deletePartnerAttachment error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
     }
-
-    await prisma.affiliateAttachment.delete({ where: { id } });
-
-    await createAuditLog(
-        session.user.id,
-        "DELETE",
-        "PartnerAttachment",
-        id,
-        { partnerId: attachment.affiliateId, title: attachment.title }
-    );
-
-    revalidatePath("/network");
 }
 
 // ============================================
@@ -521,58 +611,68 @@ export interface CreateQuickContactData {
 export async function createQuickContact(data: CreateQuickContactData) {
     const session = await requireAuth();
 
-    const normalizedPhone = formatPhoneNumber(data.phone);
-
-    // Check if this phone already exists as a contact
-    const existingContact = await prisma.sMSContact.findUnique({
-        where: { phoneNumber: normalizedPhone },
-        include: { affiliate: { select: { id: true, name: true } } },
-    });
-
-    if (existingContact?.affiliate) {
-        throw new Error(`This phone number is already linked to ${existingContact.affiliate.name}`);
+    const parsed = createQuickContactSchema.safeParse(data);
+    if (!parsed.success) {
+        return { success: false, error: parsed.error.issues[0]?.message || "Invalid input" };
     }
 
-    // Create affiliate as contact-only (auto-approved)
-    const contact = await prisma.affiliate.create({
-        data: {
-            name: data.name,
-            email: data.email || `${normalizedPhone.replace(/\D/g, "")}@contact.local`,
-            phone: data.phone,
-            type: "FARM_OUT", // Default type for contacts
-            isContactOnly: true,
-            isApproved: true, // Auto-approve contacts
-            isActive: true,
-            notes: data.notes,
-            submittedById: session.user.id,
-        },
-    });
+    try {
+        const normalizedPhone = formatPhoneNumber(data.phone);
 
-    // Create SMS contact link
-    await prisma.sMSContact.upsert({
-        where: { phoneNumber: normalizedPhone },
-        create: {
-            phoneNumber: normalizedPhone,
-            affiliateId: contact.id,
-            name: data.name,
-        },
-        update: {
-            affiliateId: contact.id,
-            name: data.name,
-        },
-    });
+        // Check if this phone already exists as a contact
+        const existingContact = await prisma.sMSContact.findUnique({
+            where: { phoneNumber: normalizedPhone },
+            include: { affiliate: { select: { id: true, name: true } } },
+        });
 
-    await createAuditLog(
-        session.user.id,
-        "CREATE",
-        "Affiliate",
-        contact.id,
-        { name: data.name, phone: data.phone, isContactOnly: true }
-    );
+        if (existingContact?.affiliate) {
+            return { success: false, error: `This phone number is already linked to ${existingContact.affiliate.name}` };
+        }
 
-    revalidatePath("/network");
-    revalidatePath("/sms");
-    return contact;
+        // Create affiliate as contact-only (auto-approved)
+        const contact = await prisma.affiliate.create({
+            data: {
+                name: data.name,
+                email: data.email || `${normalizedPhone.replace(/\D/g, "")}@contact.local`,
+                phone: data.phone,
+                type: "FARM_OUT", // Default type for contacts
+                isContactOnly: true,
+                isApproved: true, // Auto-approve contacts
+                isActive: true,
+                notes: data.notes,
+                submittedById: session.user.id,
+            },
+        });
+
+        // Create SMS contact link
+        await prisma.sMSContact.upsert({
+            where: { phoneNumber: normalizedPhone },
+            create: {
+                phoneNumber: normalizedPhone,
+                affiliateId: contact.id,
+                name: data.name,
+            },
+            update: {
+                affiliateId: contact.id,
+                name: data.name,
+            },
+        });
+
+        await createAuditLog(
+            session.user.id,
+            "CREATE",
+            "Affiliate",
+            contact.id,
+            { name: data.name, phone: data.phone, isContactOnly: true }
+        );
+
+        revalidatePath("/network");
+        revalidatePath("/sms");
+        return { success: true, data: contact };
+    } catch (error) {
+        console.error("createQuickContact error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }
 
 // ============================================
@@ -582,39 +682,45 @@ export async function createQuickContact(data: CreateQuickContactData) {
 export async function getPartnerById(id: string) {
     await requireAuth();
 
-    return await prisma.affiliate.findUnique({
-        where: { id },
-        include: {
-            submittedBy: { select: { id: true, name: true, email: true } },
-            pricingGrid: { orderBy: { serviceType: "asc" } },
-            attachments: {
-                include: { uploadedBy: { select: { id: true, name: true } } },
-                orderBy: { createdAt: "desc" },
-            },
-            vehicleInfo: true,
-            schedulePrefs: true,
-            vehicleAssignments: {
-                include: {
-                    vehicle: {
-                        select: {
-                            id: true,
-                            name: true,
-                            make: true,
-                            model: true,
-                            year: true,
-                            licensePlate: true,
-                            type: true,
+    try {
+        const result = await prisma.affiliate.findUnique({
+            where: { id },
+            include: {
+                submittedBy: { select: { id: true, name: true, email: true } },
+                pricingGrid: { orderBy: { serviceType: "asc" } },
+                attachments: {
+                    include: { uploadedBy: { select: { id: true, name: true } } },
+                    orderBy: { createdAt: "desc" },
+                },
+                vehicleInfo: true,
+                schedulePrefs: true,
+                vehicleAssignments: {
+                    include: {
+                        vehicle: {
+                            select: {
+                                id: true,
+                                name: true,
+                                make: true,
+                                model: true,
+                                year: true,
+                                licensePlate: true,
+                                type: true,
+                            },
                         },
                     },
                 },
-            },
-            smsContacts: {
-                select: {
-                    id: true,
-                    phoneNumber: true,
-                    _count: { select: { messages: true } },
+                smsContacts: {
+                    select: {
+                        id: true,
+                        phoneNumber: true,
+                        _count: { select: { messages: true } },
+                    },
                 },
             },
-        },
-    });
+        });
+        return { success: true, data: result };
+    } catch (error) {
+        console.error("getPartnerById error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }

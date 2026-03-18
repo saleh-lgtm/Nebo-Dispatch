@@ -4,6 +4,12 @@ import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireAuth, requireAdmin } from "./auth-helpers";
 import { createAuditLog } from "./auditActions";
+import {
+    reviewShiftReportSchema,
+    shiftReportFiltersSchema,
+    idParamSchema,
+    limitParamSchema,
+} from "@/lib/schemas";
 
 // Get all shift reports (ADMIN/SUPER_ADMIN only)
 export async function getAllShiftReports(options?: {
@@ -15,6 +21,11 @@ export async function getAllShiftReports(options?: {
     offset?: number;
 }) {
     await requireAdmin();
+
+    const parsed = shiftReportFiltersSchema.safeParse(options ?? {});
+    if (!parsed.success) {
+        return { success: false as const, error: parsed.error.issues[0]?.message || "Invalid input" };
+    }
 
     const where: Record<string, unknown> = {};
 
@@ -36,9 +47,57 @@ export async function getAllShiftReports(options?: {
         }
     }
 
-    const [reports, total] = await Promise.all([
-        prisma.shiftReport.findMany({
-            where,
+    try {
+        const [reports, total] = await Promise.all([
+            prisma.shiftReport.findMany({
+                where,
+                include: {
+                    user: { select: { id: true, name: true, email: true } },
+                    shift: {
+                        select: {
+                            id: true,
+                            clockIn: true,
+                            clockOut: true,
+                            totalHours: true,
+                            quotes: {
+                                select: {
+                                    id: true,
+                                    clientName: true,
+                                    serviceType: true,
+                                    status: true,
+                                    estimatedAmount: true,
+                                },
+                            },
+                        },
+                    },
+                    reviewedBy: { select: { id: true, name: true } },
+                },
+                orderBy: { createdAt: "desc" },
+                take: options?.limit || 50,
+                skip: options?.offset || 0,
+            }),
+            prisma.shiftReport.count({ where }),
+        ]);
+
+        return { success: true as const, data: { reports, total } };
+    } catch (error) {
+        console.error("getAllShiftReports error:", error);
+        return { success: false as const, error: error instanceof Error ? error.message : "Operation failed" };
+    }
+}
+
+// Get a single shift report by ID
+export async function getShiftReportById(id: string) {
+    const session = await requireAuth();
+
+    const parsed = idParamSchema.safeParse({ id });
+    if (!parsed.success) {
+        return { success: false as const, error: parsed.error.issues[0]?.message || "Invalid input" };
+    }
+
+    try {
+        const report = await prisma.shiftReport.findUnique({
+            where: { id },
             include: {
                 user: { select: { id: true, name: true, email: true } },
                 shift: {
@@ -47,6 +106,7 @@ export async function getAllShiftReports(options?: {
                         clockIn: true,
                         clockOut: true,
                         totalHours: true,
+                        tasks: true,
                         quotes: {
                             select: {
                                 id: true,
@@ -60,70 +120,48 @@ export async function getAllShiftReports(options?: {
                 },
                 reviewedBy: { select: { id: true, name: true } },
             },
-            orderBy: { createdAt: "desc" },
-            take: options?.limit || 50,
-            skip: options?.offset || 0,
-        }),
-        prisma.shiftReport.count({ where }),
-    ]);
+        });
 
-    return { reports, total };
-}
+        if (!report) {
+            return { success: false as const, error: "Report not found" };
+        }
 
-// Get a single shift report by ID
-export async function getShiftReportById(id: string) {
-    const session = await requireAuth();
+        // Only allow access to own reports or if admin
+        if (report.userId !== session.user.id && session.user.role === "DISPATCHER") {
+            return { success: false as const, error: "Access denied" };
+        }
 
-    const report = await prisma.shiftReport.findUnique({
-        where: { id },
-        include: {
-            user: { select: { id: true, name: true, email: true } },
-            shift: {
-                select: {
-                    id: true,
-                    clockIn: true,
-                    clockOut: true,
-                    totalHours: true,
-                    tasks: true,
-                    quotes: {
-                        select: {
-                            id: true,
-                            clientName: true,
-                            serviceType: true,
-                            status: true,
-                            estimatedAmount: true,
-                        },
-                    },
-                },
-            },
-            reviewedBy: { select: { id: true, name: true } },
-        },
-    });
-
-    if (!report) {
-        throw new Error("Report not found");
+        return { success: true as const, data: report };
+    } catch (error) {
+        console.error("getShiftReportById error:", error);
+        return { success: false as const, error: error instanceof Error ? error.message : "Operation failed" };
     }
-
-    // Only allow access to own reports or if admin
-    if (report.userId !== session.user.id && session.user.role === "DISPATCHER") {
-        throw new Error("Access denied");
-    }
-
-    return report;
 }
 
 // Get dispatcher's own reports
 export async function getMyShiftReports(limit: number = 20) {
     const session = await requireAuth();
 
-    return await prisma.shiftReport.findMany({
-        where: { userId: session.user.id },
-        include: {
-            shift: { select: { clockIn: true, clockOut: true, totalHours: true } },
-        },
-        orderBy: { createdAt: "desc" },
-        take: limit,
-    });
+    const parsed = limitParamSchema.safeParse({ limit });
+    if (!parsed.success) {
+        return { success: false as const, error: parsed.error.issues[0]?.message || "Invalid input" };
+    }
+
+    try {
+        const reports = await prisma.shiftReport.findMany({
+            where: { userId: session.user.id },
+            include: {
+                shift: { select: { clockIn: true, clockOut: true, totalHours: true } },
+            },
+            orderBy: { createdAt: "desc" },
+            take: limit,
+        });
+
+        return { success: true as const, data: reports };
+    } catch (error) {
+        console.error("getMyShiftReports error:", error);
+        return { success: false as const, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }
 
 // Review a shift report (ADMIN/SUPER_ADMIN only)
@@ -137,27 +175,37 @@ export async function reviewShiftReport(
 ) {
     const session = await requireAdmin();
 
-    const report = await prisma.shiftReport.update({
-        where: { id: reportId },
-        data: {
-            performanceScore: data.performanceScore,
-            adminFeedback: data.adminFeedback,
-            status: data.status || "REVIEWED",
-            reviewedById: session.user.id,
-            reviewedAt: new Date(),
-        },
-    });
+    const parsed = reviewShiftReportSchema.safeParse({ reportId, ...data });
+    if (!parsed.success) {
+        return { success: false as const, error: parsed.error.issues[0]?.message || "Invalid input" };
+    }
 
-    await createAuditLog(
-        session.user.id,
-        "REVIEW",
-        "ShiftReport",
-        reportId,
-        { performanceScore: data.performanceScore, status: data.status }
-    );
+    try {
+        const report = await prisma.shiftReport.update({
+            where: { id: reportId },
+            data: {
+                performanceScore: data.performanceScore,
+                adminFeedback: data.adminFeedback,
+                status: data.status || "REVIEWED",
+                reviewedById: session.user.id,
+                reviewedAt: new Date(),
+            },
+        });
 
-    revalidatePath("/admin/reports");
-    return report;
+        await createAuditLog(
+            session.user.id,
+            "REVIEW",
+            "ShiftReport",
+            reportId,
+            { performanceScore: data.performanceScore, status: data.status }
+        );
+
+        revalidatePath("/admin/reports");
+        return { success: true as const, data: report };
+    } catch (error) {
+        console.error("reviewShiftReport error:", error);
+        return { success: false as const, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }
 
 // Get dispatcher performance summary
@@ -168,215 +216,229 @@ export async function getDispatcherPerformance(
 ) {
     await requireAdmin();
 
-    const where: Record<string, unknown> = { userId };
+    try {
+        const where: Record<string, unknown> = { userId };
 
-    if (startDate || endDate) {
-        where.createdAt = {};
-        if (startDate) {
-            (where.createdAt as Record<string, Date>).gte = startDate;
+        if (startDate || endDate) {
+            where.createdAt = {};
+            if (startDate) {
+                (where.createdAt as Record<string, Date>).gte = startDate;
+            }
+            if (endDate) {
+                (where.createdAt as Record<string, Date>).lte = endDate;
+            }
         }
-        if (endDate) {
-            (where.createdAt as Record<string, Date>).lte = endDate;
-        }
+
+        const reports = await prisma.shiftReport.findMany({
+            where,
+            include: {
+                shift: { select: { clockIn: true, clockOut: true, totalHours: true } },
+            },
+            orderBy: { createdAt: "desc" },
+        });
+
+        // Calculate aggregates
+        const totalReports = reports.length;
+        const totalCalls = reports.reduce((sum, r) => sum + r.callsReceived, 0);
+        const totalEmails = reports.reduce((sum, r) => sum + r.emailsSent, 0);
+        const totalQuotes = reports.reduce((sum, r) => sum + r.quotesGiven, 0);
+        const totalReservations = reports.reduce((sum, r) => sum + r.totalReservationsHandled, 0);
+        const totalComplaints = reports.reduce((sum, r) => sum + r.complaintsReceived, 0);
+        const resolvedComplaints = reports.reduce((sum, r) => sum + r.complaintsResolved, 0);
+        const totalEscalations = reports.reduce((sum, r) => sum + r.escalations, 0);
+        const totalDriversDispatched = reports.reduce((sum, r) => sum + r.driversDispatched, 0);
+        const totalNoShows = reports.reduce((sum, r) => sum + r.noShowsHandled, 0);
+        const totalLatePickups = reports.reduce((sum, r) => sum + r.latePickups, 0);
+
+        // Calculate averages
+        const avgPerformanceScore = reports
+            .filter(r => r.performanceScore !== null)
+            .reduce((sum, r, _, arr) => sum + (r.performanceScore || 0) / arr.length, 0);
+
+        const avgShiftRating = reports
+            .filter(r => r.shiftRating !== null)
+            .reduce((sum, r, _, arr) => sum + (r.shiftRating || 0) / arr.length, 0);
+
+        // Calculate total hours worked
+        const totalHours = reports.reduce((sum, r) => sum + (r.shift.totalHours || 0), 0);
+
+        // Get flagged reports count
+        const flaggedCount = reports.filter(r => r.status === "FLAGGED").length;
+        const reviewedCount = reports.filter(r => r.status === "REVIEWED").length;
+
+        const result = {
+            totalReports,
+            totalHours: Math.round(totalHours * 10) / 10,
+            metrics: {
+                calls: totalCalls,
+                emails: totalEmails,
+                quotes: totalQuotes,
+                reservations: totalReservations,
+                complaints: totalComplaints,
+                resolvedComplaints,
+                escalations: totalEscalations,
+                driversDispatched: totalDriversDispatched,
+                noShows: totalNoShows,
+                latePickups: totalLatePickups,
+            },
+            averages: {
+                callsPerShift: totalReports > 0 ? Math.round(totalCalls / totalReports) : 0,
+                emailsPerShift: totalReports > 0 ? Math.round(totalEmails / totalReports) : 0,
+                quotesPerShift: totalReports > 0 ? Math.round(totalQuotes / totalReports) : 0,
+                performanceScore: Math.round(avgPerformanceScore),
+                shiftRating: Math.round(avgShiftRating * 10) / 10,
+            },
+            statusCounts: {
+                flagged: flaggedCount,
+                reviewed: reviewedCount,
+                pending: totalReports - flaggedCount - reviewedCount,
+            },
+            recentReports: reports.slice(0, 5),
+        };
+
+        return { success: true as const, data: result };
+    } catch (error) {
+        console.error("getDispatcherPerformance error:", error);
+        return { success: false as const, error: error instanceof Error ? error.message : "Operation failed" };
     }
-
-    const reports = await prisma.shiftReport.findMany({
-        where,
-        include: {
-            shift: { select: { clockIn: true, clockOut: true, totalHours: true } },
-        },
-        orderBy: { createdAt: "desc" },
-    });
-
-    // Calculate aggregates
-    const totalReports = reports.length;
-    const totalCalls = reports.reduce((sum, r) => sum + r.callsReceived, 0);
-    const totalEmails = reports.reduce((sum, r) => sum + r.emailsSent, 0);
-    const totalQuotes = reports.reduce((sum, r) => sum + r.quotesGiven, 0);
-    const totalReservations = reports.reduce((sum, r) => sum + r.totalReservationsHandled, 0);
-    const totalComplaints = reports.reduce((sum, r) => sum + r.complaintsReceived, 0);
-    const resolvedComplaints = reports.reduce((sum, r) => sum + r.complaintsResolved, 0);
-    const totalEscalations = reports.reduce((sum, r) => sum + r.escalations, 0);
-    const totalDriversDispatched = reports.reduce((sum, r) => sum + r.driversDispatched, 0);
-    const totalNoShows = reports.reduce((sum, r) => sum + r.noShowsHandled, 0);
-    const totalLatePickups = reports.reduce((sum, r) => sum + r.latePickups, 0);
-
-    // Calculate averages
-    const avgPerformanceScore = reports
-        .filter(r => r.performanceScore !== null)
-        .reduce((sum, r, _, arr) => sum + (r.performanceScore || 0) / arr.length, 0);
-
-    const avgShiftRating = reports
-        .filter(r => r.shiftRating !== null)
-        .reduce((sum, r, _, arr) => sum + (r.shiftRating || 0) / arr.length, 0);
-
-    // Calculate total hours worked
-    const totalHours = reports.reduce((sum, r) => sum + (r.shift.totalHours || 0), 0);
-
-    // Get flagged reports count
-    const flaggedCount = reports.filter(r => r.status === "FLAGGED").length;
-    const reviewedCount = reports.filter(r => r.status === "REVIEWED").length;
-
-    return {
-        totalReports,
-        totalHours: Math.round(totalHours * 10) / 10,
-        metrics: {
-            calls: totalCalls,
-            emails: totalEmails,
-            quotes: totalQuotes,
-            reservations: totalReservations,
-            complaints: totalComplaints,
-            resolvedComplaints,
-            escalations: totalEscalations,
-            driversDispatched: totalDriversDispatched,
-            noShows: totalNoShows,
-            latePickups: totalLatePickups,
-        },
-        averages: {
-            callsPerShift: totalReports > 0 ? Math.round(totalCalls / totalReports) : 0,
-            emailsPerShift: totalReports > 0 ? Math.round(totalEmails / totalReports) : 0,
-            quotesPerShift: totalReports > 0 ? Math.round(totalQuotes / totalReports) : 0,
-            performanceScore: Math.round(avgPerformanceScore),
-            shiftRating: Math.round(avgShiftRating * 10) / 10,
-        },
-        statusCounts: {
-            flagged: flaggedCount,
-            reviewed: reviewedCount,
-            pending: totalReports - flaggedCount - reviewedCount,
-        },
-        recentReports: reports.slice(0, 5),
-    };
 }
 
 // Get team performance summary (all dispatchers)
 export async function getTeamPerformance(startDate?: Date, endDate?: Date) {
     await requireAdmin();
 
-    const where: Record<string, unknown> = {};
+    try {
+        const where: Record<string, unknown> = {};
 
-    if (startDate || endDate) {
-        where.createdAt = {};
-        if (startDate) {
-            (where.createdAt as Record<string, Date>).gte = startDate;
+        if (startDate || endDate) {
+            where.createdAt = {};
+            if (startDate) {
+                (where.createdAt as Record<string, Date>).gte = startDate;
+            }
+            if (endDate) {
+                (where.createdAt as Record<string, Date>).lte = endDate;
+            }
         }
-        if (endDate) {
-            (where.createdAt as Record<string, Date>).lte = endDate;
-        }
-    }
 
-    // Get all dispatchers with their reports
-    const dispatchers = await prisma.user.findMany({
-        where: { role: "DISPATCHER", isActive: true },
-        select: {
-            id: true,
-            name: true,
-            email: true,
-            shiftReports: {
-                where,
-                select: {
-                    id: true,
-                    callsReceived: true,
-                    emailsSent: true,
-                    quotesGiven: true,
-                    totalReservationsHandled: true,
-                    complaintsReceived: true,
-                    complaintsResolved: true,
-                    escalations: true,
-                    driversDispatched: true,
-                    performanceScore: true,
-                    shiftRating: true,
-                    status: true,
-                    createdAt: true,
-                    shift: { select: { totalHours: true } },
+        // Get all dispatchers with their reports
+        const dispatchers = await prisma.user.findMany({
+            where: { role: "DISPATCHER", isActive: true },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                shiftReports: {
+                    where,
+                    select: {
+                        id: true,
+                        callsReceived: true,
+                        emailsSent: true,
+                        quotesGiven: true,
+                        totalReservationsHandled: true,
+                        complaintsReceived: true,
+                        complaintsResolved: true,
+                        escalations: true,
+                        driversDispatched: true,
+                        performanceScore: true,
+                        shiftRating: true,
+                        status: true,
+                        createdAt: true,
+                        shift: { select: { totalHours: true } },
+                    },
                 },
             },
-        },
-    });
+        });
 
-    // Calculate performance for each dispatcher
-    const dispatcherStats = dispatchers.map(dispatcher => {
-        const reports = dispatcher.shiftReports;
-        const totalReports = reports.length;
+        // Calculate performance for each dispatcher
+        const dispatcherStats = dispatchers.map(dispatcher => {
+            const reports = dispatcher.shiftReports;
+            const totalReports = reports.length;
 
-        if (totalReports === 0) {
+            if (totalReports === 0) {
+                return {
+                    id: dispatcher.id,
+                    name: dispatcher.name,
+                    email: dispatcher.email,
+                    totalReports: 0,
+                    totalHours: 0,
+                    avgPerformanceScore: 0,
+                    totalCalls: 0,
+                    totalEmails: 0,
+                    totalQuotes: 0,
+                    flaggedReports: 0,
+                };
+            }
+
+            const totalCalls = reports.reduce((sum, r) => sum + r.callsReceived, 0);
+            const totalEmails = reports.reduce((sum, r) => sum + r.emailsSent, 0);
+            const totalQuotes = reports.reduce((sum, r) => sum + r.quotesGiven, 0);
+            const totalHours = reports.reduce((sum, r) => sum + (r.shift.totalHours || 0), 0);
+            const flaggedReports = reports.filter(r => r.status === "FLAGGED").length;
+
+            const scoredReports = reports.filter(r => r.performanceScore !== null);
+            const avgPerformanceScore = scoredReports.length > 0
+                ? scoredReports.reduce((sum, r) => sum + (r.performanceScore || 0), 0) / scoredReports.length
+                : 0;
+
             return {
                 id: dispatcher.id,
                 name: dispatcher.name,
                 email: dispatcher.email,
-                totalReports: 0,
-                totalHours: 0,
-                avgPerformanceScore: 0,
-                totalCalls: 0,
-                totalEmails: 0,
-                totalQuotes: 0,
-                flaggedReports: 0,
+                totalReports,
+                totalHours: Math.round(totalHours * 10) / 10,
+                avgPerformanceScore: Math.round(avgPerformanceScore),
+                totalCalls,
+                totalEmails,
+                totalQuotes,
+                flaggedReports,
             };
-        }
+        });
 
-        const totalCalls = reports.reduce((sum, r) => sum + r.callsReceived, 0);
-        const totalEmails = reports.reduce((sum, r) => sum + r.emailsSent, 0);
-        const totalQuotes = reports.reduce((sum, r) => sum + r.quotesGiven, 0);
-        const totalHours = reports.reduce((sum, r) => sum + (r.shift.totalHours || 0), 0);
-        const flaggedReports = reports.filter(r => r.status === "FLAGGED").length;
+        // Sort by performance score (descending)
+        dispatcherStats.sort((a, b) => b.avgPerformanceScore - a.avgPerformanceScore);
 
-        const scoredReports = reports.filter(r => r.performanceScore !== null);
-        const avgPerformanceScore = scoredReports.length > 0
-            ? scoredReports.reduce((sum, r) => sum + (r.performanceScore || 0), 0) / scoredReports.length
-            : 0;
-
-        return {
-            id: dispatcher.id,
-            name: dispatcher.name,
-            email: dispatcher.email,
-            totalReports,
-            totalHours: Math.round(totalHours * 10) / 10,
-            avgPerformanceScore: Math.round(avgPerformanceScore),
-            totalCalls,
-            totalEmails,
-            totalQuotes,
-            flaggedReports,
+        // Calculate team totals
+        const teamTotals = {
+            totalReports: dispatcherStats.reduce((sum, d) => sum + d.totalReports, 0),
+            totalHours: dispatcherStats.reduce((sum, d) => sum + d.totalHours, 0),
+            totalCalls: dispatcherStats.reduce((sum, d) => sum + d.totalCalls, 0),
+            totalEmails: dispatcherStats.reduce((sum, d) => sum + d.totalEmails, 0),
+            totalQuotes: dispatcherStats.reduce((sum, d) => sum + d.totalQuotes, 0),
+            avgPerformanceScore: dispatcherStats.length > 0
+                ? Math.round(dispatcherStats.reduce((sum, d) => sum + d.avgPerformanceScore, 0) / dispatcherStats.length)
+                : 0,
         };
-    });
 
-    // Sort by performance score (descending)
-    dispatcherStats.sort((a, b) => b.avgPerformanceScore - a.avgPerformanceScore);
-
-    // Calculate team totals
-    const teamTotals = {
-        totalReports: dispatcherStats.reduce((sum, d) => sum + d.totalReports, 0),
-        totalHours: dispatcherStats.reduce((sum, d) => sum + d.totalHours, 0),
-        totalCalls: dispatcherStats.reduce((sum, d) => sum + d.totalCalls, 0),
-        totalEmails: dispatcherStats.reduce((sum, d) => sum + d.totalEmails, 0),
-        totalQuotes: dispatcherStats.reduce((sum, d) => sum + d.totalQuotes, 0),
-        avgPerformanceScore: dispatcherStats.length > 0
-            ? Math.round(dispatcherStats.reduce((sum, d) => sum + d.avgPerformanceScore, 0) / dispatcherStats.length)
-            : 0,
-    };
-
-    return {
-        dispatchers: dispatcherStats,
-        teamTotals,
-    };
+        return { success: true as const, data: { dispatchers: dispatcherStats, teamTotals } };
+    } catch (error) {
+        console.error("getTeamPerformance error:", error);
+        return { success: false as const, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }
 
 // Get report statistics for dashboard
 export async function getReportStats() {
     await requireAdmin();
 
-    const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    try {
+        const now = new Date();
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay());
+        startOfWeek.setHours(0, 0, 0, 0);
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const [today, thisWeek, thisMonth, pending, flagged] = await Promise.all([
-        prisma.shiftReport.count({ where: { createdAt: { gte: startOfDay } } }),
-        prisma.shiftReport.count({ where: { createdAt: { gte: startOfWeek } } }),
-        prisma.shiftReport.count({ where: { createdAt: { gte: startOfMonth } } }),
-        prisma.shiftReport.count({ where: { status: "SUBMITTED" } }),
-        prisma.shiftReport.count({ where: { status: "FLAGGED" } }),
-    ]);
+        const [today, thisWeek, thisMonth, pending, flagged] = await Promise.all([
+            prisma.shiftReport.count({ where: { createdAt: { gte: startOfDay } } }),
+            prisma.shiftReport.count({ where: { createdAt: { gte: startOfWeek } } }),
+            prisma.shiftReport.count({ where: { createdAt: { gte: startOfMonth } } }),
+            prisma.shiftReport.count({ where: { status: "SUBMITTED" } }),
+            prisma.shiftReport.count({ where: { status: "FLAGGED" } }),
+        ]);
 
-    return { today, thisWeek, thisMonth, pending, flagged };
+        return { success: true as const, data: { today, thisWeek, thisMonth, pending, flagged } };
+    } catch (error) {
+        console.error("getReportStats error:", error);
+        return { success: false as const, error: error instanceof Error ? error.message : "Operation failed" };
+    }
 }
