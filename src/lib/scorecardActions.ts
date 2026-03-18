@@ -3,6 +3,7 @@
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "./auth-helpers";
 import { dateRangeSchema } from "./schemas";
+import { getFrontEmailMetrics, getFrontTeamOverview } from "./frontActions";
 
 // ============================================
 // Types
@@ -39,9 +40,17 @@ export interface QuoteMetrics {
     totalEstimatedRevenue: number;
 }
 
+export interface EmailMetrics {
+    emailsSent: number;
+    emailsReceived: number;
+    avgResponseTimeMinutes: number | null;
+    inboxBreakdown: Record<string, number>;
+}
+
 export interface CategoryScores {
     confirmations: number;
     communications: number;
+    email: number;
     punctuality: number;
     quotes: number;
     reportCompliance: number;
@@ -54,6 +63,7 @@ export interface DispatcherScorecard {
     role: string;
     confirmationMetrics: ConfirmationMetrics;
     communicationMetrics: CommunicationMetrics;
+    emailMetrics: EmailMetrics | null;
     shiftMetrics: ShiftMetrics;
     quoteMetrics: QuoteMetrics;
     categoryScores: CategoryScores;
@@ -86,20 +96,31 @@ function clamp(value: number, min: number, max: number): number {
 function calculateCategoryScores(
     confirmationMetrics: ConfirmationMetrics,
     communicationMetrics: CommunicationMetrics,
+    emailMetrics: EmailMetrics | null,
     shiftMetrics: ShiftMetrics,
     quoteMetrics: QuoteMetrics,
-    teamAvgSms: number
+    teamAvgSms: number,
+    teamAvgEmails: number
 ): CategoryScores {
-    // Confirmations (30%): on-time rate × 100
+    // Confirmations (25%): on-time rate × 100
     const confirmations = confirmationMetrics.totalHandled > 0
         ? confirmationMetrics.onTimeRate * 100
         : 100; // No confirmations = no penalty
 
-    // Communications (20%): SMS volume relative to team average
+    // Communications (15%): SMS volume relative to team average
     const totalSms = communicationMetrics.smsSent + communicationMetrics.smsReceived;
     const communications = teamAvgSms > 0
         ? clamp((totalSms / teamAvgSms) * 100, 0, 100)
         : totalSms > 0 ? 100 : 50; // If no team average, any activity = 100
+
+    // Email (15%): email volume relative to team average
+    // If no Front mapping, score is neutral (50) — doesn't help or hurt
+    let email = 50;
+    if (emailMetrics) {
+        email = teamAvgEmails > 0
+            ? clamp((emailMetrics.emailsSent / teamAvgEmails) * 100, 0, 100)
+            : emailMetrics.emailsSent > 0 ? 100 : 50;
+    }
 
     // Punctuality (20%): 100 - (avg late minutes × 5), where negative earlyClockIn = late
     // earlyClockIn > 0 means early, < 0 means late
@@ -114,7 +135,7 @@ function calculateCategoryScores(
         ? quoteMetrics.conversionRate * 100
         : 50; // No quotes = neutral
 
-    // Report compliance (15%): submission rate × 100
+    // Report compliance (10%): submission rate × 100
     const reportCompliance = shiftMetrics.totalShifts > 0
         ? shiftMetrics.reportSubmissionRate * 100
         : 100; // No shifts = no penalty
@@ -122,6 +143,7 @@ function calculateCategoryScores(
     return {
         confirmations: Math.round(confirmations),
         communications: Math.round(communications),
+        email: Math.round(email),
         punctuality: Math.round(punctuality),
         quotes: Math.round(quotes),
         reportCompliance: Math.round(reportCompliance),
@@ -130,11 +152,12 @@ function calculateCategoryScores(
 
 function calculateOverallScore(scores: CategoryScores): number {
     return Math.round(
-        scores.confirmations * 0.30 +
-        scores.communications * 0.20 +
+        scores.confirmations * 0.25 +
+        scores.communications * 0.15 +
+        scores.email * 0.15 +
         scores.punctuality * 0.20 +
         scores.quotes * 0.15 +
-        scores.reportCompliance * 0.15
+        scores.reportCompliance * 0.10
     );
 }
 
@@ -400,15 +423,29 @@ export async function getDispatcherScorecard(
             totalEstimatedRevenue: Math.round(totalRevenue * 100) / 100,
         };
 
+        // --- Email Metrics (from Front) ---
+        let emailMetrics: EmailMetrics | null = null;
+        try {
+            const emailResult = await getFrontEmailMetrics(userId, from, to);
+            if (emailResult.success && emailResult.data) {
+                emailMetrics = emailResult.data;
+            }
+        } catch {
+            // Front API unavailable — email metrics will be null
+        }
+
         // --- Category Scores ---
         // For individual scorecard, use their own SMS as reference (team avg computed in team view)
         const teamAvgSms = totalSmsSent + totalSmsReceived; // Self-reference for individual
+        const teamAvgEmails = emailMetrics?.emailsSent ?? 0; // Self-reference for individual
         const categoryScores = calculateCategoryScores(
             confirmationMetrics,
             communicationMetrics,
+            emailMetrics,
             shiftMetrics,
             quoteMetrics,
-            teamAvgSms > 0 ? teamAvgSms : 1
+            teamAvgSms > 0 ? teamAvgSms : 1,
+            teamAvgEmails > 0 ? teamAvgEmails : 1
         );
 
         const overallScore = calculateOverallScore(categoryScores);
@@ -422,6 +459,7 @@ export async function getDispatcherScorecard(
                 role: user.role,
                 confirmationMetrics,
                 communicationMetrics,
+                emailMetrics,
                 shiftMetrics,
                 quoteMetrics,
                 categoryScores,
@@ -607,6 +645,33 @@ export async function getTeamScorecard(
         }
         const teamAvgSms = activeDispatchers > 0 ? totalTeamSms / activeDispatchers : 1;
 
+        // Fetch Front email metrics for all teammates
+        const frontTeamData: Map<string, { emailsSent: number; avgResponseTimeMinutes: number | null }> = new Map();
+        try {
+            const frontResult = await getFrontTeamOverview(from, to);
+            if (frontResult.success && frontResult.data) {
+                for (const member of frontResult.data) {
+                    frontTeamData.set(member.userId, {
+                        emailsSent: member.emailsSent,
+                        avgResponseTimeMinutes: member.avgResponseTimeMinutes,
+                    });
+                }
+            }
+        } catch {
+            // Front API unavailable — skip email metrics
+        }
+
+        // Calculate team average emails
+        let totalTeamEmails = 0;
+        let emailActiveCount = 0;
+        for (const fd of frontTeamData.values()) {
+            if (fd.emailsSent > 0) {
+                totalTeamEmails += fd.emailsSent;
+                emailActiveCount++;
+            }
+        }
+        const teamAvgEmails = emailActiveCount > 0 ? totalTeamEmails / emailActiveCount : 1;
+
         // Build scorecards
         const scorecards: DispatcherScorecard[] = dispatchers.map(dispatcher => {
             const totalHandled = confirmationsMap.get(dispatcher.id) || 0;
@@ -677,13 +742,26 @@ export async function getTeamScorecard(
                 ),
             };
 
+            // Email metrics from Front
+            const frontData = frontTeamData.get(dispatcher.id);
+            const emailMetrics: EmailMetrics | null = frontData
+                ? {
+                      emailsSent: frontData.emailsSent,
+                      emailsReceived: 0, // Not tracked per-user in team view
+                      avgResponseTimeMinutes: frontData.avgResponseTimeMinutes,
+                      inboxBreakdown: {},
+                  }
+                : null;
+
             // Category scores
             const categoryScores = calculateCategoryScores(
                 confirmationMetrics,
                 communicationMetrics,
+                emailMetrics,
                 shiftMetrics,
                 quoteMetrics,
-                teamAvgSms
+                teamAvgSms,
+                teamAvgEmails
             );
 
             const overallScore = calculateOverallScore(categoryScores);
@@ -695,6 +773,7 @@ export async function getTeamScorecard(
                 role: dispatcher.role,
                 confirmationMetrics,
                 communicationMetrics,
+                emailMetrics,
                 shiftMetrics,
                 quoteMetrics,
                 categoryScores,

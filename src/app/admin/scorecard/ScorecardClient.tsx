@@ -156,6 +156,7 @@ export default function ScorecardClient({
                             <th className={styles.thGrade}>Grade</th>
                             <th className={styles.thMetric}>Confirmations</th>
                             <th className={styles.thMetric}>Comms</th>
+                            <th className={styles.thMetric}>Email</th>
                             <th className={styles.thMetric}>Punctuality</th>
                             <th className={styles.thMetric}>Quotes</th>
                             <th className={styles.thMetric}>Reports</th>
@@ -164,7 +165,7 @@ export default function ScorecardClient({
                     <tbody>
                         {data.length === 0 && (
                             <tr>
-                                <td colSpan={9} className={styles.emptyRow}>
+                                <td colSpan={10} className={styles.emptyRow}>
                                     No dispatcher data for this period
                                 </td>
                             </tr>
@@ -204,6 +205,14 @@ export default function ScorecardClient({
                                     {d.categoryScores.communications}
                                     <span className={styles.metricDetail}>
                                         {d.communicationMetrics.smsSent} sent
+                                    </span>
+                                </td>
+                                <td className={`${styles.metricCell} ${scoreColor(d.categoryScores.email)}`}>
+                                    {d.categoryScores.email}
+                                    <span className={styles.metricDetail}>
+                                        {d.emailMetrics
+                                            ? `${d.emailMetrics.emailsSent} sent`
+                                            : "—"}
                                     </span>
                                 </td>
                                 <td className={`${styles.metricCell} ${scoreColor(d.categoryScores.punctuality)}`}>
@@ -248,7 +257,7 @@ export default function ScorecardClient({
                     &lt;70 Needs Improvement
                 </div>
                 <div className={styles.weightInfo}>
-                    Weights: Confirmations 30% | Comms 20% | Punctuality 20% | Quotes 15% | Reports 15%
+                    Weights: Confirmations 25% | Comms 15% | Email 15% | Punctuality 20% | Quotes 15% | Reports 10%
                 </div>
             </div>
         </div>

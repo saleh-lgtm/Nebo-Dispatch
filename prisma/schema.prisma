@@ -257,6 +257,9 @@ model User {
   // Schedule templates
   scheduleTemplatesCreated ScheduleTemplate[] @relation("ScheduleTemplateCreator")
 
+  // Front email integration
+  frontTeammateMapping     FrontTeammateMapping?
+
   // CRITICAL INDEXES for performance
   @@index([email])                      // Auth queries on every request
   @@index([role, isActive, createdAt])  // Admin dashboards, user listings
@@ -2187,4 +2190,15 @@ model ScheduleTemplateShift {
 
   @@index([templateId])
   @@index([dayOfWeek])
+}
+
+// Front email integration — maps Front app teammates to NeboOps users
+model FrontTeammateMapping {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  frontTeammateId String   @unique
+  frontName       String
+  frontEmail      String
+  createdAt       DateTime @default(now())
 }

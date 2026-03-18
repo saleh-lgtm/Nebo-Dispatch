@@ -93,6 +93,7 @@ export default function ScorecardDetailClient({
     const sc = scorecard;
     const cm = sc.confirmationMetrics;
     const comm = sc.communicationMetrics;
+    const em = sc.emailMetrics;
     const sm = sc.shiftMetrics;
     const qm = sc.quoteMetrics;
 
@@ -248,6 +249,58 @@ export default function ScorecardDetailClient({
                                     : "N/A"}
                             </span>
                         </div>
+                    </div>
+                </div>
+
+                {/* Email (Front) */}
+                <div className={styles.metricCard}>
+                    <div className={styles.metricHeader}>
+                        <h3 className={styles.metricTitle}>Email</h3>
+                        <span className={`${styles.metricScore} ${scoreColor(sc.categoryScores.email)}`}>
+                            {sc.categoryScores.email}
+                        </span>
+                    </div>
+                    <div className={styles.metricBody}>
+                        {em ? (
+                            <>
+                                <div className={styles.statRow}>
+                                    <span>Emails Sent</span>
+                                    <span className={styles.statValue}>{em.emailsSent}</span>
+                                </div>
+                                <div className={styles.statRow}>
+                                    <span>Emails Received</span>
+                                    <span className={styles.statValue}>{em.emailsReceived}</span>
+                                </div>
+                                <div className={styles.statRow}>
+                                    <span>Avg Response Time</span>
+                                    <span className={styles.statValue}>
+                                        {em.avgResponseTimeMinutes !== null
+                                            ? `${em.avgResponseTimeMinutes} min`
+                                            : "N/A"}
+                                    </span>
+                                </div>
+                                {Object.keys(em.inboxBreakdown).length > 0 && (
+                                    <>
+                                        <div className={styles.statRow} style={{ marginTop: "0.5rem", borderTop: "none" }}>
+                                            <span style={{ fontWeight: 600, fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.03em" }}>Inbox Breakdown</span>
+                                            <span />
+                                        </div>
+                                        {Object.entries(em.inboxBreakdown)
+                                            .sort(([, a], [, b]) => b - a)
+                                            .map(([inbox, count]) => (
+                                                <div key={inbox} className={styles.statRow}>
+                                                    <span>{inbox}</span>
+                                                    <span className={styles.statValue}>{count}</span>
+                                                </div>
+                                            ))}
+                                    </>
+                                )}
+                            </>
+                        ) : (
+                            <div className={styles.notConnected}>
+                                Not connected to Front
+                            </div>
+                        )}
                     </div>
                 </div>
 

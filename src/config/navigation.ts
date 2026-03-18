@@ -398,6 +398,12 @@ export const ADMIN_NAV: NavGroup[] = [
                 icon: History,
                 roles: ["SUPER_ADMIN"], // Only SUPER_ADMIN sees this
             },
+            {
+                id: "settings",
+                label: "Settings",
+                href: "/admin/settings",
+                icon: Settings,
+            },
         ],
     },
 ];
