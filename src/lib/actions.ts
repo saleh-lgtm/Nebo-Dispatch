@@ -73,6 +73,12 @@ export async function saveShiftReport(data: Record<string, unknown> & {
             callsReceived: reportData.callsReceived as number | undefined,
             emailsSent: reportData.emailsSent as number | undefined,
             quotesGiven: reportData.quotesGiven as number | undefined,
+            // Auto-tracked Twilio metrics (snapshot at submission)
+            autoSmsSent: reportData.autoSmsSent as number | undefined,
+            autoSmsReceived: reportData.autoSmsReceived as number | undefined,
+            autoCallsMade: reportData.autoCallsMade as number | undefined,
+            autoCallsReceived: reportData.autoCallsReceived as number | undefined,
+            autoCallMinutes: reportData.autoCallMinutes as number | undefined,
             // Reservation tracking
             totalReservationsHandled: reportData.totalReservationsHandled as number | undefined,
             acceptedReservations: reportData.acceptedReservations as object | undefined,

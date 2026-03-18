@@ -58,6 +58,11 @@ interface Report {
     driversDispatched: number;
     noShowsHandled: number;
     latePickups: number;
+    autoSmsSent: number;
+    autoSmsReceived: number;
+    autoCallsMade: number;
+    autoCallsReceived: number;
+    autoCallMinutes: number;
     handoffNotes: string | null;
     generalComments: string | null;
     newIdeas: string | null;
@@ -717,12 +722,21 @@ export default function ReportsClient({
                         </div>
 
                         {/* Metrics Grid */}
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
-                            <MetricBox label="Calls" value={selectedReport.callsReceived} icon={<Phone size={16} />} />
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem", marginBottom: "1rem" }}>
                             <MetricBox label="Emails" value={selectedReport.emailsSent} icon={<Mail size={16} />} />
                             <MetricBox label="Quotes" value={selectedReport.quotesGiven} icon={<FileText size={16} />} />
                             <MetricBox label="Duration" value={formatDuration(selectedReport.shift.totalHours)} icon={<Clock size={16} />} />
+                            <MetricBox label="Calls (legacy)" value={selectedReport.callsReceived} icon={<Phone size={16} />} />
                         </div>
+
+                        {/* Twilio Auto-tracked Activity */}
+                        {(selectedReport.autoSmsSent > 0 || selectedReport.autoSmsReceived > 0 || selectedReport.autoCallsMade > 0 || selectedReport.autoCallsReceived > 0) && (
+                            <div style={{ padding: "0.75rem 1rem", background: "rgba(59, 130, 246, 0.06)", border: "1px solid rgba(59, 130, 246, 0.12)", borderRadius: "8px", marginBottom: "1.5rem", fontSize: "0.8125rem", color: "var(--text-secondary)" }}>
+                                <span style={{ fontWeight: 600, color: "#60a5fa", marginRight: "0.5rem" }}>Twilio Activity:</span>
+                                {selectedReport.autoSmsSent + selectedReport.autoSmsReceived} texts ({selectedReport.autoSmsSent} sent, {selectedReport.autoSmsReceived} received),{" "}
+                                {selectedReport.autoCallsMade + selectedReport.autoCallsReceived} calls{selectedReport.autoCallMinutes > 0 ? ` (${selectedReport.autoCallMinutes} min)` : ""}
+                            </div>
+                        )}
 
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
                             <MetricBox label="Reservations" value={selectedReport.totalReservationsHandled} />

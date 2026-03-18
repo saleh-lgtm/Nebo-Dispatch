@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma";
 import { getShiftQuotes } from "@/lib/domains/quotes";
 import { getShiftReportDraft } from "@/lib/actions";
 import { getAffiliatesForShiftAudit } from "@/lib/affiliateAuditActions";
+import { getShiftCommunicationMetrics } from "@/lib/shiftReportActions";
 import dynamic from "next/dynamic";
 
 const ShiftReportForm = dynamic(() => import("@/components/ShiftReportForm"), {
@@ -35,7 +36,7 @@ export default async function ShiftReportPage() {
     }
 
     // Fetch tasks, quotes, draft, notes metrics, and affiliate audits in parallel
-    const [tasks, shiftQuotes, serverDraft, notesCreatedCount, announcementsReadCount, affiliateAudits] = await Promise.all([
+    const [tasks, shiftQuotes, serverDraft, notesCreatedCount, announcementsReadCount, affiliateAudits, commMetrics] = await Promise.all([
         prisma.shiftTask.findMany({
             where: { shiftId: activeShift.id },
             orderBy: { id: "asc" },
@@ -57,6 +58,9 @@ export default async function ShiftReportPage() {
         }),
         // Get affiliates configured for audit
         getAffiliatesForShiftAudit().catch(() => ({ success: false, data: [] })),
+        // Auto-tracked Twilio communication metrics
+        getShiftCommunicationMetrics(activeShift.clockIn, null, session.user.id)
+            .catch(() => ({ smsSent: 0, smsReceived: 0, callsMade: 0, callsReceived: 0, callDurationMinutes: 0 })),
     ]);
 
     return (
@@ -69,6 +73,7 @@ export default async function ShiftReportPage() {
             notesCreated={notesCreatedCount}
             announcementsRead={announcementsReadCount}
             initialAffiliateAudits={affiliateAudits.data ?? []}
+            autoMetrics={commMetrics}
         />
     );
 }

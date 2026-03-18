@@ -11,6 +11,83 @@ import {
     limitParamSchema,
 } from "@/lib/schemas";
 
+/**
+ * Auto-tracked communication metrics from Twilio.
+ * Single integration point — when switching to RingCentral or another provider,
+ * only the queries inside this function need to change.
+ */
+export interface CommunicationMetrics {
+    smsSent: number;
+    smsReceived: number;
+    callsMade: number;
+    callsReceived: number;
+    callDurationMinutes: number;
+}
+
+export async function getShiftCommunicationMetrics(
+    clockInTime: Date,
+    clockOutTime: Date | null,
+    userId: string
+): Promise<CommunicationMetrics> {
+    const endTime = clockOutTime || new Date();
+
+    const [smsSent, smsReceived, callsMade, callsReceived, callDuration] = await Promise.all([
+        // Outbound SMS sent by this dispatcher during shift
+        prisma.sMSLog.count({
+            where: {
+                direction: "OUTBOUND",
+                sentById: userId,
+                createdAt: { gte: clockInTime, lte: endTime },
+            },
+        }),
+
+        // Inbound SMS received during shift (all inbound, not user-specific)
+        prisma.sMSLog.count({
+            where: {
+                direction: "INBOUND",
+                createdAt: { gte: clockInTime, lte: endTime },
+            },
+        }),
+
+        // Outbound calls made by this dispatcher during shift
+        prisma.callLog.count({
+            where: {
+                direction: "OUTBOUND",
+                userId,
+                createdAt: { gte: clockInTime, lte: endTime },
+            },
+        }),
+
+        // Inbound calls during shift
+        prisma.callLog.count({
+            where: {
+                direction: "INBOUND",
+                createdAt: { gte: clockInTime, lte: endTime },
+            },
+        }),
+
+        // Total call duration in seconds
+        prisma.callLog.aggregate({
+            _sum: { durationSeconds: true },
+            where: {
+                userId,
+                createdAt: { gte: clockInTime, lte: endTime },
+                status: "completed",
+            },
+        }),
+    ]);
+
+    const totalSeconds = callDuration._sum.durationSeconds || 0;
+
+    return {
+        smsSent,
+        smsReceived,
+        callsMade,
+        callsReceived,
+        callDurationMinutes: Math.round(totalSeconds / 60),
+    };
+}
+
 // Get all shift reports (ADMIN/SUPER_ADMIN only)
 export async function getAllShiftReports(options?: {
     userId?: string;

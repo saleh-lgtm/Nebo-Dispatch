@@ -83,6 +83,14 @@ interface Session {
     };
 }
 
+interface AutoMetrics {
+    smsSent: number;
+    smsReceived: number;
+    callsMade: number;
+    callsReceived: number;
+    callDurationMinutes: number;
+}
+
 interface Props {
     session: Session;
     activeShift: ActiveShift;
@@ -92,9 +100,10 @@ interface Props {
     notesCreated?: number;
     announcementsRead?: number;
     initialAffiliateAudits?: AffiliateAuditEntry[];
+    autoMetrics?: AutoMetrics;
 }
 
-export default function ShiftReportPage({ session, activeShift, initialTasks, initialQuotes = [], initialDraft, notesCreated = 0, announcementsRead = 0, initialAffiliateAudits = [] }: Props) {
+export default function ShiftReportPage({ session, activeShift, initialTasks, initialQuotes = [], initialDraft, notesCreated = 0, announcementsRead = 0, initialAffiliateAudits = [], autoMetrics }: Props) {
     const router = useRouter();
     const [accepted, setAccepted] = useState<ReservationEntry[]>(initialDraft?.accepted || []);
     const [modified, setModified] = useState<ReservationEntry[]>(initialDraft?.modified || []);
@@ -281,10 +290,16 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
             const data = {
                 shiftId: activeShift.id,
                 userId: session.user.id,
-                callsReceived: metrics.calls,
+                callsReceived: autoMetrics ? autoMetrics.callsMade + autoMetrics.callsReceived : metrics.calls,
                 emailsSent: metrics.emails,
                 quotesGiven: quotes.length,
                 totalReservationsHandled: metrics.totalReservationsHandled,
+                // Auto-tracked Twilio metrics (snapshot)
+                autoSmsSent: autoMetrics?.smsSent || 0,
+                autoSmsReceived: autoMetrics?.smsReceived || 0,
+                autoCallsMade: autoMetrics?.callsMade || 0,
+                autoCallsReceived: autoMetrics?.callsReceived || 0,
+                autoCallMinutes: autoMetrics?.callDurationMinutes || 0,
                 generalComments: narrative.comments || undefined,
                 incidents: narrative.incidents || undefined,
                 newIdeas: narrative.ideas || undefined,
@@ -448,14 +463,43 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
                             </div>
                             <h2 className="card-title">Communication</h2>
                         </div>
+
+                        {/* Auto-tracked Twilio metrics */}
+                        {autoMetrics && (autoMetrics.smsSent > 0 || autoMetrics.smsReceived > 0 || autoMetrics.callsMade > 0 || autoMetrics.callsReceived > 0) ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginBottom: "1rem" }}>
+                                <div style={{ padding: "0.875rem 1rem", background: "rgba(59, 130, 246, 0.08)", border: "1px solid rgba(59, 130, 246, 0.15)", borderRadius: "10px" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
+                                        <Send size={14} style={{ color: "#60a5fa" }} />
+                                        <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "#60a5fa" }}>Texts</span>
+                                    </div>
+                                    <span style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--text-primary)" }}>
+                                        {autoMetrics.smsSent} sent, {autoMetrics.smsReceived} received
+                                    </span>
+                                    <span style={{ display: "block", fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>Auto-tracked from Twilio</span>
+                                </div>
+                                <div style={{ padding: "0.875rem 1rem", background: "rgba(34, 197, 94, 0.08)", border: "1px solid rgba(34, 197, 94, 0.15)", borderRadius: "10px" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
+                                        <Phone size={14} style={{ color: "#4ade80" }} />
+                                        <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "#4ade80" }}>Calls</span>
+                                    </div>
+                                    <span style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--text-primary)" }}>
+                                        {autoMetrics.callsMade} made, {autoMetrics.callsReceived} received{autoMetrics.callDurationMinutes > 0 ? `, ${autoMetrics.callDurationMinutes} min total` : ""}
+                                    </span>
+                                    <span style={{ display: "block", fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>Auto-tracked from Twilio</span>
+                                </div>
+                                <div style={{ padding: "0.5rem 0.75rem", background: "rgba(255,255,255,0.03)", borderRadius: "8px", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                                    Communications: {autoMetrics.smsSent + autoMetrics.smsReceived} texts + {autoMetrics.callsMade + autoMetrics.callsReceived} calls + {metrics.emails} emails
+                                </div>
+                            </div>
+                        ) : (
+                            <div style={{ padding: "0.875rem 1rem", background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)", borderRadius: "10px", marginBottom: "1rem" }}>
+                                <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>No Twilio activity detected during this shift</span>
+                                <span style={{ display: "block", fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>SMS and call data syncs automatically from Twilio</span>
+                            </div>
+                        )}
+
+                        {/* Manual email counter (no email system to auto-track) */}
                         <div className="metrics-row">
-                            <MetricCard
-                                label="Calls Received"
-                                value={metrics.calls}
-                                onChange={(v) => setMetrics({ ...metrics, calls: v })}
-                                icon={<Phone size={20} />}
-                                color="blue"
-                            />
                             <MetricCard
                                 label="Emails Sent"
                                 value={metrics.emails}
