@@ -1172,22 +1172,15 @@ export async function ingestManifestTrips(
                     continue;
                 }
 
-                // Check for duplicate
-                const existing = await prisma.tripConfirmation.findFirst({
+                // Atomic upsert — prevents race conditions and cross-day duplicates
+                const result = await prisma.tripConfirmation.upsert({
                     where: {
-                        tripNumber: trip.tripNumber,
-                        manifestDate: today,
+                        tripNumber_pickupAt: {
+                            tripNumber: trip.tripNumber,
+                            pickupAt: trip.pickupAt,
+                        },
                     },
-                });
-
-                if (existing) {
-                    duplicate++;
-                    continue;
-                }
-
-                // Create new confirmation
-                await prisma.tripConfirmation.create({
-                    data: {
+                    create: {
                         tripNumber: trip.tripNumber,
                         reservationNumber: trip.reservationNumber,
                         pickupAt: trip.pickupAt,
@@ -1199,9 +1192,24 @@ export async function ingestManifestTrips(
                         manifestDate: today,
                         sourceEmail: sourceEmail,
                     },
+                    update: {
+                        // Refresh fields that may change between manifests
+                        driverName: trip.driverName,
+                        reservationNumber: trip.reservationNumber,
+                        accountName: trip.accountName,
+                        accountNumber: trip.accountNumber,
+                        dueAt,
+                        manifestDate: today,
+                        sourceEmail: sourceEmail,
+                    },
                 });
 
-                created++;
+                // If createdAt matches now (within 1s), it was newly created
+                if (Math.abs(result.createdAt.getTime() - result.updatedAt.getTime()) < 1000) {
+                    created++;
+                } else {
+                    duplicate++;
+                }
             } catch (error) {
                 errors.push(
                     `Trip ${trip.tripNumber}: ${error instanceof Error ? error.message : "Unknown error"}`
@@ -1237,6 +1245,82 @@ export async function ingestManifestTrips(
 }
 
 /**
+ * One-time cleanup: archive duplicate TripConfirmation records.
+ * Keeps the most recent record (by createdAt) for each tripNumber,
+ * soft-deletes older duplicates by setting archivedAt.
+ * Admin only. Returns count of archived duplicates.
+ */
+export async function cleanupDuplicateConfirmations(dryRun: boolean = true) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+        return { success: false as const, error: "Unauthorized" };
+    }
+    if (!["SUPER_ADMIN", "ADMIN"].includes(session.user.role || "")) {
+        return { success: false as const, error: "Admin access required" };
+    }
+
+    try {
+        // Find tripNumbers that have multiple non-archived records
+        const duplicates = await prisma.$queryRaw<
+            Array<{ tripNumber: string; cnt: bigint }>
+        >`
+            SELECT "tripNumber", COUNT(*) as cnt
+            FROM "TripConfirmation"
+            WHERE "archivedAt" IS NULL
+            GROUP BY "tripNumber"
+            HAVING COUNT(*) > 1
+        `;
+
+        if (duplicates.length === 0) {
+            return { success: true as const, data: { duplicateGroups: 0, archived: 0, dryRun } };
+        }
+
+        const tripNumbers = duplicates.map(d => d.tripNumber);
+        let archivedCount = 0;
+
+        if (!dryRun) {
+            const now = new Date();
+            for (const tripNumber of tripNumbers) {
+                // Find all non-archived records for this tripNumber, ordered newest first
+                const records = await prisma.tripConfirmation.findMany({
+                    where: { tripNumber, archivedAt: null },
+                    orderBy: { createdAt: "desc" },
+                });
+
+                // Keep the first (newest), archive the rest
+                const toArchive = records.slice(1).map(r => r.id);
+                if (toArchive.length > 0) {
+                    await prisma.tripConfirmation.updateMany({
+                        where: { id: { in: toArchive } },
+                        data: { archivedAt: now },
+                    });
+                    archivedCount += toArchive.length;
+                }
+            }
+
+            await createAuditLog(
+                session.user.id,
+                "UPDATE",
+                "TripConfirmation",
+                "bulk-dedup",
+                { action: "cleanup_duplicates", archivedCount, duplicateGroups: duplicates.length }
+            );
+        }
+
+        return {
+            success: true as const,
+            data: {
+                duplicateGroups: duplicates.length,
+                archived: dryRun ? duplicates.reduce((sum, d) => sum + (Number(d.cnt) - 1), 0) : archivedCount,
+                dryRun,
+            },
+        };
+    } catch (error) {
+        return { success: false as const, error: error instanceof Error ? error.message : "Failed to cleanup duplicates" };
+    }
+}
+
+/**
  * Get pending confirmation count for dashboard badge
  */
 export async function getPendingConfirmationCount() {
@@ -1265,9 +1349,10 @@ export async function getPendingConfirmationCount() {
 }
 
 /**
- * Get confirmations created since a given timestamp
- * Used for auto-refresh polling — returns only new records
- * Uses createdAt only (indexed) to avoid full table scan on updatedAt
+ * Get confirmations created or updated since a given timestamp.
+ * Used for auto-refresh polling — returns new trips AND status changes.
+ * Each record includes an `_isUpdate` flag so the client can distinguish
+ * new trips from status updates made by other dispatchers.
  */
 export async function getNewConfirmationsSince(since: Date) {
     const session = await getServerSession(authOptions);
@@ -1290,28 +1375,72 @@ export async function getNewConfirmationsSince(since: Date) {
     }
 
     try {
-        const newConfirmations = await prisma.tripConfirmation.findMany({
-            where: {
-                createdAt: { gt: sinceDate },
+        const includeOpts = {
+            completedBy: {
+                select: { id: true, name: true },
             },
-            orderBy: { dueAt: "asc" },
-            include: {
-                completedBy: {
-                    select: { id: true, name: true },
+        };
+
+        // Fetch new trips AND recently updated trips in parallel
+        const [newTrips, updatedTrips] = await Promise.all([
+            prisma.tripConfirmation.findMany({
+                where: { createdAt: { gt: sinceDate } },
+                orderBy: { dueAt: "asc" },
+                include: includeOpts,
+                take: 50,
+            }),
+            prisma.tripConfirmation.findMany({
+                where: {
+                    updatedAt: { gt: sinceDate },
+                    // Exclude newly created — they're already in newTrips
+                    createdAt: { lte: sinceDate },
                 },
-            },
-            take: 50,
-        });
+                orderBy: { updatedAt: "desc" },
+                include: includeOpts,
+                take: 50,
+            }),
+        ]);
 
         return {
             success: true as const,
             data: {
-                confirmations: newConfirmations,
+                newTrips,
+                updatedTrips,
                 timestamp: new Date(),
             },
         };
     } catch (error) {
         return { success: false as const, error: error instanceof Error ? error.message : "Failed to fetch new confirmations" };
+    }
+}
+
+/**
+ * Get a single confirmation by ID with completedBy info.
+ * Used to fetch real status after a race condition.
+ */
+export async function getConfirmationById(id: string) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+        return { success: false as const, error: "Unauthorized" };
+    }
+
+    try {
+        const confirmation = await prisma.tripConfirmation.findUnique({
+            where: { id },
+            include: {
+                completedBy: {
+                    select: { id: true, name: true },
+                },
+            },
+        });
+
+        if (!confirmation) {
+            return { success: false as const, error: "Confirmation not found" };
+        }
+
+        return { success: true as const, data: confirmation };
+    } catch (error) {
+        return { success: false as const, error: error instanceof Error ? error.message : "Failed to fetch confirmation" };
     }
 }
 

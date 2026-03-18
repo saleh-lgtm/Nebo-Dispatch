@@ -10,7 +10,7 @@ import {
     PhoneOff,
     AlertTriangle,
 } from "lucide-react";
-import { completeConfirmation } from "@/lib/tripConfirmationActions";
+import { completeConfirmation, getConfirmationById } from "@/lib/tripConfirmationActions";
 import { useRouter } from "next/navigation";
 import styles from "./DashboardConfirmationWidget.module.css";
 
@@ -49,7 +49,23 @@ export default function DashboardConfirmationWidget({ confirmations }: Props) {
             setDismissed((prev) => new Set(prev).add(id));
             try {
                 const result = await completeConfirmation(id, status, "");
-                if (!result.success) throw new Error(result.error);
+                if (!result.success) {
+                    // Race condition — fetch real status instead of reverting
+                    const realState = await getConfirmationById(id);
+                    if (realState.success && realState.data) {
+                        const confirmerName = realState.data.completedBy?.name || "another dispatcher";
+                        setError(`Already ${realState.data.status.toLowerCase().replace("_", " ")} by ${confirmerName}`);
+                    } else {
+                        setError(result.error || "Failed to complete confirmation");
+                        setDismissed((prev) => {
+                            const next = new Set(prev);
+                            next.delete(id);
+                            return next;
+                        });
+                    }
+                    router.refresh();
+                    return;
+                }
                 router.refresh();
             } catch (err) {
                 setDismissed((prev) => {

@@ -158,6 +158,10 @@
     background: var(--danger);
 }
 
+.toastInfo {
+    background: var(--primary, #3b82f6);
+}
+
 .toastDismiss {
     background: none;
     border: none;

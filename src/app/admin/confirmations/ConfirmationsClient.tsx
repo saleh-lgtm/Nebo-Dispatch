@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { Phone, BarChart3, Users, ShieldAlert, ListFilter, X } from "lucide-react";
 import TabBar from "@/components/ui/TabBar";
-import { getAllConfirmations, completeConfirmation, getConfirmationTabData, getNewConfirmationsSince } from "@/lib/tripConfirmationActions";
+import { getAllConfirmations, completeConfirmation, getConfirmationTabData, getNewConfirmationsSince, getConfirmationById } from "@/lib/tripConfirmationActions";
 import { useRouter } from "next/navigation";
 import {
     ConfirmationModal,
@@ -74,7 +74,7 @@ export default function ConfirmationsClient({
     const router = useRouter();
 
     // Toast notification state
-    const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+    const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
 
     // Auto-dismiss toast after 5 seconds
     useEffect(() => {
@@ -83,7 +83,7 @@ export default function ConfirmationsClient({
         return () => clearTimeout(timer);
     }, [toast]);
 
-    // Auto-refresh: poll for new confirmations every 30 seconds
+    // Auto-refresh: poll for new + updated confirmations every 15 seconds
     const lastRefreshRef = useRef(new Date());
     const selectedTabRef = useRef(selectedTab);
     selectedTabRef.current = selectedTab;
@@ -95,19 +95,37 @@ export default function ConfirmationsClient({
 
             try {
                 const result = await getNewConfirmationsSince(lastRefreshRef.current);
-                const pollData = result.data ?? { confirmations: [], timestamp: lastRefreshRef.current };
-                if (pollData.confirmations.length > 0) {
-                    setConfirmations(prev => {
-                        const existingIds = new Set(prev.map(c => c.id));
-                        const newTrips = pollData.confirmations.filter(c => !existingIds.has(c.id));
+                const pollData = result.data ?? { newTrips: [], updatedTrips: [], timestamp: lastRefreshRef.current };
 
-                        if (newTrips.length > 0) {
-                            setTotalCount(prevCount => prevCount + newTrips.length);
-                            setToast({ message: `${newTrips.length} new trip${newTrips.length > 1 ? "s" : ""} added`, type: "success" });
-                            return [...(newTrips as TripConfirmation[]), ...prev];
+                const hasNew = pollData.newTrips.length > 0;
+                const hasUpdated = pollData.updatedTrips.length > 0;
+
+                if (hasNew || hasUpdated) {
+                    setConfirmations(prev => {
+                        let updated = [...prev];
+
+                        // Merge status updates for existing trips
+                        if (hasUpdated) {
+                            const updateMap = new Map(
+                                pollData.updatedTrips.map(t => [t.id, t])
+                            );
+                            updated = updated.map(c =>
+                                updateMap.has(c.id) ? (updateMap.get(c.id) as TripConfirmation) : c
+                            );
                         }
 
-                        return prev;
+                        // Add genuinely new trips
+                        if (hasNew) {
+                            const existingIds = new Set(updated.map(c => c.id));
+                            const brandNew = pollData.newTrips.filter(c => !existingIds.has(c.id));
+                            if (brandNew.length > 0) {
+                                setTotalCount(prevCount => prevCount + brandNew.length);
+                                setToast({ message: `${brandNew.length} new trip${brandNew.length > 1 ? "s" : ""} added`, type: "success" });
+                                updated = [...(brandNew as TripConfirmation[]), ...updated];
+                            }
+                        }
+
+                        return updated;
                     });
                     lastRefreshRef.current = pollData.timestamp;
                 }
@@ -116,7 +134,7 @@ export default function ConfirmationsClient({
             }
         };
 
-        const interval = setInterval(poll, 30000);
+        const interval = setInterval(poll, 15000);
         return () => clearInterval(interval);
     }, []);
 
@@ -347,22 +365,50 @@ export default function ConfirmationsClient({
         const prevConfirmations = [...confirmations];
         const prevTotalCount = totalCount;
 
-        setConfirmations(prev => prev.map(c =>
-            c.id === tripId ? {
-                ...c,
-                status: newStatus,
-                completedAt: new Date().toISOString(),
-                completedBy: { id: currentUser.id, name: currentUser.name },
-                minutesBeforeDue: Math.round(
-                    (new Date(c.dueAt).getTime() - Date.now()) / 60000
-                ),
-            } : c
-        ));
+        // Optimistic: remove from active list for CONFIRMED, update status for NO_ANSWER
+        if (newStatus === "CONFIRMED") {
+            setConfirmations(prev => prev.filter(c => c.id !== tripId));
+            setTotalCount(prev => prev - 1);
+        } else {
+            setConfirmations(prev => prev.map(c =>
+                c.id === tripId ? {
+                    ...c,
+                    status: newStatus,
+                    completedAt: new Date().toISOString(),
+                    completedBy: { id: currentUser.id, name: currentUser.name },
+                    minutesBeforeDue: Math.round(
+                        (new Date(c.dueAt).getTime() - Date.now()) / 60000
+                    ),
+                } : c
+            ));
+        }
         setCompleting(tripId);
 
         try {
             const result = await completeConfirmation(tripId, newStatus);
-            if (!result.success) throw new Error(result.error);
+            if (!result.success) {
+                // Race condition — another dispatcher already handled this trip
+                // Fetch the real current state instead of reverting to stale data
+                const realState = await getConfirmationById(tripId);
+                if (realState.success && realState.data) {
+                    const real = realState.data;
+                    const confirmerName = real.completedBy?.name || "another dispatcher";
+                    setToast({ message: `Already ${real.status.toLowerCase().replace("_", " ")} by ${confirmerName}`, type: "info" });
+                    // Update with real state — remove from list since it's handled
+                    setConfirmations(prev => prev.filter(c => c.id !== tripId));
+                    setTotalCount(prev => {
+                        // Only decrement if we haven't already (NO_ANSWER path didn't remove)
+                        const stillInList = prev === prevTotalCount;
+                        return stillInList ? prev - 1 : prev;
+                    });
+                } else {
+                    // Can't fetch real state — revert
+                    setConfirmations(prevConfirmations);
+                    setTotalCount(prevTotalCount);
+                    setToast({ message: "Failed to update - please try again", type: "error" });
+                }
+                return;
+            }
         } catch {
             setConfirmations(prevConfirmations);
             setTotalCount(prevTotalCount);
@@ -501,7 +547,7 @@ export default function ConfirmationsClient({
 
             {/* Toast Notification */}
             {toast && (
-                <div className={`${styles.toast} ${toast.type === "success" ? styles.toastSuccess : styles.toastError}`}>
+                <div className={`${styles.toast} ${toast.type === "success" ? styles.toastSuccess : toast.type === "info" ? styles.toastInfo : styles.toastError}`}>
                     <span>{toast.message}</span>
                     <button className={styles.toastDismiss} onClick={() => setToast(null)}>
                         <X size={14} />

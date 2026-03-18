@@ -1719,7 +1719,7 @@ model TripConfirmation {
   // Accountability tracking (who was on duty when this expired)
   accountableDispatchers MissedConfirmationAccountability[]
 
-  @@unique([tripNumber, manifestDate])  // Prevent duplicates from same manifest
+  @@unique([tripNumber, pickupAt])       // Prevent duplicates — trip + pickup is truly unique
   @@index([status, dueAt])
   @@index([dueAt])
   @@index([completedById])
@@ -1729,6 +1729,7 @@ model TripConfirmation {
   @@index([status, pickupAt])            // For filtering by status + pickup time
   @@index([status, archivedAt, pickupAt]) // For dashboard query (pending + not archived + future)
   @@index([createdAt])                   // For stats queries
+  @@index([updatedAt])                   // For poll sync (updated trips)
 }
 
 // Manifest ingestion log - track incoming manifests
