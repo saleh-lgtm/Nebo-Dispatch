@@ -71,6 +71,19 @@ export async function createBillingReview(data: CreateBillingReviewInput) {
             },
         });
 
+        // Create linked billing task for accounting team
+        const reasonLabel = BILLING_REVIEW_REASON_LABELS[data.reason] || data.reason;
+        await prisma.billingTask.create({
+            data: {
+                title: `Billing Review: Trip #${data.tripNumber} — ${reasonLabel}`,
+                description: data.notes || undefined,
+                entityType: "BillingReview",
+                entityId: billingReview.id,
+                priority: "HIGH",
+                createdById: session.user.id,
+            },
+        });
+
         await createAuditLog(
             session.user.id,
             "CREATE",
@@ -128,6 +141,23 @@ export async function createBillingReviews(
                 })
             )
         );
+
+        // Create linked billing tasks for each review
+        if (createdReviews.length > 0) {
+            await prisma.billingTask.createMany({
+                data: createdReviews.map((review, i) => {
+                    const reasonLabel = BILLING_REVIEW_REASON_LABELS[reviews[i].reason] || reviews[i].reason;
+                    return {
+                        title: `Billing Review: Trip #${review.tripNumber} — ${reasonLabel}`,
+                        description: reviews[i].notes?.trim() || undefined,
+                        entityType: "BillingReview",
+                        entityId: review.id,
+                        priority: "HIGH",
+                        createdById: session.user.id,
+                    };
+                }),
+            });
+        }
 
         // Log audit for batch creation
         await createAuditLog(
@@ -296,6 +326,20 @@ export async function resolveBillingReview(
                 accountingNotes: accountingNotes || null,
                 reviewedById: session.user.id,
                 reviewedAt: new Date(),
+            },
+        });
+
+        // Auto-complete the linked billing task
+        await prisma.billingTask.updateMany({
+            where: {
+                entityType: "BillingReview",
+                entityId: reviewId,
+                status: { not: "COMPLETED" },
+            },
+            data: {
+                status: "COMPLETED",
+                resolvedById: session.user.id,
+                resolvedAt: new Date(),
             },
         });
 

@@ -67,6 +67,7 @@ export interface BadgeCounts {
     pendingRequests: number;
     pendingTasks: number;
     newTbrTrips: number;
+    pendingBillingTasks: number;
 }
 
 // ============================================
@@ -319,6 +320,7 @@ export const ADMIN_NAV: NavGroup[] = [
                 label: "Accounting",
                 href: "/accounting",
                 icon: Calculator,
+                badgeKey: "pendingBillingTasks",
             },
             {
                 id: "pricing",
@@ -419,6 +421,7 @@ export const ACCOUNTING_NAV: NavGroup[] = [
                 label: "Accounting",
                 href: "/accounting",
                 icon: Calculator,
+                badgeKey: "pendingBillingTasks",
             },
             {
                 id: "pricing",
@@ -539,5 +542,6 @@ export function getEmptyBadgeCounts(): BadgeCounts {
         pendingRequests: 0,
         pendingTasks: 0,
         newTbrTrips: 0,
+        pendingBillingTasks: 0,
     };
 }

@@ -180,7 +180,11 @@ export default function FlagsList({
                                 {flag.resolution && (
                                     <div className={styles.flagResolution}>
                                         <CheckCircle size={14} />
-                                        <span>Resolution: {flag.resolution}</span>
+                                        <span>
+                                            Resolved{flag.reviewedBy ? ` by ${flag.reviewedBy.name}` : ""}
+                                            {flag.reviewedAt ? ` on ${new Date(flag.reviewedAt).toLocaleDateString()}` : ""}
+                                            {" — "}{flag.resolution}
+                                        </span>
                                     </div>
                                 )}
                             </div>

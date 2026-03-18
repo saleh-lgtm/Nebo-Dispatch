@@ -17,6 +17,7 @@ export async function getNavBadgeCounts(): Promise<{ success: true; data: BadgeC
         pendingRequests: 0,
         pendingTasks: 0,
         newTbrTrips: 0,
+        pendingBillingTasks: 0,
     };
 
     const session = await getServerSession(authOptions);
@@ -45,6 +46,7 @@ export async function getNavBadgeCounts(): Promise<{ success: true; data: BadgeC
             pendingSwaps,
             pendingTasks,
             newTbrTrips,
+            pendingBillingTasks,
         ] = await Promise.all([
             // Pending trip confirmations
             prisma.tripConfirmation.count({
@@ -96,6 +98,13 @@ export async function getNavBadgeCounts(): Promise<{ success: true; data: BadgeC
                     tbrStatus: "PENDING",
                 },
             }),
+
+            // Pending billing tasks (for accounting nav badge)
+            prisma.billingTask.count({
+                where: {
+                    status: "PENDING",
+                },
+            }),
         ]);
 
         return {
@@ -106,6 +115,7 @@ export async function getNavBadgeCounts(): Promise<{ success: true; data: BadgeC
                 pendingRequests: pendingTimeOff + pendingSwaps,
                 pendingTasks,
                 newTbrTrips,
+                pendingBillingTasks,
             },
         };
     } catch (error) {

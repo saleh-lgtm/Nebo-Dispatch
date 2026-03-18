@@ -194,6 +194,7 @@ export default function Sidebar({ user }: Props) {
         pendingRequests: 0,
         pendingTasks: 0,
         newTbrTrips: 0,
+        pendingBillingTasks: 0,
     });
 
     // Check mobile viewport

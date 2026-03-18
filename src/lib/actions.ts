@@ -88,20 +88,37 @@ export async function saveShiftReport(data: Record<string, unknown> & {
         },
     });
 
-    // Create accounting flags for flagged reservations
+    // Create accounting flags for flagged reservations + billing tasks
     if (flaggedReservations && flaggedReservations.length > 0) {
-        await prisma.accountingFlag.createMany({
-            data: flaggedReservations.map((flag) => ({
-                shiftReportId: report.id,
-                reservationType: flag.reservationType,
-                reservationId: flag.reservationId,
-                reservationNotes: flag.reservationNotes,
-                flagReason: flag.flagReason,
-                flaggedById: session.user.id,
-                status: "PENDING" as const,
-            })),
-            skipDuplicates: true,
-        });
+        // Use transaction to create flags and their linked billing tasks atomically
+        const createdFlags = await prisma.$transaction(
+            flaggedReservations.map((flag) =>
+                prisma.accountingFlag.create({
+                    data: {
+                        shiftReportId: report.id,
+                        reservationType: flag.reservationType,
+                        reservationId: flag.reservationId,
+                        reservationNotes: flag.reservationNotes,
+                        flagReason: flag.flagReason,
+                        flaggedById: session.user.id,
+                        status: "PENDING",
+                    },
+                })
+            )
+        );
+
+        // Create a billing task for each flag
+        if (createdFlags.length > 0) {
+            await prisma.billingTask.createMany({
+                data: createdFlags.map((flag) => ({
+                    title: `Billing Flag: Reservation #${flag.reservationId} — ${flag.flagReason || flag.reservationType}`,
+                    entityType: "AccountingFlag",
+                    entityId: flag.id,
+                    priority: "HIGH",
+                    createdById: session.user.id,
+                })),
+            });
+        }
 
         await createAuditLog(
             session.user.id,

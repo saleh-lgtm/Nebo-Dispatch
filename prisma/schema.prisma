@@ -215,6 +215,10 @@ model User {
   billingReviewsSubmitted BillingReview[]  @relation("BillingSubmittedBy")
   billingReviewsReviewed  BillingReview[]  @relation("BillingReviewedBy")
 
+  // Billing task relations
+  billingTasksCreated     BillingTask[]    @relation("BillingTaskCreator")
+  billingTasksResolved    BillingTask[]    @relation("BillingTaskResolver")
+
   // Notification relations
   notifications         Notification[]
 
@@ -1202,6 +1206,35 @@ model BillingReview {
   @@index([status])
   @@index([tripNumber])
   @@index([submittedById])
+  @@index([createdAt])
+}
+
+// Billing tasks — auto-created when dispatchers flag reservations or request billing reviews
+model BillingTask {
+  id          String     @id @default(cuid())
+  title       String
+  description String?    @db.Text
+  priority    String     @default("HIGH")     // HIGH, MEDIUM, LOW
+  status      TaskStatus @default(PENDING)
+
+  // Link to source entity
+  entityType  String     // "AccountingFlag" or "BillingReview"
+  entityId    String     // ID of the linked flag or review
+
+  // Created by (the dispatcher who flagged)
+  createdById String
+  createdBy   User       @relation("BillingTaskCreator", fields: [createdById], references: [id])
+
+  // Resolved by (accounting team member)
+  resolvedById String?
+  resolvedBy   User?     @relation("BillingTaskResolver", fields: [resolvedById], references: [id])
+  resolvedAt   DateTime?
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([status])
+  @@index([entityType, entityId])
   @@index([createdAt])
 }
 

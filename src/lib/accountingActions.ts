@@ -200,6 +200,20 @@ export async function resolveAccountingFlag(
             },
         });
 
+        // Auto-complete the linked billing task
+        await prisma.billingTask.updateMany({
+            where: {
+                entityType: "AccountingFlag",
+                entityId: parsed.data.flagId,
+                status: { not: "COMPLETED" },
+            },
+            data: {
+                status: "COMPLETED",
+                resolvedById: session.user.id,
+                resolvedAt: new Date(),
+            },
+        });
+
         revalidatePath("/accounting");
         return { success: true, data: flag };
     } catch (error) {
@@ -236,7 +250,7 @@ export async function getAccountingStats() {
     try {
         await requireAccounting();
 
-        const [pending, inReview, resolved, recentFlags] = await Promise.all([
+        const [pending, inReview, resolved, recentFlags, pendingBillingTasks] = await Promise.all([
             prisma.accountingFlag.count({ where: { status: "PENDING" } }),
             prisma.accountingFlag.count({ where: { status: "IN_REVIEW" } }),
             prisma.accountingFlag.count({ where: { status: "RESOLVED" } }),
@@ -253,6 +267,7 @@ export async function getAccountingStats() {
                 orderBy: { createdAt: "desc" },
                 take: 5,
             }),
+            prisma.billingTask.count({ where: { status: "PENDING" } }),
         ]);
 
         return {
@@ -263,6 +278,7 @@ export async function getAccountingStats() {
                 resolved,
                 total: pending + inReview + resolved,
                 recentFlags,
+                pendingBillingTasks,
             },
         };
     } catch (error) {
