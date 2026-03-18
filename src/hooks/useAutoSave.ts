@@ -41,8 +41,44 @@ interface AutoSaveReturn<T> {
     dismissDraft: () => void;
 }
 
-// Session storage key to track dismissed drafts
+// localStorage key to track dismissed drafts (persists across sessions)
 const getDismissedKey = (storageKey: string) => `${storageKey}-dismissed`;
+
+/**
+ * Check if draft data has meaningful changes beyond default/empty values.
+ * Prevents phantom drafts from trivial state like all-zero metrics + empty strings.
+ */
+function hasMeaningfulChanges(data: Record<string, unknown>): boolean {
+    if (!data) return false;
+
+    // Check arrays — any non-empty array is meaningful
+    const arrayKeys = ["accepted", "modified", "cancelled", "retailLeads", "billingReviews", "affiliateAudits"];
+    for (const key of arrayKeys) {
+        const arr = data[key];
+        if (Array.isArray(arr) && arr.length > 0) return true;
+    }
+
+    // Check handoff notes
+    if (typeof data.handoffNotes === "string" && data.handoffNotes.trim().length > 0) return true;
+
+    // Check metrics — any non-zero value is meaningful
+    const metrics = data.metrics as Record<string, number> | undefined;
+    if (metrics) {
+        if ((metrics.calls || 0) > 0) return true;
+        if ((metrics.emails || 0) > 0) return true;
+        if ((metrics.totalReservationsHandled || 0) > 0) return true;
+    }
+
+    // Check narrative — any non-empty text is meaningful
+    const narrative = data.narrative as Record<string, string> | undefined;
+    if (narrative) {
+        if (narrative.comments?.trim()) return true;
+        if (narrative.incidents?.trim()) return true;
+        if (narrative.ideas?.trim()) return true;
+    }
+
+    return false;
+}
 
 // Helper to compute initial state from localStorage
 function getInitialAutoSaveState(storageKey: string): { hasDraft: boolean; draftDismissed: boolean } {
@@ -50,7 +86,7 @@ function getInitialAutoSaveState(storageKey: string): { hasDraft: boolean; draft
         return { hasDraft: false, draftDismissed: false };
     }
 
-    const wasDismissed = sessionStorage.getItem(getDismissedKey(storageKey)) === "true";
+    const wasDismissed = localStorage.getItem(getDismissedKey(storageKey)) === "true";
     if (wasDismissed) {
         return { hasDraft: false, draftDismissed: true };
     }
@@ -62,7 +98,7 @@ function getInitialAutoSaveState(storageKey: string): { hasDraft: boolean; draft
             if (parsed.data && parsed.timestamp && parsed.version === DRAFT_SCHEMA_VERSION) {
                 const draftAge = Date.now() - new Date(parsed.timestamp).getTime();
                 const maxAge = 24 * 60 * 60 * 1000;
-                if (draftAge < maxAge) {
+                if (draftAge < maxAge && hasMeaningfulChanges(parsed.data)) {
                     return { hasDraft: true, draftDismissed: false };
                 } else {
                     localStorage.removeItem(storageKey);
@@ -130,6 +166,15 @@ export function useAutoSave<T>({
         // Set new timeout for debounced save
         saveTimeoutRef.current = setTimeout(() => {
             try {
+                // Only persist if the data has meaningful content
+                const meaningful = hasMeaningfulChanges(data as Record<string, unknown>);
+                if (!meaningful) {
+                    // No meaningful changes — don't create a phantom draft
+                    localStorage.removeItem(storageKey);
+                    setState((prev) => ({ ...prev, hasDraft: false }));
+                    return;
+                }
+
                 const draftData = {
                     data,
                     timestamp: new Date().toISOString(),
@@ -266,7 +311,7 @@ export function useAutoSave<T>({
                     onRestore(parsed.data);
                 }
                 // Clear the dismissed flag when restoring
-                sessionStorage.removeItem(getDismissedKey(storageKey));
+                localStorage.removeItem(getDismissedKey(storageKey));
                 setState((prev) => ({ ...prev, hasDraft: false, draftDismissed: false }));
                 return parsed.data as T;
             }
@@ -281,7 +326,7 @@ export function useAutoSave<T>({
         if (typeof window === "undefined") return;
 
         localStorage.removeItem(storageKey);
-        sessionStorage.removeItem(getDismissedKey(storageKey));
+        localStorage.removeItem(getDismissedKey(storageKey));
         setState((prev) => ({
             ...prev,
             hasDraft: false,
@@ -294,8 +339,8 @@ export function useAutoSave<T>({
     const dismissDraft = useCallback(() => {
         if (typeof window === "undefined") return;
 
-        // Mark as dismissed for this session only
-        sessionStorage.setItem(getDismissedKey(storageKey), "true");
+        // Mark as dismissed persistently (survives tab close)
+        localStorage.setItem(getDismissedKey(storageKey), "true");
         // Clear the draft from localStorage
         localStorage.removeItem(storageKey);
         setState((prev) => ({

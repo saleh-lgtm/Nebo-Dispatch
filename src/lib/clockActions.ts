@@ -393,6 +393,59 @@ export async function getIncompleteReportShifts() {
 }
 
 /**
+ * Get the most recent handoff note from the last submitted shift report.
+ * Returns null if no handoff note exists or it's older than 12 hours.
+ */
+export async function getActiveHandoffNote(): Promise<{
+    success: boolean;
+    data?: {
+        id: string;
+        handoffNotes: string;
+        authorName: string;
+        submittedAt: Date;
+    } | null;
+    error?: string;
+}> {
+    try {
+        await requireAuth();
+
+        const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
+
+        const report = await prisma.shiftReport.findFirst({
+            where: {
+                status: "SUBMITTED",
+                handoffNotes: { not: "" },
+                createdAt: { gte: twelveHoursAgo },
+            },
+            orderBy: { createdAt: "desc" },
+            select: {
+                id: true,
+                handoffNotes: true,
+                createdAt: true,
+                user: { select: { name: true } },
+            },
+        });
+
+        if (!report || !report.handoffNotes) {
+            return { success: true, data: null };
+        }
+
+        return {
+            success: true,
+            data: {
+                id: report.id,
+                handoffNotes: report.handoffNotes,
+                authorName: report.user.name || "Unknown",
+                submittedAt: report.createdAt,
+            },
+        };
+    } catch (error) {
+        console.error("getActiveHandoffNote error:", error);
+        return { success: false, error: "Failed to get handoff note" };
+    }
+}
+
+/**
  * Check if user can logout - blocks if they have an active shift without a submitted report
  */
 export async function canLogout(): Promise<{

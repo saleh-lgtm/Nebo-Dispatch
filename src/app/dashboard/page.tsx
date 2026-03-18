@@ -9,6 +9,7 @@ import { getUpcomingEvents } from "@/lib/eventActions";
 import { getUserNextShift } from "@/lib/schedulerActions";
 import { getMyTasks, getTaskProgress } from "@/lib/taskActions";
 import { getUpcomingConfirmations } from "@/lib/tripConfirmationActions";
+import { getActiveHandoffNote } from "@/lib/clockActions";
 import dynamic from "next/dynamic";
 
 // Dynamic import with loading skeleton for better initial load
@@ -115,6 +116,7 @@ export default async function DashboardPage() {
         taskProgress,
         upcomingConfirmations,
         accountabilityScore,
+        activeHandoffNote,
     ] = await Promise.all([
         // User count for admins
         safePromise(
@@ -187,6 +189,12 @@ export default async function DashboardPage() {
             }).then(u => u?.accountabilityScore ?? 100),
             100
         ),
+
+        // Active handoff note from previous shift
+        safePromise(
+            getActiveHandoffNote().then(r => r.success ? r.data ?? null : null),
+            null
+        ),
     ]);
 
     const stats = {
@@ -209,6 +217,7 @@ export default async function DashboardPage() {
             taskProgress={taskProgress}
             upcomingConfirmations={upcomingConfirmations as never}
             accountabilityScore={accountabilityScore}
+            activeHandoffNote={activeHandoffNote}
             userId={session.user.id}
             isAdmin={isAdmin}
             isSuperAdmin={isSuperAdmin}

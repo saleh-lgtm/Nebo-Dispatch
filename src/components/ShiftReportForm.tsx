@@ -325,15 +325,19 @@ export default function ShiftReportPage({ session, activeShift, initialTasks, in
                 }
             }
 
-            // Clear draft after successful submission
+            // Clear draft BEFORE redirect to prevent phantom popups
             clearDraft();
+            // Also clear the dismissed key for this shift (no longer needed)
+            if (typeof window !== "undefined") {
+                localStorage.removeItem(`shift-report-draft-${activeShift.id}-dismissed`);
+            }
             try {
                 await deleteShiftReportDraft(activeShift.id);
             } catch {
                 // Ignore draft deletion errors
             }
 
-            // Use Next.js router for proper navigation
+            // Navigate only after draft cleanup is complete
             router.push("/dashboard?submitted=true");
         } catch (error) {
             console.error("Failed to save shift report:", error);

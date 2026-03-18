@@ -15,7 +15,7 @@ import {
     Award,
 } from "lucide-react";
 import { createActiveShift } from "@/lib/actions";
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import QuotesPanel from "@/components/QuotesPanel";
 import ActiveUsersPanel from "@/components/ActiveUsersPanel";
 import RecentReportsPanel from "@/components/RecentReportsPanel";
@@ -26,6 +26,7 @@ import DashboardConfirmationWidget from "@/components/confirmations/DashboardCon
 import AnnouncementsCard from "@/components/AnnouncementsCard";
 import ShiftNotesCard from "@/components/ShiftNotesCard";
 import RoutePriceLookup from "@/components/pricing/RoutePriceLookup";
+import HandoffNoteBanner from "@/components/dashboard/HandoffNoteBanner";
 import type { DashboardNotesData } from "@/types/note";
 import styles from "./Dashboard.module.css";
 
@@ -194,6 +195,12 @@ interface Props {
     taskProgress: TaskWithProgress[];
     upcomingConfirmations: Confirmation[];
     accountabilityScore: number;
+    activeHandoffNote: {
+        id: string;
+        handoffNotes: string;
+        authorName: string;
+        submittedAt: Date;
+    } | null;
     userId: string;
     isAdmin: boolean;
     isSuperAdmin: boolean;
@@ -212,6 +219,7 @@ export default function DashboardClient({
     taskProgress,
     upcomingConfirmations,
     accountabilityScore,
+    activeHandoffNote,
     userId,
     isAdmin,
     isSuperAdmin,
@@ -260,6 +268,11 @@ export default function DashboardClient({
                     </p>
                 </div>
             </header>
+
+            {/* Handoff Note Banner — top priority */}
+            {activeHandoffNote && (
+                <HandoffNoteBanner handoffNote={activeHandoffNote} />
+            )}
 
             {/* Stats Grid */}
             <div className={styles.statsGrid}>
