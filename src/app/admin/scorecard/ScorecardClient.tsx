@@ -48,7 +48,8 @@ function getDateRange(preset: string): { from: Date; to: Date } {
     }
 }
 
-function scoreColor(score: number): string {
+function scoreColor(score: number | null): string {
+    if (score === null) return styles.scoreNA;
     if (score >= 90) return styles.scoreGreen;
     if (score >= 70) return styles.scoreAmber;
     return styles.scoreRed;
@@ -196,45 +197,47 @@ export default function ScorecardClient({
                                     </span>
                                 </td>
                                 <td className={`${styles.metricCell} ${scoreColor(d.categoryScores.confirmations)}`}>
-                                    {d.categoryScores.confirmations}
+                                    {d.categoryScores.confirmations ?? "N/A"}
                                     <span className={styles.metricDetail}>
-                                        {d.confirmationMetrics.totalHandled} handled
+                                        {d.confirmationMetrics.totalHandled > 0 ? `${d.confirmationMetrics.totalHandled} handled` : "—"}
                                     </span>
                                 </td>
                                 <td className={`${styles.metricCell} ${scoreColor(d.categoryScores.communications)}`}>
-                                    {d.categoryScores.communications}
+                                    {d.categoryScores.communications ?? "N/A"}
                                     <span className={styles.metricDetail}>
-                                        {d.communicationMetrics.smsSent} sent
+                                        {d.communicationMetrics.smsSent > 0 ? `${d.communicationMetrics.smsSent} sent` : "—"}
                                     </span>
                                 </td>
                                 <td className={`${styles.metricCell} ${scoreColor(d.categoryScores.email)}`}>
-                                    {d.categoryScores.email}
+                                    {d.categoryScores.email ?? "N/A"}
                                     <span className={styles.metricDetail}>
-                                        {d.emailMetrics
+                                        {d.emailMetrics && d.emailMetrics.emailsSent > 0
                                             ? `${d.emailMetrics.emailsSent} sent`
                                             : "—"}
                                     </span>
                                 </td>
                                 <td className={`${styles.metricCell} ${scoreColor(d.categoryScores.punctuality)}`}>
-                                    {d.categoryScores.punctuality}
+                                    {d.categoryScores.punctuality ?? "N/A"}
                                     <span className={styles.metricDetail}>
-                                        {d.shiftMetrics.avgPunctualityMinutes > 0
-                                            ? `${d.shiftMetrics.avgPunctualityMinutes}m early`
-                                            : d.shiftMetrics.avgPunctualityMinutes < 0
-                                              ? `${Math.abs(d.shiftMetrics.avgPunctualityMinutes)}m late`
-                                              : "on time"}
+                                        {d.shiftMetrics.totalShifts > 0
+                                            ? d.shiftMetrics.avgPunctualityMinutes > 0
+                                                ? `${d.shiftMetrics.avgPunctualityMinutes}m early`
+                                                : d.shiftMetrics.avgPunctualityMinutes < 0
+                                                  ? `${Math.abs(d.shiftMetrics.avgPunctualityMinutes)}m late`
+                                                  : "on time"
+                                            : "—"}
                                     </span>
                                 </td>
                                 <td className={`${styles.metricCell} ${scoreColor(d.categoryScores.quotes)}`}>
-                                    {d.categoryScores.quotes}
+                                    {d.categoryScores.quotes ?? "N/A"}
                                     <span className={styles.metricDetail}>
-                                        {d.quoteMetrics.won}/{d.quoteMetrics.totalCreated} won
+                                        {d.quoteMetrics.totalCreated > 0 ? `${d.quoteMetrics.won}/${d.quoteMetrics.totalCreated} won` : "—"}
                                     </span>
                                 </td>
                                 <td className={`${styles.metricCell} ${scoreColor(d.categoryScores.reportCompliance)}`}>
-                                    {d.categoryScores.reportCompliance}
+                                    {d.categoryScores.reportCompliance ?? "N/A"}
                                     <span className={styles.metricDetail}>
-                                        {Math.round(d.shiftMetrics.reportSubmissionRate * 100)}%
+                                        {d.shiftMetrics.totalShifts > 0 ? `${Math.round(d.shiftMetrics.reportSubmissionRate * 100)}%` : "—"}
                                     </span>
                                 </td>
                             </tr>

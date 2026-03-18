@@ -49,7 +49,8 @@ function getDateRange(preset: string): { from: Date; to: Date } {
     }
 }
 
-function scoreColor(score: number): string {
+function scoreColor(score: number | null): string {
+    if (score === null) return styles.colorNA;
     if (score >= 90) return styles.colorGreen;
     if (score >= 70) return styles.colorAmber;
     return styles.colorRed;
@@ -184,7 +185,7 @@ export default function ScorecardDetailClient({
                     <div className={styles.metricHeader}>
                         <h3 className={styles.metricTitle}>Confirmations</h3>
                         <span className={`${styles.metricScore} ${scoreColor(sc.categoryScores.confirmations)}`}>
-                            {sc.categoryScores.confirmations}
+                            {sc.categoryScores.confirmations ?? "N/A"}
                         </span>
                     </div>
                     <div className={styles.metricBody}>
@@ -229,7 +230,7 @@ export default function ScorecardDetailClient({
                     <div className={styles.metricHeader}>
                         <h3 className={styles.metricTitle}>Communications</h3>
                         <span className={`${styles.metricScore} ${scoreColor(sc.categoryScores.communications)}`}>
-                            {sc.categoryScores.communications}
+                            {sc.categoryScores.communications ?? "N/A"}
                         </span>
                     </div>
                     <div className={styles.metricBody}>
@@ -257,7 +258,7 @@ export default function ScorecardDetailClient({
                     <div className={styles.metricHeader}>
                         <h3 className={styles.metricTitle}>Email</h3>
                         <span className={`${styles.metricScore} ${scoreColor(sc.categoryScores.email)}`}>
-                            {sc.categoryScores.email}
+                            {sc.categoryScores.email ?? "N/A"}
                         </span>
                     </div>
                     <div className={styles.metricBody}>
@@ -309,7 +310,7 @@ export default function ScorecardDetailClient({
                     <div className={styles.metricHeader}>
                         <h3 className={styles.metricTitle}>Punctuality & Shifts</h3>
                         <span className={`${styles.metricScore} ${scoreColor(sc.categoryScores.punctuality)}`}>
-                            {sc.categoryScores.punctuality}
+                            {sc.categoryScores.punctuality ?? "N/A"}
                         </span>
                     </div>
                     <div className={styles.metricBody}>
@@ -341,7 +342,7 @@ export default function ScorecardDetailClient({
                     <div className={styles.metricHeader}>
                         <h3 className={styles.metricTitle}>Quotes</h3>
                         <span className={`${styles.metricScore} ${scoreColor(sc.categoryScores.quotes)}`}>
-                            {sc.categoryScores.quotes}
+                            {sc.categoryScores.quotes ?? "N/A"}
                         </span>
                     </div>
                     <div className={styles.metricBody}>
@@ -393,7 +394,7 @@ export default function ScorecardDetailClient({
                     <div className={styles.metricHeader}>
                         <h3 className={styles.metricTitle}>Report Compliance</h3>
                         <span className={`${styles.metricScore} ${scoreColor(sc.categoryScores.reportCompliance)}`}>
-                            {sc.categoryScores.reportCompliance}
+                            {sc.categoryScores.reportCompliance ?? "N/A"}
                         </span>
                     </div>
                     <div className={styles.metricBody}>
@@ -405,8 +406,8 @@ export default function ScorecardDetailClient({
                         </div>
                         <div className={styles.statRow}>
                             <span>Shifts Without Report</span>
-                            <span className={`${styles.statValue} ${(sm.totalShifts - Math.round(sm.reportSubmissionRate * sm.totalShifts)) > 0 ? styles.colorRed : ""}`}>
-                                {sm.totalShifts - Math.round(sm.reportSubmissionRate * sm.totalShifts)}
+                            <span className={`${styles.statValue} ${Math.max(0, sm.totalShifts - Math.round(sm.reportSubmissionRate * sm.totalShifts)) > 0 ? styles.colorRed : ""}`}>
+                                {Math.max(0, sm.totalShifts - Math.round(sm.reportSubmissionRate * sm.totalShifts))}
                             </span>
                         </div>
                     </div>

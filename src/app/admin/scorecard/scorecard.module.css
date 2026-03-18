@@ -273,6 +273,11 @@
     color: #dc2626;
 }
 
+.scoreNA {
+    color: var(--text-secondary);
+    opacity: 0.6;
+}
+
 /* Empty state */
 .emptyRow {
     text-align: center;

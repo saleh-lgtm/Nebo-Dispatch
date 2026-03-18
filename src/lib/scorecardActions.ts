@@ -48,12 +48,12 @@ export interface EmailMetrics {
 }
 
 export interface CategoryScores {
-    confirmations: number;
-    communications: number;
-    email: number;
-    punctuality: number;
-    quotes: number;
-    reportCompliance: number;
+    confirmations: number | null;
+    communications: number | null;
+    email: number | null;
+    punctuality: number | null;
+    quotes: number | null;
+    reportCompliance: number | null;
 }
 
 export interface DispatcherScorecard {
@@ -102,63 +102,75 @@ function calculateCategoryScores(
     teamAvgSms: number,
     teamAvgEmails: number
 ): CategoryScores {
-    // Confirmations (25%): on-time rate × 100
+    // Confirmations (25%): null if no data, else on-time rate × 100
     const confirmations = confirmationMetrics.totalHandled > 0
-        ? confirmationMetrics.onTimeRate * 100
-        : 100; // No confirmations = no penalty
+        ? Math.round(confirmationMetrics.onTimeRate * 100)
+        : null;
 
-    // Communications (15%): SMS volume relative to team average
+    // Communications (15%): null if no SMS activity
     const totalSms = communicationMetrics.smsSent + communicationMetrics.smsReceived;
-    const communications = teamAvgSms > 0
-        ? clamp((totalSms / teamAvgSms) * 100, 0, 100)
-        : totalSms > 0 ? 100 : 50; // If no team average, any activity = 100
+    const communications = totalSms > 0
+        ? Math.round(clamp((totalSms / teamAvgSms) * 100, 0, 100))
+        : null;
 
-    // Email (15%): email volume relative to team average
-    // If no Front mapping, score is neutral (50) — doesn't help or hurt
-    let email = 50;
-    if (emailMetrics) {
-        email = teamAvgEmails > 0
-            ? clamp((emailMetrics.emailsSent / teamAvgEmails) * 100, 0, 100)
-            : emailMetrics.emailsSent > 0 ? 100 : 50;
+    // Email (15%): null if no Front mapping or no email activity
+    let email: number | null = null;
+    if (emailMetrics && emailMetrics.emailsSent > 0) {
+        email = Math.round(
+            teamAvgEmails > 0
+                ? clamp((emailMetrics.emailsSent / teamAvgEmails) * 100, 0, 100)
+                : 100
+        );
     }
 
-    // Punctuality (20%): 100 - (avg late minutes × 5), where negative earlyClockIn = late
-    // earlyClockIn > 0 means early, < 0 means late
-    const punctuality = clamp(
-        100 - (Math.max(0, -shiftMetrics.avgPunctualityMinutes) * 5),
-        0,
-        100
-    );
+    // Punctuality (20%): null if no shifts
+    const punctuality = shiftMetrics.totalShifts > 0
+        ? Math.round(clamp(
+            100 - (Math.max(0, -shiftMetrics.avgPunctualityMinutes) * 5),
+            0,
+            100
+        ))
+        : null;
 
-    // Quotes (15%): conversion rate × 100
+    // Quotes (15%): null if no quotes
     const quotes = quoteMetrics.totalCreated > 0
-        ? quoteMetrics.conversionRate * 100
-        : 50; // No quotes = neutral
+        ? Math.round(quoteMetrics.conversionRate * 100)
+        : null;
 
-    // Report compliance (10%): submission rate × 100
+    // Report compliance (10%): null if no shifts, capped at 100
     const reportCompliance = shiftMetrics.totalShifts > 0
-        ? shiftMetrics.reportSubmissionRate * 100
-        : 100; // No shifts = no penalty
+        ? Math.round(Math.min(shiftMetrics.reportSubmissionRate, 1) * 100)
+        : null;
 
-    return {
-        confirmations: Math.round(confirmations),
-        communications: Math.round(communications),
-        email: Math.round(email),
-        punctuality: Math.round(punctuality),
-        quotes: Math.round(quotes),
-        reportCompliance: Math.round(reportCompliance),
-    };
+    return { confirmations, communications, email, punctuality, quotes, reportCompliance };
 }
 
+// Weights for each category — used for overall score
+const CATEGORY_WEIGHTS: Record<keyof CategoryScores, number> = {
+    confirmations: 0.25,
+    communications: 0.15,
+    email: 0.15,
+    punctuality: 0.20,
+    quotes: 0.15,
+    reportCompliance: 0.10,
+};
+
 function calculateOverallScore(scores: CategoryScores): number {
-    return Math.round(
-        scores.confirmations * 0.25 +
-        scores.communications * 0.15 +
-        scores.email * 0.15 +
-        scores.punctuality * 0.20 +
-        scores.quotes * 0.15 +
-        scores.reportCompliance * 0.10
-    );
+    // Only include categories that have data (non-null).
+    // Redistribute weight from N/A categories proportionally.
+    let totalWeight = 0;
+    let weightedSum = 0;
+
+    for (const [key, weight] of Object.entries(CATEGORY_WEIGHTS)) {
+        const value = scores[key as keyof CategoryScores];
+        if (value !== null) {
+            totalWeight += weight;
+            weightedSum += value * weight;
+        }
+    }
+
+    if (totalWeight === 0) return 0;
+    return Math.round(weightedSum / totalWeight);
 }
 
 // ============================================
@@ -244,7 +256,7 @@ export async function getDispatcherScorecard(
                 },
             }),
 
-            // 5. Shifts in period
+            // 5. Shifts in period (totalHours needed to filter stale shifts)
             prisma.shift.findMany({
                 where: {
                     userId,
@@ -256,6 +268,7 @@ export async function getDispatcherScorecard(
                     clockIn: true,
                     clockOut: true,
                     earlyClockIn: true,
+                    totalHours: true,
                 },
             }),
 
@@ -317,32 +330,24 @@ export async function getDispatcherScorecard(
             accountabilityScore: user.accountabilityScore,
         };
 
-        // --- Communication Metrics ---
-        const totalSmsSent = shiftReports.reduce((sum, r) => sum + r.autoSmsSent, 0);
-        const totalSmsReceived = shiftReports.reduce((sum, r) => sum + r.autoSmsReceived, 0);
+        // --- Communication Metrics (from SMSLog directly) ---
+        const totalSmsSent = smsLogs.filter(
+            l => l.direction === "OUTBOUND" && l.sentById === userId
+        ).length;
+        const totalSmsReceived = smsLogs.filter(
+            l => l.direction === "INBOUND"
+        ).length;
 
         // Calculate avg SMS response time from SMSLog
-        // For each inbound SMS during shifts, find the first outbound to same conversation
         let totalResponseTime = 0;
         let responseCount = 0;
 
-        // Get shift windows for this user
-        const shiftWindows = shifts.map(s => ({
-            start: s.clockIn,
-            end: s.clockOut!,
-        }));
-
-        // Group inbound messages by conversation phone
+        // Group messages by conversation phone for response time
         const inboundByConversation = new Map<string, Date[]>();
         const outboundByConversation = new Map<string, Date[]>();
 
         for (const log of smsLogs) {
             if (!log.conversationPhone) continue;
-            const isInShift = shiftWindows.some(
-                w => log.createdAt >= w.start && log.createdAt <= w.end
-            );
-            if (!isInShift) continue;
-
             if (log.direction === "INBOUND") {
                 const existing = inboundByConversation.get(log.conversationPhone) || [];
                 existing.push(log.createdAt);
@@ -378,8 +383,16 @@ export async function getDispatcherScorecard(
         };
 
         // --- Shift Metrics ---
-        const completedShiftCount = shifts.length;
-        const earlyClockInValues = shifts
+        // Filter out stale shifts (>24h duration — data errors from missed clock-outs)
+        const MAX_SHIFT_HOURS = 24;
+        const validShifts = shifts.filter(s => {
+            const hours = s.totalHours ?? (
+                (s.clockOut!.getTime() - s.clockIn.getTime()) / (1000 * 60 * 60)
+            );
+            return hours <= MAX_SHIFT_HOURS;
+        });
+        const completedShiftCount = validShifts.length;
+        const earlyClockInValues = validShifts
             .filter(s => s.earlyClockIn !== null)
             .map(s => s.earlyClockIn!);
         const avgPunctuality = earlyClockInValues.length > 0
@@ -397,7 +410,7 @@ export async function getDispatcherScorecard(
             totalShifts: completedShiftCount,
             avgPunctualityMinutes: Math.round(avgPunctuality),
             reportSubmissionRate: completedShiftCount > 0
-                ? reportCount / completedShiftCount
+                ? Math.min(reportCount / completedShiftCount, 1) // Cap at 100%
                 : 0,
             avgSelfRating: avgRating,
         };
@@ -522,6 +535,8 @@ export async function getTeamScorecard(
             allShifts,
             allReports,
             allQuotes,
+            smsOutboundByUser,
+            smsInboundByUser,
         ] = await Promise.all([
             // Confirmations per user
             prisma.tripConfirmation.groupBy({
@@ -554,7 +569,7 @@ export async function getTeamScorecard(
                 },
             }),
 
-            // All shifts
+            // All shifts (include totalHours/clockIn/clockOut for stale shift filtering)
             prisma.shift.findMany({
                 where: {
                     userId: { in: dispatcherIds },
@@ -563,6 +578,9 @@ export async function getTeamScorecard(
                 },
                 select: {
                     userId: true,
+                    clockIn: true,
+                    clockOut: true,
+                    totalHours: true,
                     earlyClockIn: true,
                 },
             }),
@@ -595,6 +613,28 @@ export async function getTeamScorecard(
                     estimatedAmount: true,
                 },
             }),
+
+            // SMS outbound counts from SMSLog (accurate, not ShiftReport auto fields)
+            prisma.sMSLog.groupBy({
+                by: ["sentById"],
+                _count: { id: true },
+                where: {
+                    sentById: { in: dispatcherIds },
+                    direction: "OUTBOUND",
+                    createdAt: { gte: from, lte: to },
+                },
+            }),
+
+            // SMS inbound counts — attribute to all dispatchers proportionally
+            // (inbound is not per-user, so we count total for team avg)
+            prisma.sMSLog.groupBy({
+                by: ["sentById"],
+                _count: { id: true },
+                where: {
+                    direction: "INBOUND",
+                    createdAt: { gte: from, lte: to },
+                },
+            }),
         ]);
 
         // Build lookup maps
@@ -608,9 +648,28 @@ export async function getTeamScorecard(
             missedByUser.map(c => [c.dispatcherId, c._count.id])
         );
 
-        // Group shifts by user
+        // SMS lookup maps (from SMSLog directly)
+        const smsOutboundMap = new Map(
+            smsOutboundByUser
+                .filter(s => s.sentById !== null)
+                .map(s => [s.sentById!, s._count.id])
+        );
+        // Inbound is team-wide — count total and distribute evenly
+        const totalInbound = smsInboundByUser.reduce((sum, s) => sum + s._count.id, 0);
+        const smsInboundMap = new Map<string, number>();
+        // Each dispatcher gets the total inbound count (it's team-wide, not per-user)
+        for (const d of dispatchers) {
+            smsInboundMap.set(d.id, totalInbound);
+        }
+
+        // Group shifts by user, filtering out stale shifts (>24h)
+        const MAX_SHIFT_HOURS = 24;
         const shiftsByUser = new Map<string, typeof allShifts>();
         for (const shift of allShifts) {
+            const hours = shift.totalHours ?? (
+                (shift.clockOut!.getTime() - shift.clockIn.getTime()) / (1000 * 60 * 60)
+            );
+            if (hours > MAX_SHIFT_HOURS) continue; // Skip data errors
             const arr = shiftsByUser.get(shift.userId) || [];
             arr.push(shift);
             shiftsByUser.set(shift.userId, arr);
@@ -632,12 +691,13 @@ export async function getTeamScorecard(
             quotesByUser.set(quote.createdById, arr);
         }
 
-        // Calculate team average SMS for communications scoring
+        // Calculate team average SMS for communications scoring (from SMSLog)
         let totalTeamSms = 0;
         let activeDispatchers = 0;
         for (const dispatcher of dispatchers) {
-            const reports = reportsByUser.get(dispatcher.id) || [];
-            const sms = reports.reduce((sum, r) => sum + r.autoSmsSent + r.autoSmsReceived, 0);
+            const sent = smsOutboundMap.get(dispatcher.id) || 0;
+            const received = smsInboundMap.get(dispatcher.id) || 0;
+            const sms = sent + received;
             if (sms > 0) {
                 totalTeamSms += sms;
                 activeDispatchers++;
@@ -691,9 +751,9 @@ export async function getTeamScorecard(
                 accountabilityScore: dispatcher.accountabilityScore,
             };
 
-            // Communication metrics
-            const smsSent = userReports.reduce((sum, r) => sum + r.autoSmsSent, 0);
-            const smsReceived = userReports.reduce((sum, r) => sum + r.autoSmsReceived, 0);
+            // Communication metrics (from SMSLog counts for accuracy)
+            const smsSent = smsOutboundMap.get(dispatcher.id) || 0;
+            const smsReceived = smsInboundMap.get(dispatcher.id) || 0;
             const communicationMetrics: CommunicationMetrics = {
                 smsSent,
                 smsReceived,
@@ -715,7 +775,7 @@ export async function getTeamScorecard(
                 totalShifts: userShifts.length,
                 avgPunctualityMinutes: Math.round(avgPunctuality),
                 reportSubmissionRate: userShifts.length > 0
-                    ? userReports.length / userShifts.length
+                    ? Math.min(userReports.length / userShifts.length, 1) // Cap at 100%
                     : 0,
                 avgSelfRating: ratings.length > 0
                     ? Math.round((ratings.reduce((sum, r) => sum + r, 0) / ratings.length) * 10) / 10
