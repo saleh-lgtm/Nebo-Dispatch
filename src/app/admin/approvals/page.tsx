@@ -35,7 +35,7 @@ export default async function AdminApprovalsPage() {
 
     return (
         <ApprovalsClient
-            pendingUsers={pendingUsersResult}
+            pendingUsers={pendingUsersResult.data ?? []}
             pendingPortals={pendingPortalsResult.data ?? []}
             pendingContacts={pendingContactsResult.success ? pendingContactsResult.data : []}
             currentUserId={session.user.id}

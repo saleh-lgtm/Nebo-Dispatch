@@ -152,9 +152,10 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
         setIsNavigating(true);
         try {
             const result = await getWeekSchedules(newWeekStart);
-            const blocks = schedulesToBlocks(result.schedules, dispatchers, newWeekStart);
+            const weekData = result.data ?? { schedules: [], isPublished: false };
+            const blocks = schedulesToBlocks(weekData.schedules, dispatchers, newWeekStart);
             setShifts(blocks);
-            setIsPublished(result.isPublished);
+            setIsPublished(weekData.isPublished);
         } finally {
             setIsNavigating(false);
         }
@@ -163,9 +164,10 @@ export default function MobileSchedulerClient({ dispatchers, initialSchedules, i
     // Real-time schedule updates
     const handleRealtimeChange = useCallback(() => {
         getWeekSchedules(weekStart).then((result) => {
-            const blocks = schedulesToBlocks(result.schedules, dispatchers, weekStart);
+            const weekData = result.data ?? { schedules: [], isPublished: false };
+            const blocks = schedulesToBlocks(weekData.schedules, dispatchers, weekStart);
             setShifts(blocks);
-            setIsPublished(result.isPublished);
+            setIsPublished(weekData.isPublished);
         });
     }, [weekStart, dispatchers]);
 

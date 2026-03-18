@@ -41,10 +41,12 @@ export default function SettingsClient({ userName, userEmail }: Props) {
         setLoading(true);
 
         try {
-            await changePassword({
+            const result = await changePassword({
                 currentPassword: formData.currentPassword,
                 newPassword: formData.newPassword,
             });
+
+            if (!result.success) throw new Error(result.error);
 
             setMessage({ type: "success", text: "Password changed successfully!" });
             setFormData({ currentPassword: "", newPassword: "", confirmPassword: "" });

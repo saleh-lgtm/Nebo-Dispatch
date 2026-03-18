@@ -25,10 +25,12 @@ export default async function AdminTasksPage() {
         redirect("/dashboard");
     }
 
-    const [tasks, dispatchers] = await Promise.all([
+    const [tasks, dispatchersResult] = await Promise.all([
         getTaskProgress(),
         getDispatchers(),
     ]);
+
+    const dispatchers = dispatchersResult.data ?? [];
 
     return (
         <TasksClient

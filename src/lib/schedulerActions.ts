@@ -21,81 +21,102 @@ import { getWeekStart, addDays, getShiftDuration } from "@/types/schedule";
 /**
  * Get all active dispatchers
  */
-export async function getDispatchers(): Promise<Dispatcher[]> {
+export async function getDispatchers(): Promise<{ success: boolean; data?: Dispatcher[]; error?: string }> {
   await requireAdmin();
 
-  return prisma.user.findMany({
-    where: { role: "DISPATCHER", isActive: true },
-    select: { id: true, name: true, email: true },
-    orderBy: { name: "asc" },
-  });
+  try {
+    const dispatchers = await prisma.user.findMany({
+      where: { role: "DISPATCHER", isActive: true },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    });
+    return { success: true, data: dispatchers };
+  } catch (error) {
+    console.error("getDispatchers error:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+  }
 }
 
 /**
  * Get schedules for a week (Monday-Sunday)
  */
-export async function getWeekSchedules(weekStart: Date): Promise<WeekScheduleData> {
+export async function getWeekSchedules(weekStart: Date): Promise<{ success: boolean; data?: WeekScheduleData; error?: string }> {
   await requireAdmin();
 
-  const normalizedWeekStart = getWeekStart(weekStart);
-  const weekEnd = addDays(normalizedWeekStart, 7);
+  try {
+    const normalizedWeekStart = getWeekStart(weekStart);
+    const weekEnd = addDays(normalizedWeekStart, 7);
 
-  const schedules = await prisma.schedule.findMany({
-    where: {
+    const schedules = await prisma.schedule.findMany({
+      where: {
+        weekStart: normalizedWeekStart,
+      },
+      include: { user: { select: { id: true, name: true } } },
+      orderBy: [{ date: "asc" }, { startHour: "asc" }],
+    });
+
+    const records: ScheduleRecord[] = schedules.map((s) => ({
+      id: s.id,
+      userId: s.userId,
+      userName: s.user.name,
+      date: s.date,
+      startHour: s.startHour,
+      endHour: s.endHour,
+      market: s.market as Market | null,
+      shiftType: s.shiftType as ShiftType,
+      isPublished: s.isPublished,
+      notes: s.notes,
+    }));
+
+    const isPublished = schedules.length > 0 && schedules.some((s) => s.isPublished);
+
+    const weekData: WeekScheduleData = {
+      schedules: records,
       weekStart: normalizedWeekStart,
-    },
-    include: { user: { select: { id: true, name: true } } },
-    orderBy: [{ date: "asc" }, { startHour: "asc" }],
-  });
+      weekEnd,
+      isPublished,
+    };
 
-  const records: ScheduleRecord[] = schedules.map((s) => ({
-    id: s.id,
-    userId: s.userId,
-    userName: s.user.name,
-    date: s.date,
-    startHour: s.startHour,
-    endHour: s.endHour,
-    market: s.market as Market | null,
-    shiftType: s.shiftType as ShiftType,
-    isPublished: s.isPublished,
-    notes: s.notes,
-  }));
-
-  const isPublished = schedules.length > 0 && schedules.some((s) => s.isPublished);
-
-  return {
-    schedules: records,
-    weekStart: normalizedWeekStart,
-    weekEnd,
-    isPublished,
-  };
+    return { success: true, data: weekData };
+  } catch (error) {
+    console.error("getWeekSchedules error:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+  }
 }
 
 /**
  * Get a single schedule by ID
  */
-export async function getSchedule(id: string): Promise<ScheduleRecord | null> {
+export async function getSchedule(id: string): Promise<{ success: boolean; data?: ScheduleRecord | null; error?: string }> {
   await requireAdmin();
 
-  const schedule = await prisma.schedule.findUnique({
-    where: { id },
-    include: { user: { select: { id: true, name: true } } },
-  });
+  try {
+    const schedule = await prisma.schedule.findUnique({
+      where: { id },
+      include: { user: { select: { id: true, name: true } } },
+    });
 
-  if (!schedule) return null;
+    if (!schedule) return { success: true, data: null };
 
-  return {
-    id: schedule.id,
-    userId: schedule.userId,
-    userName: schedule.user.name,
-    date: schedule.date,
-    startHour: schedule.startHour,
-    endHour: schedule.endHour,
-    market: schedule.market as Market | null,
-    shiftType: schedule.shiftType as ShiftType,
-    isPublished: schedule.isPublished,
-    notes: schedule.notes,
-  };
+    return {
+      success: true,
+      data: {
+        id: schedule.id,
+        userId: schedule.userId,
+        userName: schedule.user.name,
+        date: schedule.date,
+        startHour: schedule.startHour,
+        endHour: schedule.endHour,
+        market: schedule.market as Market | null,
+        shiftType: schedule.shiftType as ShiftType,
+        isPublished: schedule.isPublished,
+        notes: schedule.notes,
+      },
+    };
+  } catch (error) {
+    console.error("getSchedule error:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+  }
 }
 
 // ============ MUTATION FUNCTIONS ============
@@ -295,44 +316,50 @@ export async function deleteSchedule(id: string): Promise<{ success: boolean; er
  * Preview what would be copied from previous week
  */
 export async function previewCopyPreviousWeek(targetWeekStart: Date): Promise<{
-  schedules: ScheduleRecord[];
-  conflicts: string[];
+  success: boolean;
+  data?: { schedules: ScheduleRecord[]; conflicts: string[] };
+  error?: string;
 }> {
   await requireAdmin();
 
-  const normalized = getWeekStart(targetWeekStart);
-  const prevWeekStart = addDays(normalized, -7);
+  try {
+    const normalized = getWeekStart(targetWeekStart);
+    const prevWeekStart = addDays(normalized, -7);
 
-  const prevSchedules = await prisma.schedule.findMany({
-    where: { weekStart: prevWeekStart },
-    include: { user: { select: { id: true, name: true } } },
-    orderBy: [{ date: "asc" }, { startHour: "asc" }],
-  });
+    const prevSchedules = await prisma.schedule.findMany({
+      where: { weekStart: prevWeekStart },
+      include: { user: { select: { id: true, name: true } } },
+      orderBy: [{ date: "asc" }, { startHour: "asc" }],
+    });
 
-  // Check for existing schedules in target week
-  const existingCount = await prisma.schedule.count({
-    where: { weekStart: normalized },
-  });
+    // Check for existing schedules in target week
+    const existingCount = await prisma.schedule.count({
+      where: { weekStart: normalized },
+    });
 
-  const conflicts: string[] = [];
-  if (existingCount > 0) {
-    conflicts.push(`Target week has ${existingCount} existing schedule(s). Clear first.`);
+    const conflicts: string[] = [];
+    if (existingCount > 0) {
+      conflicts.push(`Target week has ${existingCount} existing schedule(s). Clear first.`);
+    }
+
+    const schedules: ScheduleRecord[] = prevSchedules.map((s) => ({
+      id: s.id,
+      userId: s.userId,
+      userName: s.user.name,
+      date: addDays(s.date, 7), // Preview with +7 days
+      startHour: s.startHour,
+      endHour: s.endHour,
+      market: s.market as Market | null,
+      shiftType: s.shiftType as ShiftType,
+      isPublished: false,
+      notes: null,
+    }));
+
+    return { success: true, data: { schedules, conflicts } };
+  } catch (error) {
+    console.error("previewCopyPreviousWeek error:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
   }
-
-  const schedules: ScheduleRecord[] = prevSchedules.map((s) => ({
-    id: s.id,
-    userId: s.userId,
-    userName: s.user.name,
-    date: addDays(s.date, 7), // Preview with +7 days
-    startHour: s.startHour,
-    endHour: s.endHour,
-    market: s.market as Market | null,
-    shiftType: s.shiftType as ShiftType,
-    isPublished: false,
-    notes: null,
-  }));
-
-  return { schedules, conflicts };
 }
 
 /**
@@ -584,56 +611,65 @@ function formatHourSimple(h: number): string {
  * Get coverage report for a week
  */
 export async function getWeekCoverageReport(weekStart: Date): Promise<{
-  byDay: { date: Date; dayName: string; shifts: number; hours: number; markets: (Market | null)[] }[];
-  totalHours: number;
-  dispatcherHours: { userId: string; name: string; hours: number }[];
+  success: boolean;
+  data?: {
+    byDay: { date: Date; dayName: string; shifts: number; hours: number; markets: (Market | null)[] }[];
+    totalHours: number;
+    dispatcherHours: { userId: string; name: string; hours: number }[];
+  };
+  error?: string;
 }> {
   await requireAdmin();
 
-  const normalized = getWeekStart(weekStart);
-  const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  try {
+    const normalized = getWeekStart(weekStart);
+    const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-  const schedules = await prisma.schedule.findMany({
-    where: { weekStart: normalized },
-    include: { user: { select: { id: true, name: true } } },
-  });
-
-  // Group by day (use UTC date comparison)
-  const byDay = [];
-  for (let i = 0; i < 7; i++) {
-    const dayDate = addDays(normalized, i);
-    const daySchedules = schedules.filter(
-      (s) => s.date.toISOString().slice(0, 10) === dayDate.toISOString().slice(0, 10)
-    );
-
-    const hours = daySchedules.reduce((sum, s) => sum + getShiftDuration(s.startHour, s.endHour), 0);
-    const markets = [...new Set(daySchedules.map((s) => s.market as Market | null))];
-
-    byDay.push({
-      date: dayDate,
-      dayName: DAY_NAMES[i],
-      shifts: daySchedules.length,
-      hours,
-      markets,
+    const schedules = await prisma.schedule.findMany({
+      where: { weekStart: normalized },
+      include: { user: { select: { id: true, name: true } } },
     });
+
+    // Group by day (use UTC date comparison)
+    const byDay = [];
+    for (let i = 0; i < 7; i++) {
+      const dayDate = addDays(normalized, i);
+      const daySchedules = schedules.filter(
+        (s) => s.date.toISOString().slice(0, 10) === dayDate.toISOString().slice(0, 10)
+      );
+
+      const hours = daySchedules.reduce((sum, s) => sum + getShiftDuration(s.startHour, s.endHour), 0);
+      const markets = [...new Set(daySchedules.map((s) => s.market as Market | null))];
+
+      byDay.push({
+        date: dayDate,
+        dayName: DAY_NAMES[i],
+        shifts: daySchedules.length,
+        hours,
+        markets,
+      });
+    }
+
+    // Total hours
+    const totalHours = schedules.reduce((sum, s) => sum + getShiftDuration(s.startHour, s.endHour), 0);
+
+    // Hours by dispatcher
+    const dispatcherMap = new Map<string, { name: string; hours: number }>();
+    for (const s of schedules) {
+      const existing = dispatcherMap.get(s.userId) || { name: s.user.name || "Unknown", hours: 0 };
+      existing.hours += getShiftDuration(s.startHour, s.endHour);
+      dispatcherMap.set(s.userId, existing);
+    }
+
+    const dispatcherHours = Array.from(dispatcherMap.entries())
+      .map(([userId, data]) => ({ userId, name: data.name, hours: data.hours }))
+      .sort((a, b) => b.hours - a.hours);
+
+    return { success: true, data: { byDay, totalHours, dispatcherHours } };
+  } catch (error) {
+    console.error("getWeekCoverageReport error:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
   }
-
-  // Total hours
-  const totalHours = schedules.reduce((sum, s) => sum + getShiftDuration(s.startHour, s.endHour), 0);
-
-  // Hours by dispatcher
-  const dispatcherMap = new Map<string, { name: string; hours: number }>();
-  for (const s of schedules) {
-    const existing = dispatcherMap.get(s.userId) || { name: s.user.name || "Unknown", hours: 0 };
-    existing.hours += getShiftDuration(s.startHour, s.endHour);
-    dispatcherMap.set(s.userId, existing);
-  }
-
-  const dispatcherHours = Array.from(dispatcherMap.entries())
-    .map(([userId, data]) => ({ userId, name: data.name, hours: data.hours }))
-    .sort((a, b) => b.hours - a.hours);
-
-  return { byDay, totalHours, dispatcherHours };
 }
 
 // ============ DISPATCHER VIEW ============
@@ -641,63 +677,77 @@ export async function getWeekCoverageReport(weekStart: Date): Promise<{
 /**
  * Get user's next scheduled shift (for any authenticated user)
  */
-export async function getUserNextShift(userId: string) {
+export async function getUserNextShift(userId: string): Promise<{ success: boolean; data?: { id: string; date: Date; startHour: number; endHour: number; market: string | null } | null; error?: string }> {
   await requireAuth();
 
-  // Use UTC midnight to match database date format
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
+  try {
+    // Use UTC midnight to match database date format
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
 
-  return prisma.schedule.findFirst({
-    where: {
-      userId,
-      isPublished: true,
-      date: { gte: today },
-    },
-    orderBy: [{ date: "asc" }, { startHour: "asc" }],
-    select: {
-      id: true,
-      date: true,
-      startHour: true,
-      endHour: true,
-      market: true,
-    },
-  });
+    const shift = await prisma.schedule.findFirst({
+      where: {
+        userId,
+        isPublished: true,
+        date: { gte: today },
+      },
+      orderBy: [{ date: "asc" }, { startHour: "asc" }],
+      select: {
+        id: true,
+        date: true,
+        startHour: true,
+        endHour: true,
+        market: true,
+      },
+    });
+
+    return { success: true, data: shift };
+  } catch (error) {
+    console.error("getUserNextShift error:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+  }
 }
 
 /**
  * Get user's schedules for current and next week
  */
-export async function getUserUpcomingSchedules(userId: string) {
+export async function getUserUpcomingSchedules(userId: string): Promise<{ success: boolean; data?: { id: string; date: Date; startHour: number; endHour: number; market: Market | null; shiftType: ShiftType }[]; error?: string }> {
   await requireAuth();
 
-  const today = new Date();
-  const thisWeekStart = getWeekStart(today);
-  const nextWeekEnd = addDays(thisWeekStart, 14);
+  try {
+    const today = new Date();
+    const thisWeekStart = getWeekStart(today);
+    const nextWeekEnd = addDays(thisWeekStart, 14);
 
-  const schedules = await prisma.schedule.findMany({
-    where: {
-      userId,
-      isPublished: true,
-      date: {
-        gte: thisWeekStart,
-        lt: nextWeekEnd,
+    const schedules = await prisma.schedule.findMany({
+      where: {
+        userId,
+        isPublished: true,
+        date: {
+          gte: thisWeekStart,
+          lt: nextWeekEnd,
+        },
       },
-    },
-    orderBy: [{ date: "asc" }, { startHour: "asc" }],
-    select: {
-      id: true,
-      date: true,
-      startHour: true,
-      endHour: true,
-      market: true,
-      shiftType: true,
-    },
-  });
+      orderBy: [{ date: "asc" }, { startHour: "asc" }],
+      select: {
+        id: true,
+        date: true,
+        startHour: true,
+        endHour: true,
+        market: true,
+        shiftType: true,
+      },
+    });
 
-  return schedules.map((s) => ({
-    ...s,
-    market: s.market as Market | null,
-    shiftType: s.shiftType as ShiftType,
-  }));
+    const data = schedules.map((s) => ({
+      ...s,
+      market: s.market as Market | null,
+      shiftType: s.shiftType as ShiftType,
+    }));
+
+    return { success: true, data };
+  } catch (error) {
+    console.error("getUserUpcomingSchedules error:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Operation failed" };
+  }
 }

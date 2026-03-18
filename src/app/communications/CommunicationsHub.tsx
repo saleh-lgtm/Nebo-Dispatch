@@ -258,8 +258,9 @@ export default function CommunicationsHub({
     const loadMessages = useCallback(async (phone: string) => {
         setIsLoadingMessages(true);
         try {
-            const data = await getConversationMessages(phone, { limit: 100 });
-            setMessages(data.messages as SMSMessage[]);
+            const result = await getConversationMessages(phone, { limit: 100 });
+            if (!result.success) throw new Error(result.error);
+            setMessages(result.data!.messages as SMSMessage[]);
         } catch (error) {
             console.error("Failed to load messages:", error);
             addToast("Failed to load messages", "error");

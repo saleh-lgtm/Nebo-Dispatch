@@ -117,8 +117,9 @@ export default function SMSConversationsClient() {
     const loadConversations = useCallback(async () => {
         setIsLoadingConversations(true);
         try {
-            const data = await getConversations({ limit: 50 });
-            setConversations(data.conversations as Conversation[]);
+            const result = await getConversations({ limit: 50 });
+            if (!result.success) throw new Error(result.error);
+            setConversations(result.data!.conversations as Conversation[]);
         } catch (error) {
             console.error("Failed to load conversations:", error);
         } finally {
@@ -129,8 +130,9 @@ export default function SMSConversationsClient() {
     const loadConversationMessages = useCallback(async (phone: string) => {
         setIsLoadingMessages(true);
         try {
-            const data = await getConversationMessages(phone, { limit: 100 });
-            setConversationMessages(data.messages as unknown as SMSLog[]);
+            const result = await getConversationMessages(phone, { limit: 100 });
+            if (!result.success) throw new Error(result.error);
+            setConversationMessages(result.data!.messages as unknown as SMSLog[]);
         } catch (error) {
             console.error("Failed to load messages:", error);
         } finally {

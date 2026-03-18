@@ -227,8 +227,8 @@ export default function Sidebar({ user }: Props) {
 
         const fetchCounts = async () => {
             try {
-                const counts = await getNavBadgeCounts();
-                setBadgeCounts(counts);
+                const result = await getNavBadgeCounts();
+                setBadgeCounts(result.data);
             } catch (error) {
                 console.error("Failed to fetch badge counts:", error);
             }

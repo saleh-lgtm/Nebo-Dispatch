@@ -298,9 +298,10 @@ export default function CommandSchedulerClient({ dispatchers, initialSchedules, 
 
     const loadWeekSchedules = useCallback(async (newWeekStart: Date) => {
         const result = await getWeekSchedules(newWeekStart);
-        const blocks = schedulesToBlocks(result.schedules, dispatchers, newWeekStart);
+        const weekData = result.data ?? { schedules: [], isPublished: false };
+        const blocks = schedulesToBlocks(weekData.schedules, dispatchers, newWeekStart);
         setShifts(blocks);
-        setIsPublished(result.isPublished);
+        setIsPublished(weekData.isPublished);
     }, [dispatchers]);
 
     // Real-time schedule updates

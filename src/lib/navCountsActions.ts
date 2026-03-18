@@ -10,7 +10,7 @@ import type { BadgeCounts } from "@/config/navigation";
  * Only returns counts for ADMIN and SUPER_ADMIN roles.
  * Other roles get empty counts (they don't have badge items).
  */
-export async function getNavBadgeCounts(): Promise<BadgeCounts> {
+export async function getNavBadgeCounts(): Promise<{ success: true; data: BadgeCounts }> {
     const emptyCounts: BadgeCounts = {
         pendingConfirmations: 0,
         unreadSms: 0,
@@ -19,20 +19,20 @@ export async function getNavBadgeCounts(): Promise<BadgeCounts> {
         newTbrTrips: 0,
     };
 
+    const session = await getServerSession(authOptions);
+
+    if (!session) {
+        return { success: true, data: emptyCounts };
+    }
+
+    const role = session.user.role;
+
+    // Only ADMIN and SUPER_ADMIN see badge counts
+    if (role !== "ADMIN" && role !== "SUPER_ADMIN") {
+        return { success: true, data: emptyCounts };
+    }
+
     try {
-        const session = await getServerSession(authOptions);
-
-        if (!session) {
-            return emptyCounts;
-        }
-
-        const role = session.user.role;
-
-        // Only ADMIN and SUPER_ADMIN see badge counts
-        if (role !== "ADMIN" && role !== "SUPER_ADMIN") {
-            return emptyCounts;
-        }
-
         // Calculate 24 hours ago for "new" items
         const twentyFourHoursAgo = new Date();
         twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
@@ -99,14 +99,17 @@ export async function getNavBadgeCounts(): Promise<BadgeCounts> {
         ]);
 
         return {
-            pendingConfirmations,
-            unreadSms,
-            pendingRequests: pendingTimeOff + pendingSwaps,
-            pendingTasks,
-            newTbrTrips,
+            success: true,
+            data: {
+                pendingConfirmations,
+                unreadSms,
+                pendingRequests: pendingTimeOff + pendingSwaps,
+                pendingTasks,
+                newTbrTrips,
+            },
         };
     } catch (error) {
         console.error("Failed to fetch nav badge counts:", error);
-        return emptyCounts;
+        return { success: true, data: emptyCounts };
     }
 }

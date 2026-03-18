@@ -166,7 +166,7 @@ export default async function DashboardPage() {
 
         // Next scheduled shift for non-super-admin
         safePromise(
-            isSuperAdmin ? Promise.resolve(null) : getUserNextShift(session.user.id),
+            isSuperAdmin ? Promise.resolve(null) : getUserNextShift(session.user.id).then(r => r.data ?? null),
             null
         ),
 

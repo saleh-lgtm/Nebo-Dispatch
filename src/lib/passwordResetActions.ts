@@ -4,8 +4,6 @@ import prisma from "@/lib/prisma";
 import { hash } from "bcryptjs";
 import crypto from "crypto";
 
-// Token expires in 1 hour
-const TOKEN_EXPIRY_HOURS = 1;
 
 /**
  * SECURITY: Hash tokens before storage to prevent leaks in logs/database
@@ -36,6 +34,9 @@ interface ResetPasswordResult {
  * Always returns success message to prevent email enumeration attacks.
  */
 export async function requestPasswordReset(email: string): Promise<RequestResetResult> {
+    // Token expires in 1 hour
+    const TOKEN_EXPIRY_HOURS = 1;
+
     try {
         // Normalize email
         const normalizedEmail = email.toLowerCase().trim();
@@ -217,14 +218,19 @@ export async function resetPassword(token: string, newPassword: string): Promise
 /**
  * Clean up expired tokens (can be run as a cron job)
  */
-export async function cleanupExpiredTokens(): Promise<number> {
-    const result = await prisma.passwordResetToken.deleteMany({
-        where: {
-            OR: [
-                { expiresAt: { lt: new Date() } },
-                { usedAt: { not: null } },
-            ],
-        },
-    });
-    return result.count;
+export async function cleanupExpiredTokens(): Promise<{ success: boolean; data?: number; error?: string }> {
+    try {
+        const result = await prisma.passwordResetToken.deleteMany({
+            where: {
+                OR: [
+                    { expiresAt: { lt: new Date() } },
+                    { usedAt: { not: null } },
+                ],
+            },
+        });
+        return { success: true, data: result.count };
+    } catch (error) {
+        console.error("Cleanup expired tokens error:", error);
+        return { success: false, error: "Failed to clean up expired tokens" };
+    }
 }

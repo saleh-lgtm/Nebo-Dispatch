@@ -277,58 +277,73 @@ export async function getSMSHistory(options?: {
         where.status = status;
     }
 
-    const [logs, total] = await Promise.all([
-        prisma.sMSLog.findMany({
-            where,
-            orderBy: { createdAt: "desc" },
-            take: limit,
-            skip: offset,
-            include: {
-                sentBy: { select: { id: true, name: true } },
-            },
-        }),
-        prisma.sMSLog.count({ where }),
-    ]);
+    try {
+        const [logs, total] = await Promise.all([
+            prisma.sMSLog.findMany({
+                where,
+                orderBy: { createdAt: "desc" },
+                take: limit,
+                skip: offset,
+                include: {
+                    sentBy: { select: { id: true, name: true } },
+                },
+            }),
+            prisma.sMSLog.count({ where }),
+        ]);
 
-    return { logs, total };
+        return { success: true, data: { logs, total } };
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        console.error("getSMSHistory error:", errorMessage);
+        return { success: false, error: errorMessage };
+    }
 }
 
 // Get SMS statistics
 export async function getSMSStats() {
     await requireAdmin();
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-    const thisMonth = new Date();
-    thisMonth.setDate(1);
-    thisMonth.setHours(0, 0, 0, 0);
+        const thisMonth = new Date();
+        thisMonth.setDate(1);
+        thisMonth.setHours(0, 0, 0, 0);
 
-    const [todayCount, monthCount, totalSegments, failedCount] = await Promise.all([
-        prisma.sMSLog.count({
-            where: { createdAt: { gte: today } },
-        }),
-        prisma.sMSLog.count({
-            where: { createdAt: { gte: thisMonth } },
-        }),
-        prisma.sMSLog.aggregate({
-            _sum: { segments: true },
-            where: { createdAt: { gte: thisMonth } },
-        }),
-        prisma.sMSLog.count({
-            where: { status: "failed", createdAt: { gte: thisMonth } },
-        }),
-    ]);
+        const [todayCount, monthCount, totalSegments, failedCount] = await Promise.all([
+            prisma.sMSLog.count({
+                where: { createdAt: { gte: today } },
+            }),
+            prisma.sMSLog.count({
+                where: { createdAt: { gte: thisMonth } },
+            }),
+            prisma.sMSLog.aggregate({
+                _sum: { segments: true },
+                where: { createdAt: { gte: thisMonth } },
+            }),
+            prisma.sMSLog.count({
+                where: { status: "failed", createdAt: { gte: thisMonth } },
+            }),
+        ]);
 
-    const estimatedCost = (totalSegments._sum.segments || 0) * 0.0079;
+        const estimatedCost = (totalSegments._sum.segments || 0) * 0.0079;
 
-    return {
-        todayCount,
-        monthCount,
-        totalSegments: totalSegments._sum.segments || 0,
-        failedCount,
-        estimatedCost: estimatedCost.toFixed(2),
-    };
+        return {
+            success: true,
+            data: {
+                todayCount,
+                monthCount,
+                totalSegments: totalSegments._sum.segments || 0,
+                failedCount,
+                estimatedCost: estimatedCost.toFixed(2),
+            },
+        };
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        console.error("getSMSStats error:", errorMessage);
+        return { success: false, error: errorMessage };
+    }
 }
 
 // Validate E.164 phone number format
@@ -416,43 +431,49 @@ export async function getConversations(options?: {
     const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 100));
     const safeOffset = Math.max(0, Number(offset) || 0);
 
-    // Get distinct conversation phones with the latest message
-    const conversations = await prisma.$queryRaw<
-        Array<{
-            conversationPhone: string;
-            lastMessage: string;
-            lastMessageAt: Date;
-            messageCount: bigint;
-            unreadCount: bigint;
-        }>
-    >`
-        SELECT
-            "conversationPhone",
-            (SELECT message FROM "SMSLog" s2 WHERE s2."conversationPhone" = s1."conversationPhone" ORDER BY "createdAt" DESC LIMIT 1) as "lastMessage",
-            MAX("createdAt") as "lastMessageAt",
-            COUNT(*) as "messageCount",
-            COUNT(*) FILTER (WHERE direction = 'INBOUND' AND status = 'received') as "unreadCount"
-        FROM "SMSLog" s1
-        WHERE "conversationPhone" IS NOT NULL
-        GROUP BY "conversationPhone"
-        ORDER BY MAX("createdAt") DESC
-        LIMIT ${safeLimit}
-        OFFSET ${safeOffset}
-    `;
+    try {
+        // Get distinct conversation phones with the latest message
+        const conversations = await prisma.$queryRaw<
+            Array<{
+                conversationPhone: string;
+                lastMessage: string;
+                lastMessageAt: Date;
+                messageCount: bigint;
+                unreadCount: bigint;
+            }>
+        >`
+            SELECT
+                "conversationPhone",
+                (SELECT message FROM "SMSLog" s2 WHERE s2."conversationPhone" = s1."conversationPhone" ORDER BY "createdAt" DESC LIMIT 1) as "lastMessage",
+                MAX("createdAt") as "lastMessageAt",
+                COUNT(*) as "messageCount",
+                COUNT(*) FILTER (WHERE direction = 'INBOUND' AND status = 'received') as "unreadCount"
+            FROM "SMSLog" s1
+            WHERE "conversationPhone" IS NOT NULL
+            GROUP BY "conversationPhone"
+            ORDER BY MAX("createdAt") DESC
+            LIMIT ${safeLimit}
+            OFFSET ${safeOffset}
+        `;
 
-    // Convert BigInt to number for JSON serialization
-    const formattedConversations = conversations.map(conv => ({
-        ...conv,
-        messageCount: Number(conv.messageCount),
-        unreadCount: Number(conv.unreadCount),
-    }));
+        // Convert BigInt to number for JSON serialization
+        const formattedConversations = conversations.map(conv => ({
+            ...conv,
+            messageCount: Number(conv.messageCount),
+            unreadCount: Number(conv.unreadCount),
+        }));
 
-    const total = await prisma.sMSLog.groupBy({
-        by: ["conversationPhone"],
-        where: { conversationPhone: { not: null } },
-    });
+        const total = await prisma.sMSLog.groupBy({
+            by: ["conversationPhone"],
+            where: { conversationPhone: { not: null } },
+        });
 
-    return { conversations: formattedConversations, total: total.length };
+        return { success: true, data: { conversations: formattedConversations, total: total.length } };
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        console.error("getConversations error:", errorMessage);
+        return { success: false, error: errorMessage };
+    }
 }
 
 // Get messages for a specific conversation (by phone number)
@@ -464,26 +485,33 @@ export async function getConversationMessages(
 
     const { limit = 100, offset = 0 } = options || {};
 
-    // Normalize the phone number
-    const normalizedPhone = formatPhoneNumber(phoneNumber);
+    try {
+        // Normalize the phone number
+        const normalizedPhone = formatPhoneNumber(phoneNumber);
 
-    const messages = await prisma.sMSLog.findMany({
-        where: {
-            conversationPhone: normalizedPhone,
-        },
-        orderBy: { createdAt: "asc" },
-        take: limit,
-        skip: offset,
-        include: {
-            sentBy: { select: { id: true, name: true } },
-        },
-    });
+        const [messages, total] = await Promise.all([
+            prisma.sMSLog.findMany({
+                where: {
+                    conversationPhone: normalizedPhone,
+                },
+                orderBy: { createdAt: "asc" },
+                take: limit,
+                skip: offset,
+                include: {
+                    sentBy: { select: { id: true, name: true } },
+                },
+            }),
+            prisma.sMSLog.count({
+                where: { conversationPhone: normalizedPhone },
+            }),
+        ]);
 
-    const total = await prisma.sMSLog.count({
-        where: { conversationPhone: normalizedPhone },
-    });
-
-    return { messages, total };
+        return { success: true, data: { messages, total } };
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        console.error("getConversationMessages error:", errorMessage);
+        return { success: false, error: errorMessage };
+    }
 }
 
 // Send SMS within a conversation (for the chat UI)

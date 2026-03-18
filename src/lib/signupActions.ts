@@ -182,30 +182,42 @@ export async function rejectUser(
 /**
  * Get all pending user registrations
  */
-export async function getPendingUsers() {
-    return prisma.user.findMany({
-        where: {
-            approvalStatus: "PENDING",
-        },
-        select: {
-            id: true,
-            name: true,
-            email: true,
-            createdAt: true,
-        },
-        orderBy: {
-            createdAt: "desc",
-        },
-    });
+export async function getPendingUsers(): Promise<{ success: boolean; data?: { id: string; name: string | null; email: string | null; createdAt: Date }[]; error?: string }> {
+    try {
+        const users = await prisma.user.findMany({
+            where: {
+                approvalStatus: "PENDING",
+            },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                createdAt: true,
+            },
+            orderBy: {
+                createdAt: "desc",
+            },
+        });
+        return { success: true, data: users };
+    } catch (error) {
+        console.error("Get pending users error:", error);
+        return { success: false, error: "Failed to fetch pending users" };
+    }
 }
 
 /**
  * Get count of pending registrations
  */
-export async function getPendingUserCount(): Promise<number> {
-    return prisma.user.count({
-        where: {
-            approvalStatus: "PENDING",
-        },
-    });
+export async function getPendingUserCount(): Promise<{ success: boolean; data?: number; error?: string }> {
+    try {
+        const count = await prisma.user.count({
+            where: {
+                approvalStatus: "PENDING",
+            },
+        });
+        return { success: true, data: count };
+    } catch (error) {
+        console.error("Get pending user count error:", error);
+        return { success: false, error: "Failed to fetch pending user count" };
+    }
 }

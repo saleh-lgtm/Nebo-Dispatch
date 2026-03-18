@@ -16,9 +16,11 @@ export default async function SchedulerPage() {
         redirect("/dashboard");
     }
 
-    const dispatchers = await getDispatchers();
+    const dispatchersResult = await getDispatchers();
+    const dispatchers = dispatchersResult.data ?? [];
     const currentWeekStart = getWeekStart(new Date());
-    const weekData = await getWeekSchedules(currentWeekStart);
+    const weekResult = await getWeekSchedules(currentWeekStart);
+    const weekData = weekResult.data ?? { schedules: [], isPublished: false };
 
     return (
         <SchedulerWrapper

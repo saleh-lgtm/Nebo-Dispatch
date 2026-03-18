@@ -34,10 +34,13 @@ export default async function SMSPage() {
     }
 
     // Fetch initial data
-    const [historyData, stats] = await Promise.all([
+    const [historyResult, statsResult] = await Promise.all([
         getSMSHistory({ limit: 50 }),
         getSMSStats(),
     ]);
+
+    const historyData = historyResult.data ?? { logs: [], total: 0 };
+    const stats = statsResult.data ?? { todayCount: 0, monthCount: 0, totalSegments: 0, failedCount: 0, estimatedCost: "0.00" };
 
     return (
         <SMSClient

@@ -98,21 +98,23 @@ export default function SMSClient({ initialLogs, totalLogs, initialStats }: Prop
 
     const refreshData = () => {
         startTransition(async () => {
-            const [historyData, newStats] = await Promise.all([
+            const [historyResult, statsResult] = await Promise.all([
                 getSMSHistory({ limit: LIMIT, offset: page * LIMIT, status: statusFilter || undefined }),
                 getSMSStats(),
             ]);
+            const historyData = historyResult.data ?? { logs: [], total: 0 };
             setLogs(historyData.logs as unknown as SMSLog[]);
             setTotal(historyData.total);
-            setStats(newStats);
+            if (statsResult.data) setStats(statsResult.data);
         });
     };
 
     const loadConversations = useCallback(async () => {
         setIsLoadingConversations(true);
         try {
-            const data = await getConversations({ limit: 50 });
-            setConversations(data.conversations as Conversation[]);
+            const result = await getConversations({ limit: 50 });
+            if (!result.success) throw new Error(result.error);
+            setConversations(result.data!.conversations as Conversation[]);
         } catch (error) {
             console.error("Failed to load conversations:", error);
         } finally {
@@ -123,8 +125,9 @@ export default function SMSClient({ initialLogs, totalLogs, initialStats }: Prop
     const loadConversationMessages = useCallback(async (phone: string) => {
         setIsLoadingMessages(true);
         try {
-            const data = await getConversationMessages(phone, { limit: 100 });
-            setConversationMessages(data.messages as unknown as SMSLog[]);
+            const result = await getConversationMessages(phone, { limit: 100 });
+            if (!result.success) throw new Error(result.error);
+            setConversationMessages(result.data!.messages as unknown as SMSLog[]);
         } catch (error) {
             console.error("Failed to load messages:", error);
         } finally {
@@ -163,11 +166,12 @@ export default function SMSClient({ initialLogs, totalLogs, initialStats }: Prop
         setStatusFilter(newStatus);
         setPage(0);
         startTransition(async () => {
-            const historyData = await getSMSHistory({
+            const historyResult = await getSMSHistory({
                 limit: LIMIT,
                 offset: 0,
                 status: newStatus || undefined,
             });
+            const historyData = historyResult.data ?? { logs: [], total: 0 };
             setLogs(historyData.logs as unknown as SMSLog[]);
             setTotal(historyData.total);
         });
@@ -176,11 +180,12 @@ export default function SMSClient({ initialLogs, totalLogs, initialStats }: Prop
     const handlePageChange = (newPage: number) => {
         setPage(newPage);
         startTransition(async () => {
-            const historyData = await getSMSHistory({
+            const historyResult = await getSMSHistory({
                 limit: LIMIT,
                 offset: newPage * LIMIT,
                 status: statusFilter || undefined,
             });
+            const historyData = historyResult.data ?? { logs: [], total: 0 };
             setLogs(historyData.logs as unknown as SMSLog[]);
             setTotal(historyData.total);
         });
